@@ -19,7 +19,7 @@ def dh1():
                     ['s3','c3','0'],
                     ['0','0','1']
                     ])
-                    
+
     t2_1=np.array([['c2','-s2','0','a1'],
                     ['0','0','1','0'],
                     ['-s2','-c2','0','0'],
@@ -44,7 +44,7 @@ def dh1():
     #Tn_0=T1_0@T2_1@T3_2@...Tn_n-1
     #i=4
 
-    print('T6_1:', t2_1*t3_2)
+    print('T6_1:', T1_0*T2_1)
 
 dh1()
 
@@ -59,6 +59,7 @@ def dh():
     #i=4
 
     #print('T1_0', Ti_i_1)
+    '''
     T=[]
     for i in range(1, 7):
         Ti_i_1=np.array([[c[i], neg_s[i], 0, ai_1[i]],
@@ -72,8 +73,8 @@ def dh():
         print(T[i-1])
 
     print('T6_0:', T[0]@T[1]@T[2]@T[3]@T[4]@T[5])
-
-#dh()
+    '''
+dh()
 
 def fk_3axes(l1, l2, l3, q1, q2, q3):
     x = l1 * cos(q1) + l2 * cos(q1 + q2) + l3 * cos(q1 + q2 + q3)

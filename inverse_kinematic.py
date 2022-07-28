@@ -1,11 +1,36 @@
-from math import atan2, cos, sin
-from cmath import acos, atan, pi, sqrt
+from math import atan2
+from cmath import cos, sin, acos, atan, pi, sqrt
 from pickletools import long4
 import numpy as np
 
+'''
+ https://www.onlinemathlearning.com/trig-equations-type.html
+    I) acos(q)-bsin(q)=c => acos(q)-bsin(q)=r*cos(q+alp)
+        r=sqrt(a**2+b**2)
+        alp=atan2(b,a)
+        r*cos(q+alp)=c
+        qNalp=acos(c/r)
+        tow solutions for q:
+            1) q=qNalp-alp
+            2) q=360-qNalp-alp
+
+    II) asin(q)-bcos(q)=r*sin(q-alp)
+'''
+def trig_equ(a, b, c):
+    r=np.sqrt(a**2+b**2)
+    alp=atan2(b,a)
+    #r*cos(q+alp)=c
+    # or 360-
+    qNalp1=acos(c/r)
+    qNalp2=2*pi - qNalp1
+    q3_1=qNalp1-alp
+    q3_2=qNalp2-alp
+    print(q3_1*180/pi, q3_2*180/pi)
+    return (q3_1, q3_2)
+
 #https://www.coursera.org/learn/robotics1/lecture/bNQfV/4-3-piepers-solution-1
 def ik_pieper():
-    np.set_printoptions(precision=3, suppress=True)
+    np.set_printoptions(precision=2, suppress=True)
     """
     P4_3_org is 4th col of T4_3 (i代4到Ti_i-1 的dh formular)
     [x,y,z,1]=P4_0_org = T1_0@T2_1@T3_2@P4_3_org
@@ -45,7 +70,7 @@ def ik_pieper():
 
     further more
     let g to be the func of q2 and q3
-    p4_0_org = p6_0_org = goal
+    p4_0_org = p6_0_org = goal coz frame4,5&6 all located at the point of intersection.
     P4_0_org=T1_0@T2_1@[f1]=T1_0@[g(q2,q3)]=np.array([[cos(q1), -sin(q1), 0,0],
                                                       [sin(q1),  cos(q1), 0,0],
                                                       [0,0,1,0],
@@ -57,6 +82,8 @@ def ik_pieper():
                                                         [s1g1(q2,q3)+c1g2(q2,q3)],
                                                         [g3(q2,q3)],
                                                         [1])
+    # see above, g3 is the z coord of P4_0_org and independent of q1.
+
     t2_1=np.array([[c2,-s2,0,a1],
                     [0,0,1,0],
                     [-s2,-c2,0,0],
@@ -66,7 +93,6 @@ def ik_pieper():
                     [0,0,1,0],
                     [0,0,0,1]])
     g=T2_1@f= T2_1@T3_2@P4_3_org, hence:
-
 
     t6_0=Tcup_0@np.lialg_inv(Tcup_6)
 
@@ -80,6 +106,7 @@ def ik_pieper():
     find, g1(q2,q3)=340c2-40c23-338s23-30=435.79=>
     g1=-40c23-338s23+340c2=465.79   Eq1
     g3=40s23-338c23-340s2=188.6     Eq2
+    (a+b+c)**2=a**2+b**2+c**2+2ab+2bc+2ca
     Eq1**2+Eq2**2=Eq3
     40**2+338**2+340**2(40)(340)(-c3)+2(338)(340)(-s3)=252530
     q3=-11.98 or 178.48
@@ -89,7 +116,7 @@ def ik_pieper():
     g1(q2,q3)=c2f1(q3)-s2f2(q3)+a1
     g2(q2,q3)=s2c(alpah1)f1(q3)+c2c(alpah1)f2(q3)-s(alpha1)f3(q3)-d2s(alpha1)
     g3(q2,q3)=s2s(alpha1)f1(q3)+c2s(alpha1)f2(q3)+c(alpah1)f3(q3)+d2c(alpah1)
-
+    # r=distance from org of frames 0&1 to orgins of frames 4,5&6
     r=x**2+y**2+z**2=g1**2+g2**2+g3**2 (coz T1_0 = Identity matrix)
     =f1**2+f2**2+f3**2+a1**2+d2**2+2d2*f3+2*a1(c2f1-s2f2)
     =(k1c2+k2s2)a1+k3
@@ -219,20 +246,8 @@ def ik_pieper():
                                         [0],
                                         [40s23,-338c23-340s2],
                                         [1],)
-
-
     '''
 
-    alp0=0
-    alp1=-90
-    alp2=0
-    alp3=-90
-    a1=-30
-    a2=340
-    a3=-40
-    d2=0
-    d3=0
-    d4=338
     #f1= a2*cos(q3)+d4*sin(alp3)*sin(q3)+a2
     #f2=a3*sin(q3)*cos(alp2)-d4*sin(alp3)*cos(alp2)*cos(q3)-d4*sin(alp2)*cos(alp3)-d3*sin(alp2)
     #f3=a3*sin(q3)*sin(alp2)-d4*sin(alp3)*sin(alp2)*cos(q3)+d4*cos(alp2)*cos(alp3)+d3*cos(alp2)
@@ -241,7 +256,53 @@ def ik_pieper():
     #r2=f1**2+f2**2+f3**2+a1**2+d2**2+2*d2*f3
     #f1=340c3-338s3+340
     #f2=-40s3+338c3
-    f3=0
+
+    alp0=alp2=0
+    alp1=alp3=-90
+    a1=-30
+    a2=340
+    a3=-40
+    d2=d3=0
+    d4=338
+    x=t6_0[0,3]
+    y=t6_0[1,3]
+    z=t6_0[2,3]
+    q1 = atan2(y, x)
+    print('q1', np.rad2deg(q1))
+    # eq1**2+eq2**2=eq3**2 (use 積化合差法 gets asin(x)+bcos(x)=c)
+    #c=(252530-40**2-338**2-340**2)/(2*340)
+    
+    c=((sqrt(x**2+y**2)-a1)**2+z**2-a3**2-d4**2-a2**2)/(2*a2)
+    a=a3
+    b=d4
+    # 2 solutions
+    q3=trig_equ(a,b,c)
+    # g3=40s23-338c23-340s2=188.6     Eq2   to solve q2
+    # 40(s2c3+c2s3)-338(c2c3+s2s3)-340s2=188.6
+    c3=cos(q3[0])
+    s3=sin(q3[0])
+    print('c3,s3', c3, s3)
+    #188.6=40(0.98s2+c2(-0.21))-338(c2(0.98)+s2(-0.21))
+    #39.2s2-8.4c2-331c2+71s2
+    #-230s2-339.4c2=118.6=>-339.4c2-230s2=118.6
+    sol_q2= trig_equ(-339.4, 230, 118.6)
+
+    '''
+    i end up not using this formular
+    u=tan(q/2), c(q)=1-u**2/1+u**2, s(q)=2u/1+u**2
+    #acos+bsin=c
+    a*(1-u**2/1+u**2)+b*(2u/1+u**2)=c
+    multiply 1+u**2 at both ends
+    a*(1-u**2)+b*2u=c*(1+u**2)
+    a-a*u**2+b*2u=c+c*u**2
+    c-a+(c+a)u**2-b*2u=0
+    tan(q3/2)=(2*b)+/-sqrt(2b**2-4ac)/2(c+a)
+    '''
+    #q3= 2*atan((2*b)+sqrt(2*b**2-4*a*c)/2*(c+a))
+
+    #q3=2*atan((b+sqrt(b**2-a**2-c**2))/(a+c))
+    #q3=2*atan(sqrt(a**2+b**2+c**2)/c)+atan2(b,a)
+    #print('q3', q3*180/pi)
     return (t6_0[0:3, 0:3])
 
 r6_0= ik_pieper()
@@ -317,6 +378,7 @@ def ik_part3_a(l1, l2, l3,l4, x, y, z):
 #print(ik_part3_a(0,-30,340,-40, 227,472,188.6))
 
 # q4,q5, q6
+# refer to must read UCLA ik.pdf for r6_3 )
 # https://univ.deltamoocx.net/courses/course-v1:AT+AT_010_1102+2022_02_01/courseware/a3e573de127b85f1dcb23ea797cd253f/dc947a72e470ca516e9270c3bb4424e1/?child=first
 def ik_part4(r6_0, q1,q2,q3):
     np.set_printoptions(precision=3, suppress=True)
