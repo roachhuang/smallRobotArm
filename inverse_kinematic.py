@@ -16,6 +16,7 @@ import numpy as np
 
     II) asin(q)-bcos(q)=r*sin(q-alp)
 '''
+# a- cos' param, b for sin
 def trig_equ(a, b, c):
     r=np.sqrt(a**2+b**2)
     alp=atan2(b,a)
@@ -88,7 +89,7 @@ def ik_pieper():
                     [0,0,1,0],
                     [-s2,-c2,0,0],
                     [0,0,0,1]])
-    t3_2= t3_2=np.array([[c3,-s3,0,a2],
+    t3_2=np.array([[c3,-s3,0,a2],
                     [s3,c3,0,0],
                     [0,0,1,0],
                     [0,0,0,1]])
@@ -271,21 +272,21 @@ def ik_pieper():
     print('q1', np.rad2deg(q1))
     # eq1**2+eq2**2=eq3**2 (use 積化合差法 gets asin(x)+bcos(x)=c)
     #c=(252530-40**2-338**2-340**2)/(2*340)
-    
+
     c=((sqrt(x**2+y**2)-a1)**2+z**2-a3**2-d4**2-a2**2)/(2*a2)
     a=a3
     b=d4
     # 2 solutions
     q3=trig_equ(a,b,c)
     # g3=40s23-338c23-340s2=188.6     Eq2   to solve q2
-    # 40(s2c3+c2s3)-338(c2c3+s2s3)-340s2=188.6
+    # 40(s2c3+c2s3)-338(c2c3-s2s3)-340s2=188.6
     c3=cos(q3[0])
     s3=sin(q3[0])
-    print('c3,s3', c3, s3)
-    #188.6=40(0.98s2+c2(-0.21))-338(c2(0.98)+s2(-0.21))
+    # print('c3,s3', c3, s3)
+    #188.6=40(0.98s2+c2(-0.21))-338(c2(0.98)-s2(-0.21))-340s2
     #39.2s2-8.4c2-331c2+71s2
     #-230s2-339.4c2=118.6=>-339.4c2-230s2=118.6
-    sol_q2= trig_equ(-339.4, 230, 118.6)
+    sol_q2= trig_equ(-339, 371, 118.6)
 
     '''
     i end up not using this formular
