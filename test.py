@@ -1,9 +1,10 @@
 
 from cmath import acos, pi
 from math import atan2
-from sympy import Symbol, solve, sin, cos, simplify, symbols
+from sympy import Symbol, init_printing, solve, sin, cos, symbols, trigsimp
 import numpy as np
 
+init_printing(use_unicode=True)
 np.set_printoptions(precision=2, suppress=True)
 a1 = -30
 print((227)**2 + (372)**2 + 188.6**2 + 2 * (227 + 372) * 30 + 30**2)
@@ -28,18 +29,23 @@ s3=sin(q1)
 x=Symbol('x')
 expr=(40*(sin(x)*c3+cos(x)*s3)-338*(cos(x)*c3-sin(x)*s3)-340*sin(x)-188.6)
 sol=solve(expr, x)
-#print(expr)
-#print(sol[0]*180/pi, 180-sol[1]*180/pi)
+print(expr)
+print('q2:', sol[0]*180/pi, 180-sol[1]*180/pi)
 
 q2, q3=symbols('q2, q3')
-expr1=-40*cos(q2+q3).expand(trig=True)-338*sin(q2+q3).expand(trig=True)+340*cos(q2)-465.79
-print('expr1:', expr1)
-#expr2=40*sin(q2+q3).expand(trig=True)-338*cos(q2+q3).expand(trig=True)-340*sin(q2)-188.6
-#q = solve(expr1**2+expr2**2, q3)
-#print(q)
+expr1=trigsimp(-40*cos(q2+q3)-338*sin(q2+q3)+340*cos(q2)-465.79)
+#print('expr1:', expr1)
+expr2=trigsimp(40*sin(q2+q3)-338*cos(q2+q3)-340*sin(q2)-188.6)
+#print('my', trigsimp(expr1**2+expr2**2))
+#s= TR8(expr1**2+expr2**2)
+#print(s)
+#q = solve((expr1**2+expr2**2), q3)
+#print('q3:', q)
 
+# ti_i-1
 def get_ti2i_1(i):
     np.set_printoptions(precision=2, suppress=True)
+    # fill in dh tbl wrt robot arms' dh params
     dh_tbl=np.array([[0,0,0],
                     [np.deg2rad(-90), -30, 0],
                     [0, 340, 0],
@@ -55,8 +61,6 @@ def get_ti2i_1(i):
                     [si*round(sin(alp),2), ci*round(sin(alp),2), round(cos(alp)), round(cos(alp)*di)],
                     [0,0,0,1]
                     ])
-
-    np.set_printoptions(precision=2, suppress=True)
     print(t)
     return(t)
 
@@ -70,6 +74,10 @@ def dh():
 
     t2_1= get_ti2i_1(2)
     t3_2= get_ti2i_1(3)
-    print('p4_0_org:', t2_1@t3_2@p4_3_org)
+
+    p4_0_org= t2_1@t3_2@p4_3_org
+    g1=p4_0_org[0]
+    g3=p4_0_org[2]
+    print(g3)
 
 dh()

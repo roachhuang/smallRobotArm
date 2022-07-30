@@ -1,6 +1,5 @@
 from math import atan2
 from cmath import cos, sin, acos, atan, pi, sqrt
-from pickletools import long4
 import numpy as np
 
 '''
@@ -16,17 +15,18 @@ import numpy as np
 
     II) asin(q)-bcos(q)=r*sin(q-alp)
 '''
+
 # a- cos' param, b for sin
 def trig_equ(a, b, c):
-    r=np.sqrt(a**2+b**2)
-    alp=atan2(b,a)
+    r = np.sqrt(a**2 + b**2)
+    alp = atan2(b, a)
     #r*cos(q+alp)=c
     # or 360-
-    qNalp1=acos(c/r)
-    qNalp2=2*pi - qNalp1
-    q3_1=qNalp1-alp
-    q3_2=qNalp2-alp
-    print(q3_1*180/pi, q3_2*180/pi)
+    qNalp1 = acos(c / r)
+    qNalp2 = 2 * pi - qNalp1
+    q3_1 = qNalp1 - alp
+    q3_2 = qNalp2 - alp
+    print(q3_1 * 180 / pi, q3_2 * 180 / pi)
     return (q3_1, q3_2)
 
 #https://www.coursera.org/learn/robotics1/lecture/bNQfV/4-3-piepers-solution-1
@@ -57,10 +57,10 @@ def ik_pieper():
     f3(q3)=a3*s(alpha2)s3-d4*s(alpha3)*s(alpha2)*c3+d4*c(alpha2)*c(alpah3)+d3*c(alpha2)
     g(q2)=T2_1@f(q3)
     """
-    a2=340
+    a2 = 340
     #q3=0
-    d3=0
-    alpha2=np.deg2rad(-90)
+    d3 = 0
+    alpha2 = np.deg2rad(-90)
     # i=3 to the dh Ti_i-1 formular
     """
     T3_2=np.array([[cos(q3), -sin(q3), 0, a2],
@@ -158,41 +158,30 @@ def ik_pieper():
     using x=c1g1(q2,q3)-s1g2(q2,q3) to slove q1
     """
     #see fig on p3. it is fixed
-    Td_w=np.array([[1,0,0,830],
-                   [0,1,0,20],
-                   [0,0,1,330],
-                   [0,0,0,1]])
-    tz=np.deg2rad(35)
-    # not fixed. according to the cup's current positon. can be compute by camera input data
-    # this is use at init state. ie. 0s
-    tc_d=np.array([[cos(tz), -sin(tz), 0, -280],
-                   [sin(tz), cos(tz),  0, 250],
-                   [0,       0,        1, 62.5],
-                   [0,       0,        0, 1]])
+    Td_w = np.array([[1, 0, 0, 830], [0, 1, 0, 20], [0, 0, 1, 330],
+                     [0, 0, 0, 1]])
+    tz = np.deg2rad(35)
+    # not fixed. according to the cup's current positon. can be compute by camera input
+    # this is use at only init state. ie. 0s
+    tc_d = np.array([[cos(tz), -sin(tz), 0, -280],
+                    [sin(tz),   cos(tz), 0, 250],
+                     [0, 0, 1, 62.5], [0, 0, 0, 1]])
 
     # see p2 & p7, tc_w=T0_w@t6_0@Tc_6
-    tc_w=Td_w@tc_d
+    tc_w = Td_w @ tc_d
     #print('tc_w', tc_w)
-    T0_w=np.array([[1,0,0, 0],
-                   [0,1,0, 0],
-                   [0,0,1, 373],
-                   [0,0,0, 1]])
+    T0_w = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 373], [0, 0, 0, 1]])
     # see p7
-    Tcup_6=np.array([[0, 0, 1, 0],
-                     [0,-1, 0, 0],
-                     [1, 0, 0, 206],
-                     [0, 0, 0, 1]])
+    Tcup_6 = np.array([[0, 0, 1, 0], [0, -1, 0, 0], [1, 0, 0, 206],
+                       [0, 0, 0, 1]])
 
-    tz=np.deg2rad(35)
-    tcup_0_0s=np.array([[cos(tz), -sin(tz), 0, 550],
-                    [sin(tz), cos(tz), 0, 270],
-                    [0, 0, 1, 19.5],
-                    [0,0,0,1]])
-    ty=np.deg2rad(-60)
-    tcup_0_2s=np.array([[cos(ty),  0, sin(ty),  330],
-                        [0,        1, 0,        372],
-                        [-sin(ty), 0, cos(ty),  367],
-                        [0,        0, 0,        1]])
+    tz = np.deg2rad(35)
+    tcup_0_0s = np.array([[cos(tz), -sin(tz), 0, 550],
+                          [sin(tz), cos(tz), 0, 270], [0, 0, 1, 19.5],
+                          [0, 0, 0, 1]])
+    ty = np.deg2rad(-60)
+    tcup_0_2s = np.array([[cos(ty), 0, sin(ty), 330], [0, 1, 0, 372],
+                          [-sin(ty), 0, cos(ty), 367], [0, 0, 0, 1]])
 
     #t6-0 contains q1~q6
     #print('tc0@0s', tc_0_0s)
@@ -201,17 +190,14 @@ def ik_pieper():
     #t6_0=np.linalg.inv(T0_w)@tc_w@np.linalg.inv(Tcup_6)
 
     #t6_0=tcup_0_0s@Tcup_6
-    t6_0= tcup_0_2s@np.linalg.inv(Tcup_6)
+    t6_0 = tcup_0_2s @ np.linalg.inv(Tcup_6)
     print('t6_0', t6_0)
 
-     #i 帶入4 dh craig formular
-    a3=-40
-    d4=338
-    alpha3=np.deg2rad(-90)
-    p4_3_org = np.array([[a3],
-                        [-d4*sin(alpha3)],
-                        [d4*cos(alpha3)],
-                        [1]])
+    #i 帶入4 dh craig formular
+    a3 = -40
+    d4 = 338
+    alpha3 = np.deg2rad(-90)
+    p4_3_org = np.array([[a3], [-d4 * sin(alpha3)], [d4 * cos(alpha3)], [1]])
     print('p4_3', p4_3_org)
     '''
     [x,y,z,1]=p4_0_org = T1_0@T2_1@T3_2@P4_3_org
@@ -258,36 +244,35 @@ def ik_pieper():
     #f1=340c3-338s3+340
     #f2=-40s3+338c3
 
-    alp0=alp2=0
-    alp1=alp3=-90
-    a1=-30
-    a2=340
-    a3=-40
-    d2=d3=0
-    d4=338
-    x=t6_0[0,3]
-    y=t6_0[1,3]
-    z=t6_0[2,3]
+    alp0 = alp2 = 0
+    alp1 = alp3 = -90
+    a1 = -30
+    a2 = 340
+    a3 = -40
+    d2 = d3 = 0
+    d4 = 338
+    x = t6_0[0, 3]
+    y = t6_0[1, 3]
+    z = t6_0[2, 3]
     q1 = atan2(y, x)
     print('q1', np.rad2deg(q1))
     # eq1**2+eq2**2=eq3**2 (use 積化合差法 gets asin(x)+bcos(x)=c)
     #c=(252530-40**2-338**2-340**2)/(2*340)
 
-    c=((sqrt(x**2+y**2)-a1)**2+z**2-a3**2-d4**2-a2**2)/(2*a2)
-    a=a3
-    b=d4
+    c = ((sqrt(x**2 + y**2) - a1)**2 + z**2 - a3**2 - d4**2 - a2**2) / (2 * a2)
+    a = a3
+    b = d4
     # 2 solutions
-    q3=trig_equ(a,b,c)
+    q3 = trig_equ(a, b, c)
     # g3=40s23-338c23-340s2=188.6     Eq2   to solve q2
     # 40(s2c3+c2s3)-338(c2c3-s2s3)-340s2=188.6
-    c3=cos(q3[0])
-    s3=sin(q3[0])
+    c3 = cos(q3[0])
+    s3 = sin(q3[0])
     # print('c3,s3', c3, s3)
     #188.6=40(0.98s2+c2(-0.21))-338(c2(0.98)-s2(-0.21))-340s2
     #39.2s2-8.4c2-331c2+71s2
     #-230s2-339.4c2=118.6=>-339.4c2-230s2=118.6
-    sol_q2= trig_equ(-339, 371, 118.6)
-
+    sol_q2 = trig_equ(-339, 371, 118.6)
     '''
     i end up not using this formular
     u=tan(q/2), c(q)=1-u**2/1+u**2, s(q)=2u/1+u**2
@@ -306,10 +291,11 @@ def ik_pieper():
     #print('q3', q3*180/pi)
     return (t6_0[0:3, 0:3])
 
-r6_0= ik_pieper()
 
-def ik_ntu(l1,l2,l3, x,y,z):
+r6_0 = ik_pieper()
 
+
+def ik_ntu(l1, l2, l3, x, y, z):
     """
     https://www.coursera.org/learn/robotics1/lecture/Q7ftE/4-2-duo-zhong-jie-3-example-2
     for dh table see https://www.coursera.org/learn/robotics1/lecture/tvNZN/3-6-dh-biao-da-fa-xiao-jie-2-example
@@ -342,20 +328,21 @@ def ik_ntu(l1,l2,l3, x,y,z):
         q3= phi-q1-q2
     """
 
+
 # https://univ.deltamoocx.net/courses/course-v1:AT+AT_010_1102+2022_02_01/courseware/a3e573de127b85f1dcb23ea797cd253f/ef53e59ae8e7fd326f807b8b49505fe5/1
 # x and y are center coord of the arm
-def ik_part3_a(l1, l2, l3,l4, x, y, z):
-    d1=0
-    s=z-d1
-    r1=sqrt(x**2+y**2)
-    r2=sqrt(x**2+y**2+(z-(l1+l2)**2))
+def ik_part3_a(l1, l2, l3, l4, x, y, z):
+    d1 = 0
+    s = z - d1
+    r1 = sqrt(x**2 + y**2)
+    r2 = sqrt(x**2 + y**2 + (z - (l1 + l2)**2))
     #r2_sq=l3+l4-2*l3*l4*cos(180+q3)=l3**2+l4**2+2*l3*l4*cos(q3)
-    c3=r2**2-(l3**2+l4**2)/2*l3*l4
-    s3=sqrt(1-c3**2)
+    c3 = r2**2 - (l3**2 + l4**2) / 2 * l3 * l4
+    s3 = sqrt(1 - c3**2)
     print('c3,s3:', c3, s3)
     #oc0=np.array([227,472,188.6])
     # coord of arm center 對frame0
-    q1=atan2(y,x)
+    q1 = atan2(y, x)
     #sol 2 (@phase3) -> q1=pi+atan2(x,y)
 
     # cos(q3)=D; cos(pi-q3)=-cos(q3)
@@ -365,23 +352,25 @@ def ik_part3_a(l1, l2, l3,l4, x, y, z):
     # q3 = acos(D) not recommended, coz could be in phase1,3 or 2,4
     # cos**2+sin**2=1 -> sin=+-sqrt(1-cos**2)
     #sol1
-    aty = sqrt(1-D**2)
+    aty = sqrt(1 - D**2)
     #print(D)
-    q3=atan(-aty/D)
+    q3 = atan(-aty / D)
 
-    q2=0
+    q2 = 0
     # q2=alpha-beta
     # r and s are oc 投影到x1, y1 coord. where s=zc-d1(基座高度 or height of joint1)
 
     # q2 = atan2(s,r)-atan(l3*sin(q3)/l2+l3*cos(q3))
-    return (np.rad2deg(q1),q2,q3)
+    return (np.rad2deg(q1), q2, q3)
+
 
 #print(ik_part3_a(0,-30,340,-40, 227,472,188.6))
+
 
 # q4,q5, q6
 # refer to must read UCLA ik.pdf for r6_3 )
 # https://univ.deltamoocx.net/courses/course-v1:AT+AT_010_1102+2022_02_01/courseware/a3e573de127b85f1dcb23ea797cd253f/dc947a72e470ca516e9270c3bb4424e1/?child=first
-def ik_part4(r6_0, q1,q2,q3):
+def ik_part4(r6_0, q1, q2, q3):
     np.set_printoptions(precision=3, suppress=True)
     """
     q4,q5,q6=euler angles phi, theta, psi. see unit5 part3
@@ -400,46 +389,46 @@ def ik_part4(r6_0, q1,q2,q3):
      [s1c23,    -s1s23,  -c1 ],
      [s23,  c23,  0   ])
     """
-    t1=np.deg2rad(q1)
-    t2=np.deg2rad(q2)
-    t3=np.deg2rad(q3)
+    t1 = np.deg2rad(q1)
+    t2 = np.deg2rad(q2)
+    t3 = np.deg2rad(q3)
     # this r3_0 uses standard dh table.
-    r3_0=np.array([[cos(t1)*cos(t2+t3), -cos(t1)*sin(t2+t3), -sin(t1)],
-    [sin(t1)*cos(t2+t3), -sin(t1)*sin(t2+t3), cos(t1)],
-    [-sin(t2+t3), -cos(t2+t3), 0 ]])
+    r3_0 = np.array(
+        [[cos(t1) * cos(t2 + t3), -cos(t1) * sin(t2 + t3), -sin(t1)],
+         [sin(t1) * cos(t2 + t3), -sin(t1) * sin(t2 + t3),
+          cos(t1)], [-sin(t2 + t3), -cos(t2 + t3), 0]])
 
-    R3_0=np.array([[0.6006, 0.7082, -0.3710],
-    [0.24, 0.2830, 0.9286],
-    [0.7627, -0.6468, 0]])
+    R3_0 = np.array([[0.6006, 0.7082, -0.3710], [0.24, 0.2830, 0.9286],
+                     [0.7627, -0.6468, 0]])
     print('r3_0', r3_0)
-    r6_3=np.transpose(r3_0)@r6_0
+    r6_3 = np.transpose(r3_0) @ r6_0
     print('r6-3', r6_3)
     '''
     r6_3=np.array([[c4c5c6-s4s6, -c4c5s6-s4c6, -c4s5],
                 [s5c6, -s5s6, -c5],
                 [-s4c5c6-c4s6, s4c5s6-c4c6, s4s5]])
     '''
-    c4s5=-r6_3[0,2]
-    s4s5=r6_3[2,2]
-    c5=-r6_3[1,2]
-    s5c6=r6_3[1,0]
-    s5s6=-r6_3[1,1]
+    c4s5 = -r6_3[0, 2]
+    s4s5 = r6_3[2, 2]
+    c5 = -r6_3[1, 2]
+    s5c6 = r6_3[1, 0]
+    s5s6 = -r6_3[1, 1]
     print('c5', c5)
     # s5!=0, i.e q5 !=0 or pi, s5=+-sqrt(1-c5**2)
-    q5_1=atan(sqrt(1-c5**2)/c5)
-    print('q5_1:', q5_1*180/pi)
-    q4_1=atan2(s4s5,c4s5)
+    q5_1 = atan(sqrt(1 - c5**2) / c5)
+    print('q5_1:', q5_1 * 180 / pi)
+    q4_1 = atan2(s4s5, c4s5)
     print('q4_1:', np.rad2deg(q4_1))
-    q6_1=atan2(s5s6,s5c6)
+    q6_1 = atan2(s5s6, s5c6)
     print('q6_1', np.rad2deg(q6_1))
 
     # s5 < 0, 0 ~ -pi
-    q5_2 =atan(-sqrt(1-c5**2)/c5)
-    print('q5_2', q5_2*180/pi)
+    q5_2 = atan(-sqrt(1 - c5**2) / c5)
+    print('q5_2', q5_2 * 180 / pi)
     # coz s5 is neg
-    q4_2=atan2(-s4s5,-c4s5)
+    q4_2 = atan2(-s4s5, -c4s5)
     print('q4_2', np.rad2deg(q4_2))
-    q6_2=atan2(-s5s6,-s5c6)
+    q6_2 = atan2(-s5s6, -s5c6)
     print('q6_2', np.rad2deg(q6_2))
 
     #DH6_3 = np.array([[c(q4-q6), sin(q4-q6),0, 0],
@@ -451,18 +440,20 @@ def ik_part4(r6_0, q1,q2,q3):
 
 ik_part4(r6_0, 58.61, -64.46, -11.98)
 
+
 # https://www.youtube.com/watch?v=yHsIn6gA1_8&t=30s
 def ik_delta(l1, l2, l3, x, y, phi):
     # cos(q2)
     D = (x**2 + y**2 - l1**2 - l2**2) / (2 * l1 * l2)
     # q2 = acos(D) not recommended as q2 can be 2 solutions - phase1,3 or 2,4
     #sin(q2)=+-sqrt(1-D**2)
-    q2=atan(sqrt(1-D**2)/D)
+    q2 = atan(sqrt(1 - D**2) / D)
     # or q2=atan2(-sqrt(1-D**2)/D)
 
     # q1 dependent on q2. 有偏差值d, oc 不相交于 z0 axis.
-    q1=atan(y/x)-atan(l2*sin(q2)/l1+l2*cos(q2))
-    print('q1,q2:', q1,q2)
+    q1 = atan(y / x) - atan(l2 * sin(q2) / l1 + l2 * cos(q2))
+    print('q1,q2:', q1, q2)
+
 
 # return q1, q2, q3
 def ik(l1, l2, l3, x, y, phi):
