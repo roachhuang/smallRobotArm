@@ -2,7 +2,16 @@
 from cmath import acos, pi
 from math import atan2
 from sympy import Symbol, init_printing, solve, sin, cos, symbols, trigsimp
+from sympy.simplify.fu import fu, L, TR0, TR10, TR3, TR8, TR9, TR10i, TR11
 import numpy as np
+import craig as cg
+from inverse_kinematic import trig_equ
+
+ty = np.deg2rad(-60)
+tcup_0_2s = np.array([[cos(ty), 0, sin(ty), 330], [0, 1, 0, 372],
+                          [-sin(ty), 0, cos(ty), 367], [0, 0, 0, 1]])
+Tcup_6 = np.array([[0, 0, 1, 0], [0, -1, 0, 0], [1, 0, 0, 206],
+                       [0, 0, 0, 1]])
 
 init_printing(use_unicode=True)
 np.set_printoptions(precision=2, suppress=True)
@@ -43,6 +52,7 @@ expr2=trigsimp(40*sin(q2+q3)-338*cos(q2+q3)-340*sin(q2)-188.6)
 #print('q3:', q)
 
 # ti_i-1
+'''
 def get_ti2i_1(i):
     np.set_printoptions(precision=2, suppress=True)
     # fill in dh tbl wrt robot arms' dh params
@@ -63,21 +73,40 @@ def get_ti2i_1(i):
                     ])
     print(t)
     return(t)
-
-def dh():
+'''
+def getT4_0_org():
     np.set_printoptions(suppress=True)
 
     # (i代4到Ti_i-1 的dh formular)
-    t4_3=get_ti2i_1(4)
+    t4_3=cg.get_ti2i_1(4)
     # returns the 3rd col
     p4_3_org=t4_3[:, 3]
-
-    t2_1= get_ti2i_1(2)
-    t3_2= get_ti2i_1(3)
+    print('p4_3:', p4_3_org)
+    t2_1= cg.get_ti2i_1(2)
+    t3_2= cg.get_ti2i_1(3)
 
     p4_0_org= t2_1@t3_2@p4_3_org
-    g1=p4_0_org[0]
+    # !!!manually adjust +30, find a way to auto it.
+    g1=p4_0_org[0]+30
+    #print('p4_0:', p4_0_org)
+    g2=p4_0_org[1]
+    #print('g2:', g2)
     g3=p4_0_org[2]
-    print(g3)
+    #print('g3:', g3)
+    #q2, q3=symbols('q2, q3')
+    g1=trigsimp(g1)
+    print('trigsimp_g1:', g1)
+    print('trigsimp_g2:', trigsimp(g2))
+    print('trigsimp_g3:', trigsimp(g3))
+    g3=trigsimp(g3)
+    r = trigsimp((g1**2).expand()+(g3**2).expand())
+    #print(((np.sqrt(257**2+372**2))**2+188.6**2))
 
-dh()
+getT4_0_org()
+
+def q2():
+    t2_1=cg.get_ti2i_1(2)
+    t1_0=cg.get_ti2i_1(1)
+    print(t1_0@t2_1)
+
+q2()

@@ -1,6 +1,7 @@
 from math import atan2
 from cmath import cos, sin, acos, atan, pi, sqrt
 import numpy as np
+import craig as cg
 
 '''
  https://www.onlinemathlearning.com/trig-equations-type.html
@@ -26,7 +27,7 @@ def trig_equ(a, b, c):
     qNalp2 = 2 * pi - qNalp1
     q3_1 = qNalp1 - alp
     q3_2 = qNalp2 - alp
-    print(q3_1 * 180 / pi, q3_2 * 180 / pi)
+    print('q3:', q3_1 * 180 / pi, q3_2 * 180 / pi)
     return (q3_1, q3_2)
 
 #https://www.coursera.org/learn/robotics1/lecture/bNQfV/4-3-piepers-solution-1
@@ -160,24 +161,26 @@ def ik_pieper():
     #see fig on p3. it is fixed
     Td_w = np.array([[1, 0, 0, 830], [0, 1, 0, 20], [0, 0, 1, 330],
                      [0, 0, 0, 1]])
-    tz = np.deg2rad(35)
+    tz = np.deg2rad(60)
     # not fixed. according to the cup's current positon. can be compute by camera input
     # this is use at only init state. ie. 0s
-    tc_d = np.array([[cos(tz), -sin(tz), 0, -280],
-                    [sin(tz),   cos(tz), 0, 250],
-                     [0, 0, 1, 62.5], [0, 0, 0, 1]])
+    tc_d = np.array([[cos(tz), -sin(tz), 0, -500],
+                    [sin(tz),   cos(tz), 0, 452],
+                     [0, 0, 1, 410], [0, 0, 0, 1]])
 
     # see p2 & p7, tc_w=T0_w@t6_0@Tc_6
     tc_w = Td_w @ tc_d
-    #print('tc_w', tc_w)
+    print('tc_w', tc_w)
     T0_w = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 373], [0, 0, 0, 1]])
     # see p7
     Tcup_6 = np.array([[0, 0, 1, 0], [0, -1, 0, 0], [1, 0, 0, 206],
                        [0, 0, 0, 1]])
 
+    # see pg6
     tz = np.deg2rad(35)
     tcup_0_0s = np.array([[cos(tz), -sin(tz), 0, 550],
-                          [sin(tz), cos(tz), 0, 270], [0, 0, 1, 19.5],
+                          [sin(tz), cos(tz), 0, 270],
+                          [0, 0, 1, 19.5],
                           [0, 0, 0, 1]])
     ty = np.deg2rad(-60)
     tcup_0_2s = np.array([[cos(ty), 0, sin(ty), 330], [0, 1, 0, 372],
@@ -244,16 +247,19 @@ def ik_pieper():
     #f1=340c3-338s3+340
     #f2=-40s3+338c3
 
-    alp0 = alp2 = 0
-    alp1 = alp3 = -90
-    a1 = -30
-    a2 = 340
-    a3 = -40
-    d2 = d3 = 0
-    d4 = 338
-    x = t6_0[0, 3]
-    y = t6_0[1, 3]
-    z = t6_0[2, 3]
+    #alp0 = alp2 = 0
+    #alp1 = alp3 = -90
+    #a1 = -30
+    #a2 = 340
+    #a3 = -40
+    #d2 = d3 = 0
+    #d4 = 338
+    (alp4, a4, d4)=cg.dh_tbl[4, :]
+    (alp3, a3, d3)=cg.dh_tbl[3, :]
+    (alp2, a2, d2)=cg.dh_tbl[2, :]
+    (alp1, a1, d1)=cg.dh_tbl[1, :]
+
+    (x,y,z)=t6_0[0:3, 3]
     q1 = atan2(y, x)
     print('q1', np.rad2deg(q1))
     # eq1**2+eq2**2=eq3**2 (use 積化合差法 gets asin(x)+bcos(x)=c)
@@ -264,6 +270,7 @@ def ik_pieper():
     b = d4
     # 2 solutions
     q3 = trig_equ(a, b, c)
+    print('q3:', q3)
     # g3=40s23-338c23-340s2=188.6     Eq2   to solve q2
     # 40(s2c3+c2s3)-338(c2c3-s2s3)-340s2=188.6
     c3 = cos(q3[0])
@@ -273,6 +280,7 @@ def ik_pieper():
     #39.2s2-8.4c2-331c2+71s2
     #-230s2-339.4c2=118.6=>-339.4c2-230s2=118.6
     sol_q2 = trig_equ(-339, 371, 118.6)
+    print('q2:', sol_q2)
     '''
     i end up not using this formular
     u=tan(q/2), c(q)=1-u**2/1+u**2, s(q)=2u/1+u**2
