@@ -17,21 +17,19 @@ import craig as cg
     II) asin(q)-bcos(q)=r*sin(q-alp)
 '''
 
-# a- cos' param, b for sin
-def trig_equ(a, b, c):
-    r = np.sqrt(a**2 + b**2)
-    alp = atan2(b, a)
-    #r*cos(q+alp)=c
-    # or 360-
-    qNalp1 = acos(c / r)
-    qNalp2 = 2 * pi - qNalp1
-    q3_1 = qNalp1 - alp
-    q3_2 = qNalp2 - alp
-    print('q3:', q3_1 * 180 / pi, q3_2 * 180 / pi)
-    return (q3_1, q3_2)
+
 
 #https://www.coursera.org/learn/robotics1/lecture/bNQfV/4-3-piepers-solution-1
 def ik_pieper():
+    dh_tbl=np.array([[0,0,0],
+                    [np.deg2rad(-90), -30, 0],
+                    [0, 340, 0],
+                    [np.deg2rad(-90), -40, 338],
+                    [np.deg2rad(90), 0, 0],
+                    [np.deg2rad(-90),0,0]])
+
+    cg.setDhTbl(dh_tbl)
+
     np.set_printoptions(precision=2, suppress=True)
     """
     P4_3_org is 4th col of T4_3 (i代4到Ti_i-1 的dh formular)
@@ -161,12 +159,12 @@ def ik_pieper():
     #see fig on p3. it is fixed
     Td_w = np.array([[1, 0, 0, 830], [0, 1, 0, 20], [0, 0, 1, 330],
                      [0, 0, 0, 1]])
-    tz = np.deg2rad(60)
+    tz = np.deg2rad(35)
     # not fixed. according to the cup's current positon. can be compute by camera input
     # this is use at only init state. ie. 0s
-    tc_d = np.array([[cos(tz), -sin(tz), 0, -500],
-                    [sin(tz),   cos(tz), 0, 452],
-                     [0, 0, 1, 410], [0, 0, 0, 1]])
+    tc_d = np.array([[cos(tz), -sin(tz), 0, 550],
+                    [sin(tz),   cos(tz), 0, 270],
+                     [0, 0, 1, 19.5], [0, 0, 0, 1]])
 
     # see p2 & p7, tc_w=T0_w@t6_0@Tc_6
     tc_w = Td_w @ tc_d
@@ -269,7 +267,7 @@ def ik_pieper():
     a = a3
     b = d4
     # 2 solutions
-    q3 = trig_equ(a, b, c)
+    q3 = cg.trig_equ(a, b, c)
     print('q3:', q3)
     # g3=40s23-338c23-340s2=188.6     Eq2   to solve q2
     # 40(s2c3+c2s3)-338(c2c3-s2s3)-340s2=188.6
@@ -279,7 +277,7 @@ def ik_pieper():
     #188.6=40(0.98s2+c2(-0.21))-338(c2(0.98)-s2(-0.21))-340s2
     #39.2s2-8.4c2-331c2+71s2
     #-230s2-339.4c2=118.6=>-339.4c2-230s2=118.6
-    sol_q2 = trig_equ(-339, 371, 118.6)
+    sol_q2 = cg.trig_equ(-339, 371, 118.6)
     print('q2:', sol_q2)
     '''
     i end up not using this formular
@@ -445,7 +443,7 @@ def ik_part4(r6_0, q1, q2, q3):
     # [0,0,0,1])
     # R6_3=np.transpose(R3_0)@R6_0
 
-
+# get g4~6
 ik_part4(r6_0, 58.61, -64.46, -11.98)
 
 

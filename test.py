@@ -1,13 +1,26 @@
-
+from decimal import *
 from cmath import acos, pi
 from math import atan2
 from sympy import Symbol, init_printing, solve, sin, cos, symbols, trigsimp
 from sympy.simplify.fu import fu, L, TR0, TR10, TR3, TR8, TR9, TR10i, TR11
 import numpy as np
 import craig as cg
-from inverse_kinematic import trig_equ
+#import warnings
 
-ty = np.deg2rad(-60)
+#warnings.filterwarnings('ignore')
+#from inverse_kinematic import trig_equ
+dh_tbl=np.array([[0,0,0],
+                    [np.deg2rad(-90), -30, 0],
+                    [0, 340, 0],
+                    [np.deg2rad(-90), -40, 338],
+                    [np.deg2rad(90), 0, 0],
+                    [np.deg2rad(-90),0,0]])
+
+cg.setDhTbl(dh_tbl)
+getcontext().prec=2
+getcontext().rounding = ROUND_UP
+
+ty = np.deg2rad(-60) # rotate y axis
 tcup_0_2s = np.array([[cos(ty), 0, sin(ty), 330], [0, 1, 0, 372],
                           [-sin(ty), 0, cos(ty), 367], [0, 0, 0, 1]])
 Tcup_6 = np.array([[0, 0, 1, 0], [0, -1, 0, 0], [1, 0, 0, 206],
@@ -29,12 +42,12 @@ alp = atan2(b, a)
 # or 360-
 qNalp1 = acos(c / r)
 qNalp2 = 2 * pi - qNalp1
-q1 = qNalp1 - alp
-q2 = qNalp2 - alp
-print(q1 * 180 / pi, q2 * 180 / pi)
+q31 = (qNalp1 - alp).real
+q32 = (qNalp2 - alp).real
+print('q3_1, q3_2:', (q31 * 180 / pi), q32 * 180 / pi)
 
-c3=cos(q1)
-s3=sin(q1)
+c3=cos(q31)
+s3=sin(q31)
 x=Symbol('x')
 expr=(40*(sin(x)*c3+cos(x)*s3)-338*(cos(x)*c3-sin(x)*s3)-340*sin(x)-188.6)
 sol=solve(expr, x)
@@ -100,13 +113,8 @@ def getT4_0_org():
     print('trigsimp_g3:', trigsimp(g3))
     g3=trigsimp(g3)
     r = trigsimp((g1**2).expand()+(g3**2).expand())
+    print('r:', r)
     #print(((np.sqrt(257**2+372**2))**2+188.6**2))
 
 getT4_0_org()
 
-def q2():
-    t2_1=cg.get_ti2i_1(2)
-    t1_0=cg.get_ti2i_1(1)
-    print(t1_0@t2_1)
-
-q2()
