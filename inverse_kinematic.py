@@ -30,7 +30,7 @@ def ik_pieper():
 
     cg.setDhTbl(dh_tbl)
 
-    np.set_printoptions(precision=2, suppress=True)
+    np.set_printoptions(precision=3, suppress=True)
     """
     P4_3_org is 4th col of T4_3 (i代4到Ti_i-1 的dh formular)
     [x,y,z,1]=P4_0_org = T1_0@T2_1@T3_2@P4_3_org
@@ -192,14 +192,14 @@ def ik_pieper():
 
     #t6_0=tcup_0_0s@Tcup_6
     t6_0 = tcup_0_2s @ np.linalg.inv(Tcup_6)
-    print('t6_0', t6_0)
+    print('t6_0', t6_0.real)
 
     #i 帶入4 dh craig formular
     a3 = -40
     d4 = 338
     alpha3 = np.deg2rad(-90)
     p4_3_org = np.array([[a3], [-d4 * sin(alpha3)], [d4 * cos(alpha3)], [1]])
-    print('p4_3', p4_3_org)
+    print('p4_3', p4_3_org.real)
     '''
     [x,y,z,1]=p4_0_org = T1_0@T2_1@T3_2@P4_3_org
     =T1_0@T2_1@T3_2@np.array([a3
@@ -252,10 +252,10 @@ def ik_pieper():
     #a3 = -40
     #d2 = d3 = 0
     #d4 = 338
-    (alp4, a4, d4)=cg.dh_tbl[4, :]
-    (alp3, a3, d3)=cg.dh_tbl[3, :]
-    (alp2, a2, d2)=cg.dh_tbl[2, :]
-    (alp1, a1, d1)=cg.dh_tbl[1, :]
+    (alp4, a4, d5)=cg.dh_tbl[4, :]
+    (alp3, a3, d4)=cg.dh_tbl[3, :]
+    (alp2, a2, d3)=cg.dh_tbl[2, :]
+    (alp1, a1, d2)=cg.dh_tbl[1, :]
 
     (x,y,z)=t6_0[0:3, 3]
     q1 = atan2(y, x)
@@ -266,6 +266,7 @@ def ik_pieper():
     c = ((sqrt(x**2 + y**2) - a1)**2 + z**2 - a3**2 - d4**2 - a2**2) / (2 * a2)
     a = a3
     b = d4
+    print('abc:', a, b, c.real)
     # 2 solutions
     q3 = cg.trig_equ(a, b, c)
     print('q3:', q3)

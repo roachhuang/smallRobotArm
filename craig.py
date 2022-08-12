@@ -1,3 +1,4 @@
+from asyncio.windows_events import NULL
 from cmath import acos, pi
 from math import atan2
 from sympy import Symbol, init_printing, solve, sin, cos, symbols
@@ -18,14 +19,15 @@ def setDhTbl(dh):
     dh_tbl = dh
 
 # ti_i-1
-def get_ti2i_1(i):
+def get_ti2i_1(i, t=NULL):
     np.set_printoptions(precision=3, suppress=True)
     init_printing( use_latex='mathjax' )  # use pretty math output
     # fill in dh tbl wrt robot arms' dh params
 
     # array idx starts frm 0, so i-1
     (alp, ai, di) = dh_tbl[i - 1, :]
-    t = 'q' + str(i)
+    if (t==NULL):
+        t = 'q' + str(i)
     #ci = Symbol('cos'+str(i))
     #si = Symbol('sin'+str(i))
     t = np.array([[cos(t), -sin(t), 0, round(ai)],
@@ -41,24 +43,25 @@ def get_ti2i_1(i):
                       round(cos(alp)),
                       round(cos(alp) * di)
                   ], [0, 0, 0, 1]])
-    print(f't{i}-{i-1}:', t)
-    return (t)
+    print(f't{i}-{i-1}:', t.real)
+    return (t.real)
 
 
 # a- cos' param, b for sin  asin(x)+bcos(x)=c
 
 # a- cos' param, b for sin
 def trig_equ(a, b, c):
+    np.set_printoptions(precision=3, suppress=True)
     r = np.sqrt(a**2 + b**2)
     alp = atan2(b, a)
     #r*cos(q+alp)=c
     # or 360-
     qNalp1 = acos(c / r)
     qNalp2 = 2 * pi - qNalp1
-    q3_1 = (qNalp1 - alp).real
-    q3_2 = (qNalp2 - alp).real
-    print('q3:', q3_1 * 180 / pi, q3_2 * 180 / pi)
-    return (q3_1, q3_2)
+    q_1 = (qNalp1 - alp).real
+    q_2 = (qNalp2 - alp).real
+    # print('q3:', q3_1 * 180 / pi, q3_2 * 180 / pi)
+    return (q_1, q_2)
 
 def extract_num(inp_str):
     print("Original String : " + inp_str)

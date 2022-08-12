@@ -108,6 +108,7 @@ def quiz4_5(tcup_0):
     #print('trigsimp_g1:', g1)
     #print('trigsimp_g3:', trigsimp(g3))
     g3=trigsimp(g3)
+    # expand (a+b+c)^2
     r = trigsimp((g1**2).expand()+(g3**2).expand())
     print('r:', r)
     q3 = cg.trig_equ(-27200, -229840, r_equ)

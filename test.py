@@ -25,9 +25,33 @@ tcup_0_2s = np.array([[cos(ty), 0, sin(ty), 330], [0, 1, 0, 372],
                           [-sin(ty), 0, cos(ty), 367], [0, 0, 0, 1]])
 Tcup_6 = np.array([[0, 0, 1, 0], [0, -1, 0, 0], [1, 0, 0, 206],
                        [0, 0, 0, 1]])
+tcup_0_2s = np.array([[cos(ty), 0, sin(ty), 330], [0, 1, 0, 372],
+                          [-sin(ty), 0, cos(ty), 367], [0, 0, 0, 1]])
 
 init_printing(use_unicode=True)
-np.set_printoptions(precision=2, suppress=True)
+np.set_printoptions(precision=3, suppress=True)
+
+t6_0 = tcup_0_2s @ np.linalg.inv(Tcup_6)
+print('t6_0', t6_0)
+#p4_0_org=P6_0_org
+(x,y,z)=t6_0[0:3, 3]
+
+t4_3=cg.get_ti2i_1(4)
+# returns the 3rd col
+p4_3_org=t4_3[:, 3]
+print('p4_3:', p4_3_org)
+t2_1= cg.get_ti2i_1(2)
+t3_2= cg.get_ti2i_1(3)
+
+#g3_equ=z
+p4_0_org= t2_1@t3_2@p4_3_org
+print('p4_0:', p4_0_org)
+g1=p4_0_org[0]
+#g3=p4_0_org[2]
+g1=trigsimp(g1)
+#print('trigsimp_g1:', g1)
+#print('trigsimp_g3:', trigsimp(g3))
+
 a1 = -30
 print((227)**2 + (372)**2 + 188.6**2 + 2 * (227 + 372) * 30 + 30**2)
 print((435.79 - a1)**2 + 188.6**2)
@@ -35,34 +59,26 @@ c = (252530 - 40**2 - 338**2 - 340**2) / (2 * 340)
 print('c', c)
 a = -40
 b = 338
-#a*cos-b*sin=c
-r = np.sqrt(a**2 + b**2)
-alp = atan2(b, a)
-#r*cos(q+alp)=c
-# or 360-
-qNalp1 = acos(c / r)
-qNalp2 = 2 * pi - qNalp1
-q31 = (qNalp1 - alp).real
-q32 = (qNalp2 - alp).real
-print('q3_1, q3_2:', (q31 * 180 / pi), q32 * 180 / pi)
 
-c3=cos(q31)
-s3=sin(q31)
-x=Symbol('x')
-expr=(40*(sin(x)*c3+cos(x)*s3)-338*(cos(x)*c3-sin(x)*s3)-340*sin(x)-188.6)
-sol=solve(expr, x)
-print(expr)
+(q3_1, q3_2)= cg.trig_equ(a, b, c)
+# print('q3_1, q3_2:', (q31 * 180 / pi), q32 * 180 / pi)
+print('q3:', np.rad2deg(q3_1), np.rad2deg(q3_2))
+
+# send caculated q3 to ti_2_i-1
+t3_2= cg.get_ti2i_1(3, q3_1)
+#g3_equ=z
+p4_0_org= t2_1@t3_2@p4_3_org
+g3=p4_0_org[2]-z
+#g3=g3.find(lambda x: x.replace('cos(q3)',c3))
+# g3=TR9(g3)-z
+print('g3:', g3)
+q2=Symbol('q2')
+sol=solve(g3, q2)
+
+# expr=(40*(sin(x)*c3+cos(x)*s3)-338*(cos(x)*c3-sin(x)*s3)-340*sin(x)-188.6)
+#sol=solve(expr, x)
+#print(expr)
 print('q2:', sol[0]*180/pi, 180-sol[1]*180/pi)
-
-q2, q3=symbols('q2, q3')
-expr1=trigsimp(-40*cos(q2+q3)-338*sin(q2+q3)+340*cos(q2)-465.79)
-#print('expr1:', expr1)
-expr2=trigsimp(40*sin(q2+q3)-338*cos(q2+q3)-340*sin(q2)-188.6)
-#print('my', trigsimp(expr1**2+expr2**2))
-#s= TR8(expr1**2+expr2**2)
-#print(s)
-#q = solve((expr1**2+expr2**2), q3)
-#print('q3:', q)
 
 # ti_i-1
 '''
