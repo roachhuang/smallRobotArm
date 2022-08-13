@@ -3,6 +3,7 @@ from cmath import acos, pi
 from math import atan2
 from sympy import Symbol, init_printing, solve, sin, cos, symbols
 import numpy as np
+
 '''
 dh_tbl=np.array([[0,0,0],
                     [np.deg2rad(-90), -30, 0],
@@ -63,11 +64,25 @@ def trig_equ(a, b, c):
     # print('q3:', q3_1 * 180 / pi, q3_2 * 180 / pi)
     return (q_1, q_2)
 
+def is_negative_number_digit(n: str) -> bool:
+     try:
+         int(n)
+         return True
+     except ValueError:
+         return False
+
 def extract_num(inp_str):
-    print("Original String : " + inp_str)
+    # inp_str=inp_str.strip()
+    # inp_str= inp_str.replace("+ ", "+")
+    # inp_str= inp_str.replace("- ", "-")
+
+    print("Original String : ", inp_str)
     num = 0
+    s='+'
     for c in inp_str.split():
-        if c.isnumeric():
-            num += float(c)
-    print("Extracted numbers from the list : ", num)
+        if c =='+' or c=='-':
+            s=c # keep the sign of nxt numeric
+        elif c.isnumeric():
+            num = num-float(c) if s=='-' else num+float(c)
+            print("Extracted numbers from the list : ", num)
     return num

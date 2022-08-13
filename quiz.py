@@ -93,7 +93,7 @@ def quiz4_5(tcup_0):
     g1=p4_0_org[0]
     #num = g1.find(lambda e: e.is_numeric, group=False)
     #num = [float(x) for x in str(g1).split() if x.isnumeric()]
-    num=cg.extract_num(str(g1))
+    num=-cg.extract_num(str(g1))
     # what about its sign?
     print('num:', num)
     # add num to two sides
