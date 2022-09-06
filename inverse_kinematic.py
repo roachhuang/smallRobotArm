@@ -245,13 +245,6 @@ def ik_pieper():
     #f1=340c3-338s3+340
     #f2=-40s3+338c3
 
-    #alp0 = alp2 = 0
-    #alp1 = alp3 = -90
-    #a1 = -30
-    #a2 = 340
-    #a3 = -40
-    #d2 = d3 = 0
-    #d4 = 338
     (alp4, a4, d5)=cg.dh_tbl[4, :]
     (alp3, a3, d4)=cg.dh_tbl[3, :]
     (alp2, a2, d3)=cg.dh_tbl[2, :]

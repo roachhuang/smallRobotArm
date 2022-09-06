@@ -1,5 +1,5 @@
 from decimal import *
-from cmath import acos, pi
+from cmath import acos, pi, sqrt
 from math import atan2
 from sympy import Symbol, init_printing, solve, sin, cos, symbols, trigsimp
 from sympy.simplify.fu import fu, L, TR0, TR10, TR3, TR8, TR9, TR10i, TR11
@@ -17,8 +17,8 @@ dh_tbl=np.array([[0,0,0],
                     [np.deg2rad(-90),0,0]])
 
 cg.setDhTbl(dh_tbl)
-getcontext().prec=2
-getcontext().rounding = ROUND_UP
+#getcontext().prec=2
+#getcontext().rounding = ROUND_UP
 
 ty = np.deg2rad(-60) # rotate y axis
 tcup_0_2s = np.array([[cos(ty), 0, sin(ty), 330], [0, 1, 0, 372],
@@ -35,6 +35,7 @@ t6_0 = tcup_0_2s @ np.linalg.inv(Tcup_6)
 print('t6_0', t6_0)
 #p4_0_org=P6_0_org
 (x,y,z)=t6_0[0:3, 3]
+print('4-0-org:', x,y,z)
 
 t4_3=cg.get_ti2i_1(4)
 # returns the 3rd col
@@ -43,12 +44,17 @@ print('p4_3:', p4_3_org)
 t2_1= cg.get_ti2i_1(2)
 t3_2= cg.get_ti2i_1(3)
 
-#g3_equ=z
+g3_equ=z
 p4_0_org= t2_1@t3_2@p4_3_org
 print('p4_0:', p4_0_org)
 g1=p4_0_org[0]
-#g3=p4_0_org[2]
+g3=p4_0_org[2]
 g1=trigsimp(g1)
+g3=trigsimp(g3)
+num=-cg.extract_num(str(g1))
+g1+=num
+g1_equ=sqrt(x**2+y**2)+num
+
 #print('trigsimp_g1:', g1)
 #print('trigsimp_g3:', trigsimp(g3))
 
@@ -63,6 +69,14 @@ b = 338
 (q3_1, q3_2)= cg.trig_equ(a, b, c)
 # print('q3_1, q3_2:', (q31 * 180 / pi), q32 * 180 / pi)
 print('q3:', np.rad2deg(q3_1), np.rad2deg(q3_2))
+
+r_equ=g1_equ**2+g3_equ**2
+r = trigsimp((g1**2).expand()+(g3**2).expand())
+r+=(-r_equ)
+q3=Symbol('q3')
+print('r:', r)
+sol=solve(r, q3)
+print('sol_q3:', sol[0]*180/pi, sol[1]*180/pi)
 
 # send caculated q3 to ti_2_i-1
 t3_2= cg.get_ti2i_1(3, q3_1)
@@ -80,6 +94,8 @@ sol=solve(g3, q2)
 #print(expr)
 print('q2:', sol[0]*180/pi, 180-sol[1]*180/pi)
 
+q1=atan2(y, x)
+print('q1:', np.rad2deg(q1))
 # ti_i-1
 '''
 def get_ti2i_1(i):
@@ -104,7 +120,7 @@ def get_ti2i_1(i):
     return(t)
 '''
 def getT4_0_org():
-    np.set_printoptions(suppress=True)
+    np.set_printoptions(precision=3, suppress=True)
 
     # (i代4到Ti_i-1 的dh formular)
     t4_3=cg.get_ti2i_1(4)
@@ -132,5 +148,5 @@ def getT4_0_org():
     print('r:', r)
     #print(((np.sqrt(257**2+372**2))**2+188.6**2))
 
-getT4_0_org()
+# getT4_0_org()
 
