@@ -11,6 +11,8 @@ import numpy as np
 np.set_printoptions(precision=3, suppress=True)
 init_printing(use_unicode=True)
 # init_printing( use_latex='mathjax' )  # use pretty math output
+
+# alpha(i-1), ai-1, di, thetai
 dh_tbl=np.array([[0,0,0],
                     [radians(-90), -30, 0],
                     [0, 340, 0],
@@ -21,7 +23,7 @@ cg.setDhTbl(dh_tbl)
 
 def quiz4_3():
     d2= np.sqrt(69.28**2+40**2)
-    # alpha(i-1), ai-1, di, thetai
+    '''
     dh_tbl=np.array([[0,0,0],
                     [radians(-90), -30, 0],
                     [0, 340, 0],
@@ -30,7 +32,7 @@ def quiz4_3():
                     [radians(-90),0,0]])
 
     cg.setDhTbl(dh_tbl)
-
+    '''
     #t1_0=cg.get_ti2i_1(5)
     #t1_0=cg.get_ti2i_1(4)
     #t1_0=cg.get_ti2i_1(3)
@@ -165,11 +167,11 @@ def quiz4_5(tc_0):
     r = trigsimp((g1**2).expand()+(g3**2).expand())
     r+=(-r_equ)
     print('r:', simplify(r))
-    #q3 = cg.trig_equ(-27200, 229840, 372656)
+    #q3 = cg.trig_equ(-27200, -229840, 372656)
     #print('q3:', q3)
     q3=Symbol('q3')
-    # sol=solve(r, q3)
-    # print('sol_q3:', sol[0]*180/pi, 180-sol[1]*180/pi)
+    sol=solve(r, q3)
+    print('sol_q3:', sol[0]*180/pi, sol[1]*180/pi)
     cg.trig_equ(-27200, -229840, 354852)
 
     # https://zhuanlan.zhihu.com/p/440748878
@@ -187,14 +189,14 @@ def quiz4_5(tc_0):
     k3= ((a1-cos(q1)*x-sin(q1)*y)**2+z**2-(a3**2+d4**2+a2**2))/(2*a2)
     s = sqrt(a3**2+d4**2-k3**2)
     print('s:', s)
-    q3 = math.atan2(k3, s) + math.atan2(a3,d4)
+    q3 = atan(k3/s) + atan(a3/d4)
     print('q3::', q3*180/pi)
 
     g=cos(q1)*x+sin(q1)*y -a1
     e=a3*cos(q3)+d4*sin(q3)+a2
     f=a3*sin(q3)-d4*cos(q3)
-    q2=math.atan2(z*e-g*f, g*e+z*f)
-    print('q2:', 180-np.rad2deg(q2))
+    q2=atan(z*e-g*f/g*e+z*f)
+    print('q2:', q2*180/pi)
 
 t2_1= cg.get_ti2i_1(2)
 t3_2= cg.get_ti2i_1(3)

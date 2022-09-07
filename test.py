@@ -1,5 +1,5 @@
 from decimal import *
-from cmath import acos, pi, sqrt
+from cmath import acos, atan, pi, sqrt
 from math import atan2
 from sympy import Symbol, init_printing, solve, sin, cos, symbols, trigsimp
 from sympy.simplify.fu import fu, L, TR0, TR10, TR3, TR8, TR9, TR10i, TR11
@@ -96,6 +96,30 @@ print('q2:', sol[0]*180/pi, 180-sol[1]*180/pi)
 
 q1=atan2(y, x)
 print('q1:', np.rad2deg(q1))
+
+
+# https://zhuanlan.zhihu.com/p/440748878
+(alp4, a4, d5)=cg.dh_tbl[4, :]
+(alp3, a3, d4)=cg.dh_tbl[3, :]
+(alp2, a2, d3)=cg.dh_tbl[2, :]
+(alp1, a1, d2)=cg.dh_tbl[1, :]
+q1=atan2(d3, abs(sqrt(x+y+z-d3*d3)))+atan2(y,x)
+print('q1', np.rad2deg(q1))
+
+#https://zhuanlan.zhihu.com/p/440748878
+k3= ((a1-cos(q1)*x-sin(q1)*y)**2+z**2-(a3**2+d4**2+a2**2))/(2*a2)
+s = sqrt(a3**2+d4**2-k3**2)
+print('s:', s)
+q3 = atan(k3/s) + atan(a3/d4)
+print('q3:', q3*180/pi)
+
+g=cos(q1)*x+sin(q1)*y -a1
+e=a3*cos(q3)+d4*sin(q3)+a2
+f=a3*sin(q3)-d4*cos(q3)
+q2=atan(z*e-g*f/g*e+z*f)
+print('q2:', q2*180/pi)
+
+
 # ti_i-1
 '''
 def get_ti2i_1(i):
@@ -119,6 +143,7 @@ def get_ti2i_1(i):
     print(t)
     return(t)
 '''
+
 def getT4_0_org():
     np.set_printoptions(precision=3, suppress=True)
 
