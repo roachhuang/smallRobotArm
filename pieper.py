@@ -1,9 +1,8 @@
-from decimal import *
-from cmath import acos, atan, pi, sqrt, tan
-from math import atan2
-import math
-from sympy import *
-from sympy.simplify.fu import fu, L, TR0, TR10, TR3, TR8, TR9, TR10i, TR11
+from cmath import sqrt, tan
+from math import atan2, pi
+# import math
+from sympy import Symbol, Eq, solve, sin, cos, symbols, trigsimp, simplify
+# from sympy.simplify.fu mport
 import numpy as np
 import craig as cg
 #import warnings
@@ -110,6 +109,8 @@ def getT4_0_org():
 
 # getT4_0_org()
 def pieper():
+    print('pi', pi)
+
     (alp4, a4, d5) = cg.dh_tbl[4, :]
     (alp3, a3, d4) = cg.dh_tbl[3, :]
     (alp2, a2, d3) = cg.dh_tbl[2, :]
@@ -123,19 +124,19 @@ def pieper():
     =
     '''
     t4_3 = cg.get_ti2i_1(4)
-    p4_3 = t4_3[:, 3]
-    print('p4_3:', p4_3)
+    p4_3_org = t4_3[:, 3]
+    print('p4_3:', p4_3_org)
     t1_0 = cg.get_ti2i_1(1)
     t2_1 = cg.get_ti2i_1(2)
     t3_2 = cg.get_ti2i_1(3)
-    p4_0_org = simplify(t1_0 @ t2_1 @ t3_2 @ p4_3)
+    p4_0_org = simplify(t1_0 @ t2_1 @ t3_2 @ p4_3_org)
     print('p4_0_org', p4_0_org)
-
+    # p6_0 = p4_0
     (x, y, z) = t6_0[0:3, 3]
     print('4-0-org:', x, y, z)
 
     #f is a func of theta3
-    f = simplify(t3_2 @ p4_3)
+    f = simplify(t3_2 @ p4_3_org)
     f1 = f[0]
     f2 = f[1]
     f3 = f[2]
@@ -163,11 +164,27 @@ def pieper():
     print('r:', r)
     q3=Symbol('q3')
     # r = x**2+y**2+z**2
-    sol= solve(Eq(r, x**2+y**2+z**2), q3)
-    #sol=solve(r, q3)
-    print('sol_q3:', sol[0]*180/math.pi, sol[1]*180/math.pi)
+    th3= solve(Eq(r, x**2+y**2+z**2), q3)
+    print('q3:', th3[0]*180/pi, th3[1]*180/pi)
 
+    # send caculated q3 to ti_2_i-1
+    t3_2= cg.get_ti2i_1(3, th3[0])
+    p4_0_org= t2_1@t3_2@p4_3_org
+    g3=p4_0_org[2]
+    print('g3:', g3)
+    q2=Symbol('q2')
+    #g3=z
+    th2=solve(Eq(g3, z), q2)
 
+    print('q2:', (th2[0]*180)/pi, th2[1]*180/pi)
+
+    t2_1 = cg.get_ti2i_1(2, th2[0])
+    t3_2 = cg.get_ti2i_1(3, th3[0])
+    p4_0_org = simplify(t1_0 @ t2_1 @ t3_2 @ p4_3_org)
+    print('x:', p4_0_org[0])
+    q1=Symbol('q1')
+    th1=solve(Eq(p4_0_org[0], x), q1)
+    print('q1:', th1[0]*180/pi, th1[1]*180/pi)
     k1 = f1
     k2 = -f2
     k3 = f1**2 + f2**2 + f3**2 + a1**2 + d2**2 + 2 * d2 * f3
