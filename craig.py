@@ -22,7 +22,7 @@ def setDhTbl(dh):
 
 # ti_i-1
 def get_ti2i_1(i, theta=NULL):
-    np.set_printoptions(precision=3, suppress=True)
+    np.set_printoptions(precision=2, suppress=True)
     init_printing(use_latex='mathjax')  # use pretty math output
     # fill in dh tbl wrt robot arms' dh params
 
@@ -35,18 +35,18 @@ def get_ti2i_1(i, theta=NULL):
         t = theta
     #ci = Symbol('cos'+str(i))
     #si = Symbol('sin'+str(i))
-    t = np.array([[cos(t), -sin(t), 0, round(ai)],
+    t = np.array([[cos(t), -sin(t), 0, ai],
                   [
                       sin(t) * round(cos(alp), 2),
                       cos(t) * round(cos(alp), 2),
                       round(-sin(alp)),
-                      round(-sin(alp) * di)
+                      round(-sin(alp)) * di
                   ],
                   [
                       sin(t) * round(sin(alp), 2),
                       cos(t) * round(sin(alp), 2),
                       round(cos(alp)),
-                      round(cos(alp) * di)
+                      round(cos(alp)) * di
                   ], [0, 0, 0, 1]])
     print(f't{i}-{i-1}:', t.real)
     return (t.real)

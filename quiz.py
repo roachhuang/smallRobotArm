@@ -2,7 +2,6 @@
 from cmath import acos, atan, pi, sqrt
 from math import radians
 import math
-from tkinter import S
 import craig as cg
 #from sympy import *
 from sympy import Symbol, init_printing, solve, sin, cos, symbols, trigsimp, simplify
@@ -159,14 +158,17 @@ def quiz4_5(tc_0):
     print('g3:', g3)
 
     #q2, q3=symbols('q2, q3')
-    g1=trigsimp(g1)
+    # g1=trigsimp(g1)
+
     #print('trigsimp_g1:', g1)
     #print('trigsimp_g3:', trigsimp(g3))
-    g3=trigsimp(g3)
+    
+    #g3=trigsimp(g3)
+
     # expand (a+b+c)^2
-    r = trigsimp((g1**2).expand()+(g3**2).expand())
+    r = simplify((g1**2).expand()+(g3**2).expand())
     r+=(-r_equ)
-    print('r:', simplify(r))
+    print('r:', r)
     #q3 = cg.trig_equ(-27200, -229840, 372656)
     #print('q3:', q3)
     q3=Symbol('q3')
