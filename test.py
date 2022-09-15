@@ -51,9 +51,12 @@ g1=p4_0_org[0]
 g3=p4_0_org[2]
 g1=trigsimp(g1)
 g3=trigsimp(g3)
-num=-cg.extract_num(str(g1))
+myTuple=cg.extract_num(str(g1))
+num=-myTuple[1]
 g1+=num
-g1_equ=sqrt(x**2+y**2)+num
+# g1_equ=sqrt(x**2+y**2)+num
+g1_equ=sqrt((x+num)**2+y**2)
+
 
 #print('trigsimp_g1:', g1)
 #print('trigsimp_g3:', trigsimp(g3))

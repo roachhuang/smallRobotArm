@@ -3,13 +3,13 @@ from cmath import acos, atan, pi, sqrt
 from math import radians
 import math
 import craig as cg
-#from sympy import *
+from sympy import *
 from sympy import Symbol, init_printing, solve, sin, cos, symbols, trigsimp, simplify
 import numpy as np
 
 np.set_printoptions(precision=3, suppress=True)
-init_printing(use_unicode=True)
-# init_printing( use_latex='mathjax' )  # use pretty math output
+# init_printing(use_unicode=True)
+init_printing( use_latex='mathjax' )  # use pretty math output
 
 # alpha(i-1), ai-1, di, thetai
 dh_tbl=np.array([[0,0,0],
@@ -137,15 +137,17 @@ def quiz4_5(tc_0):
     print('p4_0:', p4_0_org)
     # !!!manually adjust +30, find a way to auto it. see p13
     g1=p4_0_org[0]
+    print(type(g1))
     #num = g1.find(lambda e: e.is_numeric, group=False)
     #num = [float(x) for x in str(g1).split() if x.isnumeric()]
-    num=-cg.extract_num(str(g1))
-
-    print('num:', num)
+    myTuple=cg.extract_num(str(g1))
+    num=-myTuple[1]
+    print('num:', myTuple[1])
     # add num to two sides
-    g1 += num
+    g1=simplify(myTuple[0])
+    # g1 ="{:1f}.format(g1)
     print('g1:', g1)
-    g1_equ=sqrt(x**2+y**2)+num
+    g1_equ=sqrt(x**2+y**2)
     # g1_equ=x+num
     g2_equ=y
     g3_equ=z
@@ -154,6 +156,7 @@ def quiz4_5(tc_0):
 
     #print('p4_0:', p4_0_org)
     #p4_0_org=P6_0_org
+    g2=p4_0_org[1]
     g3=p4_0_org[2]
     print('g3:', g3)
 
@@ -162,17 +165,22 @@ def quiz4_5(tc_0):
 
     #print('trigsimp_g1:', g1)
     #print('trigsimp_g3:', trigsimp(g3))
-    
+
     #g3=trigsimp(g3)
 
     # expand (a+b+c)^2
-    r = simplify((g1**2).expand()+(g3**2).expand())
-    r+=(-r_equ)
+    # r = expand_trig(g1**2+g3**2)
+    r = trigsimp((g1**2).expand()+(g2**2).expand()+(g3**2).expand())
+    r_equ=(x+num)**2+y**2+z**2
+    r+=round(-r_equ)
     print('r:', r)
     #q3 = cg.trig_equ(-27200, -229840, 372656)
     #print('q3:', q3)
     q3=Symbol('q3')
-    sol=solve(r, q3)
+    #sol=solve(r, q3)
+    sol=solve(Eq(r,0), q3)
+
+    print(type(sol))
     print('sol_q3:', sol[0]*180/pi, sol[1]*180/pi)
     cg.trig_equ(-27200, -229840, 354852)
 
