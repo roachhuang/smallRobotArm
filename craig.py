@@ -1,7 +1,7 @@
 from asyncio.windows_events import NULL
 from cmath import acos, pi
 from math import atan2
-from sympy import Symbol, init_printing, solve, sin, cos, symbols
+from sympy import trigsimp, Symbol, init_printing, sin, cos, symbols
 import numpy as np
 
 '''
@@ -67,9 +67,16 @@ def get_ti2i_1(i, theta=NULL):
     print(f't{i}-{i-1}:', t.real)
     return (t.real)
 
-# a- cos' param, b for sin  asin(x)+bcos(x)=c
-
-# a- cos' param, b for sin
+'''
+acos(x)+bsin(x)=c
+u=tan(x/2)
+cosx=1-u**2/1+u**2
+sinx=2*u/1+u**2
+subs cosx and sinx and multiple 1+u**2 on both sides
+a(1-u**2)+2bu=c(1+u**2) -> (a+c)u^2-2bu+(c-a)=0
+一元2次方程式: u=b+/-srqt(b^2+a^2-c^2)/a+c
+x=2atan2(b+/-srqt(b^2+a^2-c^2), a+c)
+'''
 def trig_equ(a, b, c):
     np.set_printoptions(precision=3, suppress=True)
     r = np.sqrt(a**2 + b**2)
@@ -117,5 +124,6 @@ def extract_num(inp_str):
             print("Extracted numbers from the list : ", num)
         else:
             newG+=c
-    t=(newG, num)
+    # conver string to sympy expressions
+    t=(trigsimp(newG), num)
     return t

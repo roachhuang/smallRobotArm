@@ -1,11 +1,9 @@
-from decimal import *
-from cmath import acos, atan, pi, sqrt, tan
+from cmath import atan, pi, sqrt
 from math import atan2
-from sympy import Symbol, init_printing, solve, sin, cos, symbols, simplify, trigsimp
-from sympy.simplify.fu import fu, L, TR0, TR10, TR3, TR8, TR9, TR10i, TR11
+from sympy import expand_trig, Eq, Symbol, init_printing, solve, solveset, S, pprint, sin, cos, symbols, simplify, trigsimp
+# from sympy.simplify.fu import fu, L, TR0, TR10, TR3, TR8, TR9, TR10i, TR11
 import numpy as np
 import craig as cg
-#import warnings
 
 #warnings.filterwarnings('ignore')
 #from inverse_kinematic import trig_equ
@@ -48,16 +46,18 @@ g3_equ=z
 p4_0_org= t2_1@t3_2@p4_3_org
 print('p4_0:', p4_0_org)
 g1=p4_0_org[0]
+g2=p4_0_org[1]
 g3=p4_0_org[2]
 g1=trigsimp(g1)
+g2=trigsimp(g2)
 g3=trigsimp(g3)
 myTuple=cg.extract_num(str(g1))
 num=-myTuple[1]
-g1+=num
+#g1+=num
+ng1=myTuple[0]
 # g1_equ=sqrt(x**2+y**2)+num
-g1_equ=sqrt((x+num)**2+y**2)
-
-
+# g1_equ=sqrt((x+num)**2+y**2)
+# g1_equ=x+num
 #print('trigsimp_g1:', g1)
 #print('trigsimp_g3:', trigsimp(g3))
 
@@ -73,12 +73,13 @@ b = 338
 # print('q3_1, q3_2:', (q31 * 180 / pi), q32 * 180 / pi)
 print('q3:', np.rad2deg(q3_1), np.rad2deg(q3_2))
 
-r_equ=g1_equ**2+g3_equ**2
-r = trigsimp((g1**2).expand()+(g3**2).expand())
-r+=(-r_equ)
+#r_equ=g1_equ**2+g3_equ**2
+r_equ=x**2+y**2+z**2+num**2
+r = trigsimp((ng1**2).expand()+(g2**2).expand()+(g3**2).expand())
+# r+=(-r_equ)
 q3=Symbol('q3')
 print('r:', r)
-sol=solve(r, q3)
+sol=solve(Eq(r, r_equ), q3)
 print('sol_q3:', sol[0]*180/pi, sol[1]*180/pi)
 
 # send caculated q3 to ti_2_i-1
@@ -178,6 +179,11 @@ def getT4_0_org():
 
 # getT4_0_org()
 def pieper():
+    (alp4, a4, d5)=cg.dh_tbl[4, :]
+    (alp3, a3, d4)=cg.dh_tbl[3, :]
+    (alp2, a2, d3)=cg.dh_tbl[2, :]
+    (alp1, a1, d2)=cg.dh_tbl[1, :]
+
     #(alp3, a3, d4)=cg.dh_tbl[3, :]
     #p4_3=np.array([a3, -d4*sin(alp3), d4*round(cos(alp3)),1])
     #print('p4_3:', p4_3)
@@ -194,16 +200,16 @@ def pieper():
     t3_2=cg.get_ti2i_1(3)
     p4_0_org  = t2_1@t3_2@p4_3
     #f is a func of theta3
-    f=simplify(t3_2@p4_3)
+    f=trigsimp(t3_2@p4_3)
     f1=f[0]
     f2=f[1]
     f3=f[2]
     # g is a func of theta2 and theta3
-    g=t2_1@f
+    g=trigsimp(t2_1@f)
     g1=trigsimp(g[0])
     g2=trigsimp(g[1])
     g3=trigsimp(g[2])
-    p4_0_org= t2_1@t3_2@p4_3_org
+    p4_0_org = trigsimp(t2_1@t3_2@p4_3_org)
     print('p4_0:', p4_0_org)
     g1=p4_0_org[0]
     g3=p4_0_org[2]
@@ -221,11 +227,54 @@ def pieper():
     print('r:', r)
     k1=f1
     k2=-f2
-    k3=f1**2+f2**2+f3**2+a1**2+d2**2+2*d2*f3
+    k3=trigsimp(f1**2 + f2**2 + f3**2 + a1**2 + d2**2 + 2*d2*f3)
     k4=f3*cos(alp1)+d2*cos(alp1)
-    t=0
-    u=tan(t/2)
-    c=1-u**2/1+u**2
-    s=2*u/1+u
-    #(r-k3)**2/4*a1**2 + (z-k4)**2/sin(alp1)**2=k1**2+k2**2
+
+    # frame0 to wrist 的長度平方. eliminate q1
+    r_sq=trigsimp((k1*cos(q2)+k2*sin(q2))*2*a1 + k3)
+    Z=trigsimp((k1*sin(q2)-k2*cos(q2))*sin(alp1) + k4)
+
+    q3=Symbol('q3')
+    if (a1==0):
+        '''
+        the distance from the origins of the 0 and 1 frames to the center of the spherical wrist
+        (which is the origin of frames 4, 5, and 6) is a function of θ3 only;
+        r=k3
+        '''
+        th3=solve(Eq(k3, x**2+y**2+z**2), q3)
+    # general case when a1 != 0 & alpha1 != 0
+    # combine k3 and g3
+    elif (alp1 == 0):
+        z=k4
+        t3=solve(Eq(k4), z, q3)
+    else:
+        '''
+        move k3&k4 to the left side, r and z 取平方和 to eliminate q2
+        (r_sq-k3/2*a1)**2 + (Z-k4/sin(alp1))**2 = k1**2+k2**2
+        =>(r_sq-k3)**2/4*a1**2 + (Z-k4)**2/sin(alp1)**2 = k1**2+k2**2
+        '''
+        u=Symbol('u', real=True)
+        #u=tan(q3/2)
+        #cos(q3)=1-u**2/1+u**2
+        #sin(q3)=2*u/1+u**2
+        #ng1=g1.subs([(q2, th2), (q3, th3)])
+        # (Z-k4)**2/sin(alp1)**2
+        expr1=trigsimp((r_sq-k3)**2/4*a1**2)
+        expr1 = expr1.subs([(sin(q3), simplify('2*u/1+u**2')), (cos(q3), simplify('1-u**2/1+u**2'))])
+
+        expr2 = trigsimp((Z-k4)**2/sin(alp1)**2)
+        expr2 = expr2.subs([(sin(q3), simplify('2*u/1+u**2')), (cos(q3), simplify('1-u**2/1+u**2'))])
+        expr1=expr1.expand()
+        expr2=expr2.expand()
+        # expr = expr.subs([(sin(2*q3), 2*sin(q3)*cos(q3)),(cos(2*q3), cos(q3)**2-sin(q3)**2)])
+        expr=simplify(expr1+expr2)
+        print('expr:', simplify(expr))
+        # expr = expr.subs([(sin(q3), simplify('2*u/1+u**2')), (cos(q3), simplify('1-u**2/1+u**2'))])
+        right_expr= trigsimp(k1**2+k2**2)
+        right_expr=right_expr.subs([(sin(q3), simplify('2*u/1+u**2')), (cos(q3), simplify('1-u**2/1+u**2'))])
+        right_expr=right_expr.expand()
+        expr-=right_expr
+        th3=solveset(expr, u, S.Reals)
+        print('u:', th3)
+    print('t3:=', th3[0]*180/pi, th3[1]*180/pi)
 pieper()
