@@ -88,3 +88,18 @@ def ik(l1, l2, l3, x, y, phi):
     print('sol1 (q1~q3):', sol1)
     #print('sol2 (q1~q3):', sol2)
     return sol1
+
+'''
+import sympy as sp
+
+# Define symbols
+theta1, theta2, l1, l2, x, y = sp.symbols("theta1 theta2 l1 l2 x y")
+
+# Define equations, rearranged so expressions equal 0
+eq1 = l1 * sp.cos(theta1) + l2 * sp.cos(theta1 + theta2) - x
+eq2 = l1 * sp.sin(theta1) + l2 * sp.sin(theta1 + theta2) - y
+
+# Solve for theta1 & theta2
+solution = sp.solve([eq1, eq2], [theta1, theta2], dict=True)
+print(solution)
+'''

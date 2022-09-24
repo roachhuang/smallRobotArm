@@ -5,7 +5,7 @@ from sympy import Matrix, Symbol, Eq, solve, sin, cos, symbols, simplify, trigsi
 # from sympy.simplify.fu mport
 import numpy as np
 import craig as cg
-#import warnings
+import sympy as sp
 
 #warnings.filterwarnings('ignore')
 #from inverse_kinematic import trig_equ

@@ -3,9 +3,9 @@ from cmath import acos, pi
 from math import atan2
 from sympy import trigsimp, Symbol, init_printing, sin, cos, symbols
 import numpy as np
-
+import sympy as sp
 '''
-dh_tbl=np.array([[0,0,0],
+dh_tbl=np.array([[0,0,0],   
                     [np.deg2rad(-90), -30, 0],
                     [0, 340, 0],
                     [np.deg2rad(-90), -40, 338],
@@ -127,3 +127,7 @@ def extract_num(inp_str):
     # conver string to sympy expressions
     t=(trigsimp(newG), num)
     return t
+
+from sympy.abc import x, y
+#x=Symbol('x')
+sp.pprint(sp.poly(x*(x**2 + x - 1)**2))
