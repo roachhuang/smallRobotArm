@@ -117,17 +117,18 @@ def pieper():
         =>(r-k3)**2/4*a1**2 + (z-k4)**2/sin(alp1)**2 = k1**2+k2**2
         '''
         #u=tan(q3/2)
-        #cos(q3)=1-u**2/1+u**2
-        #sin(q3)=2*u/1+u**2
-        #sp.expand_trig
-        lExpr = (r-k3)**2/4*a1**2 +(z-k4)**2/sin(alp1)**2
+        c3=(1-u**2)/(1+u**2)
+        s3=2*u/(1+u**2)
+        # very tricky - lexpr needs () for all expression!!!
+        lExpr = (r-k3)**2/(4*(a1**2)) + ((z-k4)**2)/(sin(alp1))**2
+        # lExpr = (r-k3/2*a1)**2 + (z-k4/sin(alp1))**2
         lExpr=sp.expand_trig(lExpr)
-        lExpr = lExpr.subs([(sin(q3), simplify('2*u/(1+u**2)')), (cos(q3), simplify('(1-u**2)/(1+u**2)'))])
+        lExpr = lExpr.subs([(sin(q3), s3), (cos(q3), c3)])
         lExpr = lExpr.expand()
         rExpr = (k1**2).expand()+(k2**2).expand()
         rExpr = trigsimp(rExpr)
         print('rExpr:', rExpr)
-        rExpr = rExpr.subs([(sin(q3), simplify('2*u/(1+u**2)')), (cos(q3), simplify('(1-u**2)/(1+u**2)'))])
+        rExpr = rExpr.subs([(sin(q3), s3), (cos(q3), c3)])
         rExpr = rExpr.expand()
         print('rexpr:', rExpr)
         expr=lExpr-rExpr
@@ -135,7 +136,7 @@ def pieper():
         # sp.pprint([expr.evalf(chop=True) for expr in results])
         print('u:', roots)
         for root in roots:
-            rad = 2*atan2(root,1)
+            rad = 2*atan2(root, 1)
             print('deg:', rad*180/pi)
 
     #print('t3:=', th3[0]*180/pi, th3[1]*180/pi)
