@@ -1,11 +1,10 @@
-from asyncio.windows_events import NULL
 from cmath import acos, pi
 from math import atan2
 from sympy import trigsimp, Symbol, init_printing, sin, cos, symbols
 import numpy as np
 import sympy as sp
 '''
-dh_tbl=np.array([[0,0,0],   
+dh_tbl=np.array([[0,0,0],
                     [np.deg2rad(-90), -30, 0],
                     [0, 340, 0],
                     [np.deg2rad(-90), -40, 338],
@@ -20,7 +19,7 @@ def setDhTbl(dh):
     dh_tbl = dh
 
 # ti_i-1
-def get_ti2i_1(i, theta=NULL):
+def get_ti2i_1(i, theta=None):
     np.set_printoptions(precision=2, suppress=True)
     init_printing(use_latex='mathjax')  # use pretty math output
     # fill in dh tbl wrt robot arms' dh params
@@ -28,7 +27,7 @@ def get_ti2i_1(i, theta=NULL):
     # array idx starts frm 0, so i-1
     alp, ai, di, t = symbols('alp, ai, di, t')
     (alp, ai, di) = dh_tbl[i - 1, :]
-    if (theta == NULL):
+    if theta is None:
         t = 'q' + str(i)
     else:
         t = theta
@@ -68,6 +67,7 @@ def get_ti2i_1(i, theta=NULL):
     return (t.real)
 
 '''
+ntu:
 acos(x)+bsin(x)=c
 u=tan(x/2)
 cosx=1-u**2/1+u**2

@@ -284,4 +284,4 @@ def pieper():
         for root in roots:
             print('deg:', 2*atan(sp.re(root)))
     print('t3:=', th3[0]*180/pi, th3[1]*180/pi)
-#pieper()
+pieper()

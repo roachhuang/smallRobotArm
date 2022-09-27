@@ -1,9 +1,9 @@
 # quiz
 from cmath import acos, atan, pi, sqrt
 from math import radians
-import math
+import test as t
 import craig as cg
-from sympy import *
+import sympy as sp
 from sympy import Symbol, init_printing, solve, sin, cos, symbols, trigsimp, simplify
 import numpy as np
 
@@ -61,7 +61,7 @@ def quiz4_4():
           [0,0,1,-43],
           [0,0,0,1]])
 
-    t=np.deg2rad(60)
+    t=np.deg2rad(-60)
     # rotation in y axis
     tc_d=np.array([[cos(t),  0, sin(t), -500],
                    [0,       1, 0,       452],
@@ -69,11 +69,14 @@ def quiz4_4():
                    [0, 0, 0, 1]
                 ])
     tc_w=simplify(Td_w@tc_d)
-    tc_w=simplify(T0_w@Td_0@tc_d)
+    # my t0_w td_0 & tc_d are correct
+    # tc_w=simplify(T0_w@Td_0@tc_d)
     tc_0=simplify(Td_0@tc_d)
     print('tc_0:', tc_0)
     # real parts only
     print('tc_w:', tc_w)
+    # 0.5//-0.866//0.866//330/472//740
+
     # get coord of end effector
     # return tc_w[0:3, 3]
     return tc_0
@@ -90,12 +93,15 @@ def quiz4_5(tc_0):
           [0,1,0,20],
           [0,0,1,-43],
           [0,0,0,1]])
-    ty= np.deg2rad(60)
+
+    # the cup is rotated in y axis
+    ty= np.deg2rad(-60)
     x=-500
     y=452
     z=410
     tcup_d = np.array([[cos(ty), 0, sin(ty), x], [0, 1, 0, y],
                           [-sin(ty), 0, cos(ty), z], [0, 0, 0, 1]])
+
     # sequence matters!!! think about it.
     tcup_0= simplify(Td_0 @ tcup_d)
     print('tcup_0', tcup_0)
@@ -119,71 +125,39 @@ def quiz4_5(tc_0):
                     [0,0,0,1]])
     '''
     print('t6_0', t6_0)
+    t.pieper(t6_0)
+    # theta3: -158//35
+    quiz4_6(t6_0, -2.7603560010540047)
+    quiz4_6(t6_0, -0.6168272962769602)
+    #theta2: 12//-50
+    #theta1: 64
 
-    #p4_0_org=P6_0_org
+# compute q2
+def quiz4_6(t6_0, q3):
     (x,y,z)=t6_0[0:3, 3]
-    # (x,y,z)=(7,4,7)
-    print('4-0-org:', x,y,z)
-    # (i代4到Ti_i-1 的dh formular)
-    t4_3=cg.get_ti2i_1(4)
-    # returns the 3rd col
-    p4_3_org=t4_3[:, 3]
-    print('p4_3:', p4_3_org)
-    t2_1= cg.get_ti2i_1(2)
-    t3_2= cg.get_ti2i_1(3)
-
-    # g3_equ=z
-    p4_0_org = simplify(t2_1 @ t3_2 @ p4_3_org)
-    print('p4_0:', p4_0_org)
-    # !!!manually adjust +30, find a way to auto it. see p13
-    g1=p4_0_org[0]
-    print(type(g1))
-    #num = g1.find(lambda e: e.is_numeric, group=False)
-    #num = [float(x) for x in str(g1).split() if x.isnumeric()]
-    myTuple=cg.extract_num(str(g1))
-    num=-myTuple[1]
-    print('num:', myTuple[1])
-    # add num to two sides
-    g1=simplify(myTuple[0])
-    # g1 ="{:1f}.format(g1)
-    print('g1:', g1)
-    g1_equ=sqrt(x**2+y**2)
-    # g1_equ=x+num
-    g2_equ=y
-    g3_equ=z
-    #r_equ=round(g1_equ**2+g2_equ**2+g3_equ**2)
-    r_equ=round(g1_equ**2+g3_equ**2)
-
-    #print('p4_0:', p4_0_org)
-    #p4_0_org=P6_0_org
-    g2=p4_0_org[1]
+    t2_1=cg.get_ti2i_1(2)
+    t4_3 = cg.get_ti2i_1(4)
+    p4_3_org = t4_3[:, 3]
+    # send caculated q3 to ti_2_i-1
+    new_t3_2= cg.get_ti2i_1(3, q3)
+    p4_0_org= t2_1@new_t3_2@p4_3_org
+    # z coordinate for p6_0_org=p4_0_org
     g3=p4_0_org[2]
-    print('g3:', g3)
+    #print('g3:', g3)
+    q2=Symbol('q2')
+    #g3=z, note that z is independent of theta1
+    th2=solve(sp.Eq(g3, z), q2)
+    print('@q3:=', q3*180/pi)
+    print('theta2:=', th2[0]*180/pi, th2[1]*180/pi)
+    return th2
 
-    #q2, q3=symbols('q2, q3')
-    # g1=trigsimp(g1)
+quiz4_3()
+tc_0 = quiz4_4()
 
-    #print('trigsimp_g1:', g1)
-    #print('trigsimp_g3:', trigsimp(g3))
+quiz4_5(tc_0)
 
-    #g3=trigsimp(g3)
 
-    # expand (a+b+c)^2
-    # r = expand_trig(g1**2+g3**2)
-    r = trigsimp((g1**2).expand()+(g2**2).expand()+(g3**2).expand())
-    r_equ=(x+num)**2+y**2+z**2
-    r+=round(-r_equ)
-    print('r:', r)
-    #q3 = cg.trig_equ(-27200, -229840, 372656)
-    #print('q3:', q3)
-    q3=Symbol('q3')
-    #sol=solve(r, q3)
-    sol=solve(Eq(r,0), q3)
-
-    print(type(sol))
-    print('sol_q3:', sol[0]*180/pi, sol[1]*180/pi)
-    cg.trig_equ(-27200, -229840, 354852)
-
+'''
     # https://zhuanlan.zhihu.com/p/440748878
     (alp4, a4, d5)=cg.dh_tbl[4, :]
     (alp3, a3, d4)=cg.dh_tbl[3, :]
@@ -211,11 +185,12 @@ def quiz4_5(tc_0):
 t2_1= cg.get_ti2i_1(2)
 t3_2= cg.get_ti2i_1(3)
 print('myt3_2:', simplify(t2_1 @ t3_2))
+'''
 
 quiz4_3()
 tc_0 = quiz4_4()
 
 quiz4_5(tc_0)
 
-def quiz456(q4, q5):
+def quiz456(q4):
     q5 = acos(sin(q4), cos(q4))

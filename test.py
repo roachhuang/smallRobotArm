@@ -6,33 +6,10 @@ import numpy as np
 import sympy as sp
 import craig as cg
 
-#warnings.filterwarnings('ignore')
-#from inverse_kinematic import trig_equ
-dh_tbl=np.array([[0,0,0],
-                    [np.deg2rad(-90), -30, 0],
-                    [0, 340, 0],
-                    [np.deg2rad(-90), -40, 338],
-                    [np.deg2rad(90), 0, 0],
-                    [np.deg2rad(-90),0,0]])
-
-cg.setDhTbl(dh_tbl)
-#getcontext().prec=2
-#getcontext().rounding = ROUND_UP
-
-ty = np.deg2rad(-60) # rotate y axis
-tcup_0_2s = np.array([[cos(ty), 0, sin(ty), 330], [0, 1, 0, 372],
-                          [-sin(ty), 0, cos(ty), 367], [0, 0, 0, 1]])
-Tcup_6 = np.array([[0, 0, 1, 0], [0, -1, 0, 0], [1, 0, 0, 206],
-                       [0, 0, 0, 1]])
-tcup_0_2s = np.array([[cos(ty), 0, sin(ty), 330], [0, 1, 0, 372],
-                          [-sin(ty), 0, cos(ty), 367], [0, 0, 0, 1]])
-
 init_printing(use_unicode=True, use_latex='mathjax')
 np.set_printoptions(precision=3, suppress=True)
 
-
-
-def pieper():
+def pieper(t6_0):
     u, q2, q3=sp.symbols('u,q2,q3')
 
     (alp4, a4, d5)=cg.dh_tbl[4, :]
@@ -40,7 +17,6 @@ def pieper():
     (alp2, a2, d3)=cg.dh_tbl[2, :]
     (alp1, a1, d2)=cg.dh_tbl[1, :]
 
-    t6_0 = tcup_0_2s @ np.linalg.inv(Tcup_6)
     print('t6_0', t6_0)
     #p4_0_org=P6_0_org
     (x,y,z)=t6_0[0:3, 3]
@@ -76,12 +52,15 @@ def pieper():
     print('g2:', g2)
     print('g3:', g3)
 
-    #p4_0=[x,y,z,1]=t1_0@g
-    # r=x**2+y**2+z**2=g1**2+g2**2+g3**2
-    # r is func of only theta2 & 3
-    # z = g3 (z is func of theta 3)
-    # r = trigsimp((g1**2).expand()+(g3**2).expand())
-    # print('r:', r)
+    '''
+    p4_0=[x,y,z,1] = t1_0@g = [c1g1-s1g2, s1g1+c1g2, g3, 1]
+    frame0 to wrist 的長度平方 so as to eliminate q1
+    c1g1**2-s1g2**2+s1g1**2+c1g2**2+g3**2=> g1**2(c1**2+s1**2)+g2**2(s1**2+c1**2)+g3**2
+    hence, r=x**2+y**2+z**2=g1**2+g2**2+g3**2
+    r is func of only theta2 & 3
+    z = g3 (z is func of theta 3)
+    '''
+
     r=x**2+y**2+z**2
 
     k1=f1
@@ -89,7 +68,7 @@ def pieper():
     k3=trigsimp(f1**2 + f2**2 + f3**2 + a1**2 + d2**2 + 2*d2*f3)
     k4=f3*cos(alp1)+d2*cos(alp1)
 
-    # frame0 to wrist 的長度平方. eliminate q1
+    #
     #r=trigsimp((k1*cos(q2)+k2*sin(q2))*2*a1 + k3)
     #z=trigsimp((k1*sin(q2)-k2*cos(q2))*sin(alp1) + k4)
 
@@ -111,33 +90,73 @@ def pieper():
         r=(k1c2+k2s2)*2a1+k3
         z=(k1s2-k2c2)*sin(alp1)+k4
         r**2+z**2 to eliminate theta2, you can see from above 2 equations
-
         move k3&k4 to the left side, r and z 取平方和 to eliminate q2
         (r-k3/2*a1)**2 + (z-k4/sin(alp1))**2 = k1**2+k2**2
         =>(r-k3)**2/4*a1**2 + (z-k4)**2/sin(alp1)**2 = k1**2+k2**2
         '''
         #u=tan(q3/2)
+        #c3=simplify("(1-u**2)/(1+u**2)")
+        #s3=simplify("(2*u)/(1+u**2)")
         c3=(1-u**2)/(1+u**2)
-        s3=2*u/(1+u**2)
+        s3=(2*u)/(1+u**2)
+        #c3=1-u**2/1+u**2
+        #s3=2*u/1+u**2
         # very tricky - lexpr needs () for all expression!!!
+        # lExpr = (r-k3)**2/(4*(a1**2)) + ((z-k4)**2)/(sin(alp1))**2
         lExpr = (r-k3)**2/(4*(a1**2)) + ((z-k4)**2)/(sin(alp1))**2
-        # lExpr = (r-k3/2*a1)**2 + (z-k4/sin(alp1))**2
         lExpr=sp.expand_trig(lExpr)
+        #lExpr=trigsimp(((r-k3)**2)/(4*(a1**2)) + ((z-k4)**2)/(sin(alp1))**2)
+        print('lExpr:', lExpr)
         lExpr = lExpr.subs([(sin(q3), s3), (cos(q3), c3)])
+        #lExpr = lExpr.subs([(sin(q3), simplify(2*u/1+u**2)), (cos(q3), simplify(1-u**2/1+u**2))])
         lExpr = lExpr.expand()
-        rExpr = (k1**2).expand()+(k2**2).expand()
-        rExpr = trigsimp(rExpr)
+        print('lExpr:', lExpr)
+        #rExpr = (k1**2).expand()+(k2**2).expand()
+        rExpr = k1**2+k2**2
+        #rExpr = trigsimp(rExpr)
+        rExpr=sp.expand_trig(rExpr)
         print('rExpr:', rExpr)
         rExpr = rExpr.subs([(sin(q3), s3), (cos(q3), c3)])
+        #rExpr=rExpr.subs([(sin(q3), simplify(2*u/1+u**2)), (cos(q3), simplify(1-u**2/1+u**2))])
         rExpr = rExpr.expand()
         print('rexpr:', rExpr)
         expr=lExpr-rExpr
-        roots=solve(Eq(lExpr,rExpr), u)
+        #roots=solve(Eq(lExpr,rExpr), u)
+        roots=solveset(Eq(lExpr, rExpr), u)
+        #roots=expr.all_roots()
         # sp.pprint([expr.evalf(chop=True) for expr in results])
         print('u:', roots)
         for root in roots:
             rad = 2*atan2(root, 1)
+            print ('rad:', rad)
+            #rad = 2*atan(root)
             print('deg:', rad*180/pi)
 
     #print('t3:=', th3[0]*180/pi, th3[1]*180/pi)
-pieper()
+
+def ntu_pieper():
+    #warnings.filterwarnings('ignore')
+    #from inverse_kinematic import trig_equ
+    dh_tbl=np.array([[0,0,0],
+                        [np.deg2rad(-90), -30, 0],
+                        [0, 340, 0],
+                        [np.deg2rad(-90), -40, 338],
+                        [np.deg2rad(90), 0, 0],
+                        [np.deg2rad(-90),0,0]])
+
+    cg.setDhTbl(dh_tbl)
+    #getcontext().prec=2
+    #getcontext().rounding = ROUND_UP
+
+    ty = np.deg2rad(-60) # rotate y axis
+    tcup_0_2s = np.array([[cos(ty), 0, sin(ty), 330], [0, 1, 0, 372],
+                            [-sin(ty), 0, cos(ty), 367], [0, 0, 0, 1]])
+    Tcup_6 = np.array([[0, 0, 1, 0], [0, -1, 0, 0], [1, 0, 0, 206],
+                        [0, 0, 0, 1]])
+    tcup_0_2s = np.array([[cos(ty), 0, sin(ty), 330], [0, 1, 0, 372],
+                            [-sin(ty), 0, cos(ty), 367], [0, 0, 0, 1]])
+
+    t6_0 = tcup_0_2s @ np.linalg.inv(Tcup_6)
+    pieper(t6_0)
+
+#ntu_pieper()
