@@ -10,7 +10,11 @@ init_printing(use_unicode=True, use_latex='mathjax')
 np.set_printoptions(precision=3, suppress=True)
 
 def pieper(t6_0):
-    u, q2, q3=sp.symbols('u,q2,q3')
+    q1s=[]
+    q2s=[]
+    q3s=[]
+
+    u, q1, q2, q3=sp.symbols('u,q1,q2,q3')
 
     (alp4, a4, d5)=cg.dh_tbl[4, :]
     (alp3, a3, d4)=cg.dh_tbl[3, :]
@@ -62,7 +66,6 @@ def pieper(t6_0):
     '''
 
     r=x**2+y**2+z**2
-
     k1=f1
     k2=-f2
     k3=trigsimp(f1**2 + f2**2 + f3**2 + a1**2 + d2**2 + 2*d2*f3)
@@ -79,12 +82,13 @@ def pieper(t6_0):
         (which is the origin of frames 4, 5, and 6) is a function of θ3 only;
         r=k3
         '''
-        th3=solve(Eq(k3, x**2+y**2+z**2), q3)
+        #q3s=solve(Eq(k3, x**2+y**2+z**2), q3)
+        q3s=solve(Eq(r, k3), q3)
     # general case when a1 != 0 & alpha1 != 0
     # combine k3 and g3
     elif (alp1 == 0):
         # z=k4
-        t3=solve(Eq(k4), z, q3)
+        q3s=solve(Eq(z, k4), q3)
     else:
         '''
         r=(k1c2+k2s2)*2a1+k3
@@ -95,20 +99,15 @@ def pieper(t6_0):
         =>(r-k3)**2/4*a1**2 + (z-k4)**2/sin(alp1)**2 = k1**2+k2**2
         '''
         #u=tan(q3/2)
-        #c3=simplify("(1-u**2)/(1+u**2)")
-        #s3=simplify("(2*u)/(1+u**2)")
         c3=(1-u**2)/(1+u**2)
         s3=(2*u)/(1+u**2)
-        #c3=1-u**2/1+u**2
-        #s3=2*u/1+u**2
         # very tricky - lexpr needs () for all expression!!!
-        # lExpr = (r-k3)**2/(4*(a1**2)) + ((z-k4)**2)/(sin(alp1))**2
         lExpr = (r-k3)**2/(4*(a1**2)) + ((z-k4)**2)/(sin(alp1))**2
         lExpr=sp.expand_trig(lExpr)
         #lExpr=trigsimp(((r-k3)**2)/(4*(a1**2)) + ((z-k4)**2)/(sin(alp1))**2)
         print('lExpr:', lExpr)
         lExpr = lExpr.subs([(sin(q3), s3), (cos(q3), c3)])
-        #lExpr = lExpr.subs([(sin(q3), simplify(2*u/1+u**2)), (cos(q3), simplify(1-u**2/1+u**2))])
+        #lExpr = lExpr.subs([(sin(q3), simplify('2*u/1+u**2')), (cos(q3), simplify('1-u**2/1+u**2'))])
         lExpr = lExpr.expand()
         print('lExpr:', lExpr)
         #rExpr = (k1**2).expand()+(k2**2).expand()
@@ -117,22 +116,47 @@ def pieper(t6_0):
         rExpr=sp.expand_trig(rExpr)
         print('rExpr:', rExpr)
         rExpr = rExpr.subs([(sin(q3), s3), (cos(q3), c3)])
-        #rExpr=rExpr.subs([(sin(q3), simplify(2*u/1+u**2)), (cos(q3), simplify(1-u**2/1+u**2))])
+        #rExpr=rExpr.subs([(sin(q3), simplify('2*u/1+u**2')), (cos(q3), simplify('1-u**2/1+u**2'))])
         rExpr = rExpr.expand()
         print('rexpr:', rExpr)
         expr=lExpr-rExpr
-        #roots=solve(Eq(lExpr,rExpr), u)
         roots=solveset(Eq(lExpr, rExpr), u)
         #roots=expr.all_roots()
         # sp.pprint([expr.evalf(chop=True) for expr in results])
         print('u:', roots)
         for root in roots:
-            rad = 2*atan2(root, 1)
-            print ('rad:', rad)
+            q3s.append(2*atan2(root, 1))
             #rad = 2*atan(root)
-            print('deg:', rad*180/pi)
+    # remove duplicates from the list
+    q3s=list(dict.fromkeys(q3s))
+    for t3 in q3s:
+        print('t3:=', t3*180/pi)
+        # solve q2: r=(k1*c2+k2*s2)*2*a1+k3
+        k1 = k1.subs(q3, t3)
+        k2 = k2.subs(q3, t3)
+        k3 = k3.subs(q3, t3)
+        rExpr=(k1*cos(q2)+k2*sin(q2))*2*a1+k3
+        tmp=solve(Eq(r, rExpr), q2)
+        q2s.extend(tmp)
 
-    #print('t3:=', th3[0]*180/pi, th3[1]*180/pi)
+    q2s=list(dict.fromkeys(q2s))
+    # solve q1: x=c1*g1(q2,q3)-s1*g2(q2,q3)
+    for t2 in q2s:
+        print('t2:=', t2*180/pi)
+        for t3 in q3s:
+            g1 = g1.subs([(q2,t2),(q3, t3)])
+            g2 = g2.subs([(q2,t2),(q3, t3)])
+            rExpr=cos(q1)*g1-sin(q1)*g2
+            tmp=solve(Eq(x, rExpr),q1)
+            q1s.extend(tmp)
+
+    q1s=list(dict.fromkeys(q1s))
+    for t1 in q1s:
+        print('t1:=', t1*180/pi)
+
+    #pc_0
+    cg.verify_ik((227,372), 300, 338, 206, q1s, q2s, q3s)
+    print('all done!')
 
 def ntu_pieper():
     #warnings.filterwarnings('ignore')
@@ -159,4 +183,4 @@ def ntu_pieper():
     t6_0 = tcup_0_2s @ np.linalg.inv(Tcup_6)
     pieper(t6_0)
 
-#ntu_pieper()
+ntu_pieper()

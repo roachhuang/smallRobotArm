@@ -128,6 +128,19 @@ def extract_num(inp_str):
     t=(trigsimp(newG), num)
     return t
 
-from sympy.abc import x, y
-#x=Symbol('x')
-sp.pprint(sp.poly(x*(x**2 + x - 1)**2))
+def fk_3axes(l1, l2, l3, q1, q2, q3):
+    x = l1 * cos(q1) + l2 * cos(q1 + q2) + l3 * cos(q1 + q2 + q3)
+    y = l1 * sin(q1) + l2 * sin(q1 + q2) + l3 * sin(q1 + q2 + q3)
+    print('x, y:', x, y)
+    return (x, y)
+
+#l3=206
+# endEffector # tuple (x,y)
+def verify_ik(pc_0, l1, l2, l3, q1s, q2s, q3s):
+    endEffector = pc_0
+    for q1 in q1s:
+        for q2 in q2s:
+            for q3 in q3s:
+                if (fk_3axes(l1, l2, l3, q1, q2, q3) == endEffector):
+                    print(q2, q3)
+
