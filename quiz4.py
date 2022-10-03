@@ -127,8 +127,9 @@ def quiz4_5(tc_0):
     print('t6_0', t6_0)
     t.pieper(t6_0)
     # theta3: -158//35
-    quiz4_6(t6_0, -2.7603560010540047)
-    quiz4_6(t6_0, -0.6168272962769602)
+    # quiz4_6(t6_0, -2.7603560010540047)
+    # quiz4_6(t6_0, -0.6168272962769602)
+
     #theta2: 12//-50
     #theta1: 64
 
@@ -186,11 +187,5 @@ t2_1= cg.get_ti2i_1(2)
 t3_2= cg.get_ti2i_1(3)
 print('myt3_2:', simplify(t2_1 @ t3_2))
 '''
-
-quiz4_3()
-tc_0 = quiz4_4()
-
-quiz4_5(tc_0)
-
 def quiz456(q4):
     q5 = acos(sin(q4), cos(q4))

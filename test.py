@@ -128,29 +128,34 @@ def pieper(t6_0):
             q3s.append(2*atan2(root, 1))
             #rad = 2*atan(root)
     # remove duplicates from the list
+    # solve q2: r=(k1*c2+k2*s2)*2*a1+k3
     q3s=list(dict.fromkeys(q3s))
     for t3 in q3s:
-        print('t3:=', t3*180/pi)
-        # solve q2: r=(k1*c2+k2*s2)*2*a1+k3
-        k1 = k1.subs(q3, t3)
-        k2 = k2.subs(q3, t3)
-        k3 = k3.subs(q3, t3)
-        rExpr=(k1*cos(q2)+k2*sin(q2))*2*a1+k3
+        print('@t3:=', t3*180/pi)
+        #print('cos(t3)= {}'.format(cos(t3)))
+        #print('sin(t3)= {}'.format(sin(t3)))
+        aftk1 = k1.subs(q3, t3)
+        aftk2 = k2.subs(q3, t3)
+        aftk3 = k3.subs(q3, t3)
+        rExpr=((aftk1*cos(q2))+(aftk2*sin(q2)))*(2*a1)+aftk3
         tmp=solve(Eq(r, rExpr), q2)
         q2s.extend(tmp)
 
     q2s=list(dict.fromkeys(q2s))
+    '''
     # solve q1: x=c1*g1(q2,q3)-s1*g2(q2,q3)
-    for t2 in q2s:
-        print('t2:=', t2*180/pi)
-        for t3 in q3s:
-            g1 = g1.subs([(q2,t2),(q3, t3)])
-            g2 = g2.subs([(q2,t2),(q3, t3)])
-            rExpr=cos(q1)*g1-sin(q1)*g2
+    for t3 in q3s:
+        print('@t3:=', t3*180/pi)
+        for t2 in q2s:
+            print('@t2:=', t2*180/pi)
+            aftg1 = g1.subs([(q2,t2),(q3, t3)])
+            aftg2 = g2.subs([(q2,t2),(q3, t3)])
+            rExpr=cos(q1)*aftg1-sin(q1)*aftg2
             tmp=solve(Eq(x, rExpr),q1)
             q1s.extend(tmp)
-
     q1s=list(dict.fromkeys(q1s))
+    '''
+    q1s.append(atan2(y,x))
     for t1 in q1s:
         print('t1:=', t1*180/pi)
 
@@ -183,4 +188,4 @@ def ntu_pieper():
     t6_0 = tcup_0_2s @ np.linalg.inv(Tcup_6)
     pieper(t6_0)
 
-ntu_pieper()
+#ntu_pieper()
