@@ -1,4 +1,4 @@
-# quiz5 @ coursera's robotics by ntu
+# quiz5 3~6 @ coursera's robotics by ntu
 
 from math import radians
 import numpy as np
@@ -32,7 +32,6 @@ T = np.array([[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
               [0, 0, 0, 0, 0, 0, 2, 6 * dt2, 0, 0, -2, 0]])
 
 # Cartesian-space
-
 """
 5-6 exam 2
 C = np.array([
@@ -59,7 +58,6 @@ else:
     print('error det !=0; no inverse')
 #print(T_inv)
 #print(np.matmul(T_inv, C_of_X))
-
 """
 C_of_Q1 = np.array([2.50, 1.99, 1.99, 0.35, 0.35, -1.62, 0, 0, 0, 0, 0, 0])
 C_of_Q2 = np.array([2.21, 1.0, 1.0, 2.35, 2.35, 2.35, 0, 0, 0, 0, 0, 0])
@@ -78,7 +76,7 @@ for i in C:
 #padding 0 for last 6 rows
 # col:theta1~theat3 of the arm
 Q12x3.resize((12, 3), refcheck=False)
-print('theta:', Q12x3)
+print('theta:', Q12x3.real)
 
 # 2 dicimal points accroding to 5-6 exm2
 np.set_printoptions(precision=3, suppress=True)
@@ -86,25 +84,35 @@ A12x3 = (np.round(T_inv @ Q12x3, 2))
 
 # make a0~a3 in one row, 0~1s,2~4s,4~9s in one group(3x4), each group represent one theta
 # 3xseg, 3xtheta, 4xai
-A12x3 = np.transpose(A12x3).reshape(3,3,4)
+A12x3 = np.transpose(A12x3).reshape(3, 3, 4)
 #A = np.reshape(A, (3, 3, 4))
 # A is now a 3-D array
 # row: theta, col:aij,
-print(A12x3)
+print('A12x3:', A12x3.real)
+'''
+each theta has 3 polyonmials (init, via & final)
+and each seg(i) has 4 coefficients (ai0~ai3)
+hence, each theta has 12 coefficients
+'''
 
 # q:0~2, seg: 0~2
 def getCoefficients(q, segment):
     #a = np.empty([1, 4])
-    a=[]
+    a = []
     # return an arry of the 4 coefficients - ai0,ai1,ai2,ai3 (where i is seg)
     # Sj(t)=Aj+Bj*dt+Cj*dt**2+Dj*dt**3
     # Sj'(t) = Bj+2*Cj*dt+3*Dj*dt**2
     for x in range(4):
-        a= np.append(a, A12x3[q, segment, x])
+        a = np.append(a, A12x3[q, segment, x])
     return a
+'''
+ans:
+5. 2.21//0//-0.83//0.27
+6. -2.21//0.14//-0.61//0.05
+'''
+
 
 #print(getCoefficients(0, 1))
-
 """
 
 get the 4 'a' coefficients for each joint

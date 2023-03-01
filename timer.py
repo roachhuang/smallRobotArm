@@ -1,19 +1,17 @@
 import math
 import threading as th
 import time
-from matplotlib import pyplot as plt
-from traj_joint_space import getCoefficients
+# from matplotlib import pyplot as plt
+import matplotlib.pyplot as plt
 import numpy as np
+from traj_joint_space import getCoefficients
 
 def cb1():
     #while True:
     print("1st event")
 
-
 # do your stuff
 #sc.enter(10, 1, do_something, (sc,))
-
-
 def cb2():
     s1Active = False
     print("2nd event")
@@ -40,6 +38,7 @@ L3 = 1
 x0 = y0 = 0
 figno = 1
 
+
 def doSeg(dt, seg):
     pos = np.array([0, 0, 0], dtype=float)
     vel = np.array([0, 0, 0], dtype=float)
@@ -57,8 +56,8 @@ def doSeg(dt, seg):
 
     x1 = L1 * math.cos(pos[0])
     y1 = L1 * math.sin(pos[0])
-    x2 = x1 + L2 * math.cos(pos[0]+pos[1])
-    y2 = y1 + L2 * math.sin(pos[0]+pos[1])
+    x2 = x1 + L2 * math.cos(pos[0] + pos[1])
+    y2 = y1 + L2 * math.sin(pos[0] + pos[1])
     filename = str(figno) + 'jpg'
     figno = figno + 1
     plt.figure()
@@ -66,7 +65,7 @@ def doSeg(dt, seg):
     plt.plot([x1, x2], [y1, y2])
     plt.xlim([-8, 8])
     plt.ylim([-8, 8])
-    plt.savefig(filename)
+    # plt.savefig(filename)
     print('---------------')
 
 
