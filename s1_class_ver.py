@@ -1,4 +1,25 @@
+"""_summary_
+Measure the position of the target location relative to the table frame,
+using a measuring tape, laser range finder, or other measurement tool.
 
+Calculate the position of the target location in the robot's base frame,
+by transforming the measured position from the table frame to the robot's
+base frame. This can be done using a coordinate transformation matrix
+that describes the position and orientation of the table frame in the
+robot's base frame.
+
+Determine the desired orientation of the end-effector at the target
+location. Depending on your application, this may be a fixed orientation
+(e.g. always pointing straight down), or it may be a variable orientation
+that depends on the specific task.
+
+Combine the calculated position and orientation into a homogeneous
+transformation matrix T, as described in my previous answer.
+This matrix represents the pose that you will use as input to the inverse
+kinematics algorithm.
+    Returns:
+        _type_: _description_
+"""
 from math import radians
 from threading import Thread, Event
 from time import sleep, perf_counter
@@ -45,15 +66,22 @@ The functions included in this module are:
 - init_ser: init serial port (auto select port#)
 """
 
-
 def send2Arduino(ser, header: str, j, bWaitAck: bool):
+    """send robot cmd to arduino
+
+    Args:
+        ser (_type_): _description_
+        header (str): cmd type
+        j (float): theta in deg for 6 axes
+        bWaitAck (bool): wait for ack from arduino or not
+    """
     msg = f'{header}{j[0]:.2f},{j[1]:.2f},{j[2]:.2f},{j[3]:.2f},{j[4]:.2f},{j[5]:.2f}\n'
     ser.write(msg.encode('utf-8'))
     event_ok2send.clear()
     print(msg)
     if bWaitAck is True:
         event_ok2send.wait()
-    #while event_ack.is_set() and bWaitAck is True:
+    # while event_ack.is_set() and bWaitAck is True:
     #    pass
 
 
@@ -128,7 +156,7 @@ def main() -> None:
     tc6 = robot.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
     # orientation for frame 6 is unchanged (x points up, z->front)
     t60 = robot.pose2T([164.5, 0.0, 241.0, 90.0, 180.0, -90])
-    #t60 = robot.pose2T([164.5, 0.0, 241.0, 180.0, -90.0, 0])
+    # t60 = robot.pose2T([164.5, 0.0, 241.0, 180.0, -90.0, 0])
     tc0 = t60 @ tc6
     T_se3 = SE3(tc0)
     tZ1, tY, tZ2 = T_se3.eul(unit='deg')
@@ -157,7 +185,7 @@ def main() -> None:
     ser.write(b"rst\n")
     sleep(.5)
     j = smallRobotArm.ik(initPose)
-    #j=[0,0,0,0,90,0]
+    # j=[0,0,0,0,90,0]
     send2Arduino(ser, 'j', j, bWaitAck=True)
     '''
     T = SE3(initPose[0],  initPose[1], initPose[2]) * \

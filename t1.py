@@ -1,25 +1,31 @@
 import numpy as np
-from roboticstoolbox import DHRobot, RevoluteDH
+import roboticstoolbox as rtb
+# from roboticstoolbox import DHRobot, RevoluteDH
 from spatialmath import SE3
 
 # Define your DH table parameters
-a1, a2, a3, a6 = 47.0, 110.0, 26.0, 50
+a1, a2, a3 = 47.0, 110.0, 26.0
 d1, d4, d6 = 133.0, 117.50, 28.0
 
 dh_table = [
-    RevoluteDH(d=d1, a=a1, alpha=-np.pi/2),    # joint 1
-    RevoluteDH(d=0, a=a2, alpha=0, offset=-np.pi/2),             # joint 2
-    RevoluteDH(d=0, a=a3, alpha=-np.pi/2),      # joint 3
-    RevoluteDH(d=d4, a=0, alpha=np.pi/2),       # joint 4
-    RevoluteDH(d=0, a=0, alpha=-np.pi/2),       # joint 5
-    RevoluteDH(d=d6, a=a6, alpha=0)              # joint 6
+    rtb.RevoluteDH(d=d1, a=a1, alpha=-np.pi/2),    # joint 1
+    rtb.RevoluteDH(d=0, a=a2, alpha=0, offset=-np.pi/2),             # joint 2
+    rtb.RevoluteDH(d=0, a=a3, alpha=-np.pi/2),      # joint 3
+    rtb.RevoluteDH(d=d4, a=0, alpha=np.pi/2),       # joint 4
+    rtb.RevoluteDH(d=0, a=0, alpha=-np.pi/2),       # joint 5
+    rtb.RevoluteDH(d=d6, a=0, alpha=0)              # joint 6
 ]
 
 # Create the robot object with the DH parameters
-robot = DHRobot(dh_table)
-
+robot = rtb.DHRobot(dh_table)
+print('Reach of the robot:', robot.reach)
+print('nbranches', robot.nbranches)
+robot.islimit([0, 0, -4, 4, 0, 0])
+print('is spherical:', robot.isspherical())
+# Robot kinematics as an elemenary transform sequence
+robot.ets()
 # Print the robot's kinematic model
-print(robot)
+
 """
          ti     q1     q2     q3      q4      q5      q6
 0   2.0  11.56  73.55 -24.84  180.00  138.72   58.44

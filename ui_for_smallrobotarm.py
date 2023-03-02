@@ -13,9 +13,22 @@ class Application(tk.Frame):
         self.create_widgets()
 
         # initialize the serial connection to the Arduino
-        self.ser = serial.Serial('COM4', 115200)
+        self.ser = serial.Serial('COM3', 115200)
         self.ser.write(b"en\n")
         sleep(1)
+
+    def adjust_slider_value(self, slider, increment):
+        """
+        Adjust the value of the given slider by the given increment.
+
+        Args:
+            slider: The slider to adjust.
+            increment: The amount to increment the slider value by.
+        """
+        current_value = slider.get()
+        new_value = current_value + increment
+        slider.set(new_value)
+
     def create_widgets(self):
         # create labels for the joint sliders
         joint1_label = tk.Label(self, text="Joint 1")
@@ -51,6 +64,71 @@ class Application(tk.Frame):
             self, from_=-180, to=180, orient=tk.HORIZONTAL, length=200)
         self.joint6_slider.grid(row=5, column=1)
 
+        # create sliders for the joint angles
+        self.joint1_slider = tk.Scale(
+            self, from_=-180, to=180, orient=tk.HORIZONTAL, length=200)
+        self.joint1_slider.grid(row=0, column=1)
+        self.joint2_slider = tk.Scale(
+            self, from_=-180, to=180, orient=tk.HORIZONTAL, length=200)
+        self.joint2_slider.grid(row=1, column=1)
+        self.joint3_slider = tk.Scale(
+            self, from_=-180, to=180, orient=tk.HORIZONTAL, length=200)
+        self.joint3_slider.grid(row=2, column=1)
+        self.joint4_slider = tk.Scale(
+            self, from_=-180, to=180, orient=tk.HORIZONTAL, length=200)
+        self.joint4_slider.grid(row=3, column=1)
+        self.joint5_slider = tk.Scale(
+            self, from_=-180, to=180, orient=tk.HORIZONTAL, length=200)
+        self.joint5_slider.grid(row=4, column=1)
+        self.joint6_slider = tk.Scale(
+            self, from_=-180, to=180, orient=tk.HORIZONTAL, length=200)
+        self.joint6_slider.grid(row=5, column=1)
+
+        # create buttons to adjust slider values
+        self.joint1_plus_button = tk.Button(
+            self, text='+', command=lambda: self.adjust_slider_value(self.joint1_slider, 10))
+        self.joint1_plus_button.grid(row=0, column=3, padx=10)
+        self.joint1_minus_button = tk.Button(
+            self, text='-', command=lambda: self.adjust_slider_value(self.joint1_slider, -10))
+        self.joint1_minus_button.grid(row=0, column=2, padx=10)
+
+        self.joint2_plus_button = tk.Button(
+            self, text='+', command=lambda: self.adjust_slider_value(self.joint2_slider, 10))
+        self.joint2_plus_button.grid(row=1, column=3, padx=10)
+        self.joint2_minus_button = tk.Button(
+            self, text='-', command=lambda: self.adjust_slider_value(self.joint2_slider, -10))
+        self.joint2_minus_button.grid(row=1, column=2, padx=10)
+
+        self.joint3_plus_button = tk.Button(
+            self, text='+', command=lambda: self.adjust_slider_value(self.joint3_slider, 10))
+        self.joint3_plus_button.grid(row=2, column=3, padx=10)
+        self.joint3_minus_button = tk.Button(
+            self, text='-', command=lambda: self.adjust_slider_value(self.joint3_slider, -10))
+        self.joint3_minus_button.grid(row=2, column=2, padx=10)
+
+        self.joint4_plus_button = tk.Button(
+            self, text='+', command=lambda: self.adjust_slider_value(self.joint4_slider, 10))
+        self.joint4_plus_button.grid(row=3, column=3, padx=10)
+        self.joint4_minus_button = tk.Button(
+            self, text='-', command=lambda: self.adjust_slider_value(self.joint4_slider, -10))
+        self.joint4_minus_button.grid(row=3, column=2, padx=10)
+
+        self.joint5_plus_button = tk.Button(
+            self, text='+', command=lambda: self.adjust_slider_value(self.joint5_slider, 10))
+        self.joint5_plus_button.grid(row=4, column=3, padx=10)
+        self.joint5_minus_button = tk.Button(
+            self, text='-', command=lambda: self.adjust_slider_value(self.joint5_slider, -10))
+        self.joint5_minus_button.grid(row=4, column=2, padx=10)
+
+        self.joint6_plus_button = tk.Button(
+            self, text='+', command=lambda: self.adjust_slider_value(self.joint6_slider, 10))
+        self.joint6_plus_button.grid(row=5, column=3, padx=10)
+        self.joint6_minus_button = tk.Button(
+            self, text='-', command=lambda: self.adjust_slider_value(self.joint6_slider, -10))
+        self.joint6_minus_button.grid(row=5, column=2, padx=10)
+
+
+        """
         # create labels and entry boxes for the Cartesian space coordinates
         x_label = tk.Label(self, text="X")
         x_label.grid(row=0, column=2)
@@ -80,6 +158,7 @@ class Application(tk.Frame):
         rz_label.grid(row=5, column=2)
         self.rz_entry = tk.Entry(self)
         self.rz_entry.grid(row=5, column=3)
+        """
 
         # create a button to send the command to the Arduino
         send_button = tk.Button(self, text="Send Command",
