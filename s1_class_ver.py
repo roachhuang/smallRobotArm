@@ -27,8 +27,7 @@ from time import sleep, perf_counter
 import logging
 import pandas as pd
 import numpy as np
-import serial.tools.list_ports
-import serial
+import init_serial as com
 import equations as eq
 import robotarm_class as robot
 import plan_traj as pt
@@ -75,7 +74,8 @@ def send2Arduino(ser, header: str, j, bWaitAck: bool):
         j (float): theta in deg for 6 axes
         bWaitAck (bool): wait for ack from arduino or not
     """
-    msg = f'{header}{j[0]:.2f},{j[1]:.2f},{j[2]:.2f},{j[3]:.2f},{j[4]:.2f},{j[5]:.2f}\n'
+    # msg = f'{header}{j[0]:.2f},{j[1]:.2f},{j[2]:.2f},{j[3]:.2f},{j[4]:.2f},{j[5]:.2f}\n'
+    msg = '{header}{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}\n'.format(*j, header)
     ser.write(msg.encode('utf-8'))
     event_ok2send.clear()
     print(msg)
@@ -101,39 +101,6 @@ def ReceiveThread(ser, event_run):
             if string == 'ack':
                 # receive ack frm arduion meaning it is free now
                 event_ok2send.set()
-
-
-def init_ser():
-    """
-    Initializes a serial connection to an Arduino board.
-
-    Returns:
-        A `serial.Serial` object representing the serial connection, or `None` if no suitable
-        serial port is found or if the connection fails.
-    """
-    ports = list(serial.tools.list_ports.comports())
-    ser = None
-
-    if not ports:
-        print("No serial ports found.")
-        return None
-
-    # Skip over COM1 port, if available
-    ports = [p for p in ports if "COM1" not in p.name]
-
-    for port in ports:
-        try:
-            ser = serial.Serial(port.name, 115200, timeout=.1)
-            break
-        except (OSError, serial.SerialException):
-            print(f"Could not connect to serial port {port.name}")
-
-    if not ser:
-        print("Failed to connect to any serial port.")
-        return None
-
-    print(f"Connected to serial port {ser.name}")
-    return ser
 
 
 def main() -> None:
@@ -171,7 +138,7 @@ def main() -> None:
     print("dhTbl =\n" + np.array2string(smallRobotArm.dhTbl, separator=', ',
                                         formatter={'float': '{: 0.2f}'.format}))
     # init serial
-    ser = init_ser()
+    ser = com.init_ser()
     # ser.reset_input_buffer()
     # ser.reset_output_buffer()
     event_run.set()

@@ -5,6 +5,7 @@ import init_serial as com
 class Application(tk.Frame):
     def __init__(self, master=None):
         super().__init__(master)
+        self.prevJoint = [0,0,0,0,0,0]
         self.master = master
         self.master.title("Robot Arm Control Panel")
         self.master.geometry("600x400")
@@ -14,7 +15,7 @@ class Application(tk.Frame):
 
         # initialize the serial connection to the Arduino
         self.ser = com.init_ser()
-        # cannot just send right after init_ser
+        # there must be a dealy here!!!
         sleep(1)
         self.ser.write(b"en\n")
         sleep(.5)
@@ -36,12 +37,14 @@ class Application(tk.Frame):
     def send_command(self):
         # read the joint angles from the sliders
         joint=[0,0,0,0,0,0]
+
         for i in range(6):
             joint[i] = float(self.sliders[i].get())
 
+        dtJoint = [x - y for x, y in zip(joint, self.prevJoint)]
+        self.prevJoint = joint
         # construct the command string
-        command = "g{},{},{},{},{},{}\n".format(
-            joint[0], joint[1], joint[2], joint[3], joint[4], joint[5])
+        command = "g{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}\n".format(*dtJoint)
         print(command)
         # send the command to the Arduino
         self.ser.write(command.encode('utf-8'))

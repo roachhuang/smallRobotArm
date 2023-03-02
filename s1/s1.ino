@@ -78,6 +78,8 @@ float velG = 0;
   float A[5][6];  // plus head and tail
 */
 
+float* splitString(String val);
+
 void setup() {
   pinMode(ledPin, OUTPUT);
   digitalWrite(ledPin , HIGH );
@@ -137,7 +139,7 @@ void setup() {
 }
 
 void loop() {
-  String val;
+  String val;  
   // float velG = 0.25e-4;
 
   if (Serial.available() > 0) {
@@ -146,30 +148,52 @@ void loop() {
       digitalWrite(ledPin, LOW);
       // Serial.println("data == \"jn\"");
       val = data.substring(1, data.length());
-      splitString(val, X);      // update array X
+      
+      float* ik = splitString(val);      // update array X
+      
       // goStrightLine(Ji, X, 0.25e-4, 0.75e-10, 0.5 * velG, 0.5 * velG);
-      goStrightLine(Ji, X, 0.15e-4, 0.35e-10, 0, 0 );
+      goStrightLine(Ji, ik, 0.15e-4, 0.35e-10, 0, 0 );
       Serial.println("ack");
       // des, src, size
-      memcpy(Ji, X, sizeof(X));
+      memcpy(Ji, ik, sizeof(Ji));
       velG = 0.25e-4;
     }
     else if (data.startsWith("m")) {
       digitalWrite(ledPin, LOW);
       val = data.substring(1, data.length());
-      splitString(val, X);
-      goTrajectory(X);
+      
+      float* j_of_time = splitString(val);
+      
+      goTrajectory(j_of_time);
       // Serial.println("ack m");
     }
-    else if (data.startsWith("g")) {
+    if (data.startsWith("i")) {
       val = data.substring(1, data.length());
-      splitString(val, X);
-      float Jinitial[6] = {curPos1, curPos2, curPos3, curPos4, curPos5, curPos6};
-      float Jfinal[6] = {curPos1, curPos2, curPos3, curPos4, curPos5, curPos6};
-      for (int i = 0; i < sizeof(X); i++) {
-        Jfinal[i] = (X[i] != 0) ? X[i] : Jfinal[i];
+      
+      float* ik = splitString(val);      // update array X
+      
+      goStrightLine(Ji, ik, 0.15e-4, 0.35e-10, 0, 0 );
+      Serial.println("ack");
+      curPos1 = 0.0;  //
+      curPos2 = 0.0;
+      curPos3 = 0.0;
+      curPos4 = 0.0;
+      curPos5 = 90.0;
+      curPos6 = 0.0;
+    }
+    else if (data.startsWith("g")) {           
+      val = data.substring(1, data.length());      
+      float* dTheta = splitString(val);
+      float from[6] = {curPos1, curPos2, curPos3, curPos4, curPos5, curPos6};
+      float to[6] = {curPos1, curPos2, curPos3, curPos4, curPos5, curPos6};
+      
+      for (int i = 0; i < 6; i++) {        
+        //to[i] = (dTheta[i] != 0) ? from[i]+dTheta[i] : from[i];
+        to[i]=from[i]+dTheta[i];
+        //Serial.println(from[i]);
+        //Serial.println(to[i]);
       }
-      goStrightLine(Jinitial, Jfinal, 0.25e-4, 0.75e-10, 0.0, 0.0);
+      goStrightLine(from, to, 0.25e-4, 0.75e-10, 0.0, 0.0);
     }
     /*
       else if (data.startsWith("J")) {
@@ -215,13 +239,13 @@ void loop() {
       digitalWrite(EN5_PIN, HIGH);
       digitalWrite(EN6_PIN, HIGH);
     }
-    else if (data == "rst") {      
+    else if (data == "rst") {
       curPos1 = 0.0;
       curPos2 = -78.51;
       curPos3 = 73.90;
       curPos4 = 0.0;
       curPos5 = -90.0;
-      curPos6 = 0.0;      
+      curPos6 = 0.0;
       float curPos[6] = {curPos1, curPos2, curPos3, curPos4, curPos5, curPos6};
       memcpy(Ji, curPos, sizeof(Ji));
     }
@@ -229,15 +253,18 @@ void loop() {
   // delay(10);
 }
 
-void splitString(String val, float arr[]) {
+float* splitString(String val) {
+  float* arr = new float[6];
+  
   char *p = strtok((char*)val.c_str(), ","); // Use strtok to split the String into individual values
   //while(p!=null && i < 6)
   for (int i = 0; i < 6; i++) {
-    X[i] = atof(p);
+    arr[i] = atof(p);
     // Serial.println(X[i]);
     // with a NULL pointer as the first argument will return the next token, and so on until there are no more tokens
     p = strtok(NULL, ",");
   }
+  return arr;
   /*
     int StringCount = 0;
     // Split the string into substrings
