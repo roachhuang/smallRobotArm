@@ -1,11 +1,19 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+from roboticstoolbox import DHRobot, RevoluteDH
+
 import tkinter as tk
 from time import sleep
 import init_serial as com
 
+
 class Application(tk.Frame):
     def __init__(self, master=None):
         super().__init__(master)
-        self.prevJoint = [0,0,0,0,0,0]
+        self.prevInputVal = np.zeros(6)
+        self.fromAngles = np.array([0.0, -78.51, 73.9, 0.0, -90.0, 0.0])
+        self.currJoint =np.zeros(6)
         self.master = master
         self.master.title("Robot Arm Control Panel")
         self.master.geometry("600x400")
@@ -34,17 +42,44 @@ class Application(tk.Frame):
         new_value = current_value + increment
         slider.set(new_value)
 
+    def animate(self, q):
+        # example of joint angle update
+        # q = frame / 100 * np.array([np.pi/2, np.pi/4, np.pi/2, 0, 0, 0])
+        robot.plot(q, fig=fig, backend="pyplot")
+        return ax.collections
+
+    def reset_command(self):
+        self.fromAngles = [0.0, -78.51, 73.9, 0.0, -90.0, 0.0]
+        dJoint = self.fromAngles - self.currJoint
+        command = "g{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}\n".format(
+            *dJoint)
+        print(command)
+        # send the command to the Arduino
+        self.ser.write(command.encode('utf-8'))
+        self.prevInputVal = np.zeros(6)
+        self.currJoint = np.zeros(6)
+        for i in range(6):
+            self.sliders[i].set(0)
+        robot.plot(np.radians(self.fromAngles), fig=fig, backend="pyplot")
+
     def send_command(self):
         # read the joint angles from the sliders
-        joint=[0,0,0,0,0,0]
+        currInputVal=np.zeros(6)
 
         for i in range(6):
-            joint[i] = float(self.sliders[i].get())
+            currInputVal[i] = float(self.sliders[i].get())
 
-        dtJoint = [x - y for x, y in zip(joint, self.prevJoint)]
-        self.prevJoint = joint
+        dJoint = currInputVal - self.prevInputVal
+        self.prevInputVal = currInputVal
+
+        self.currJoint = self.fromAngles+ dJoint
+        self.fromAngles = self.currJoint
+
         # construct the command string
-        command = "g{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}\n".format(*dtJoint)
+        anim = FuncAnimation(fig, self.animate(np.radians(self.currJoint)))
+        plt.show()
+
+        command = "g{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}\n".format(*dJoint)
         print(command)
         # send the command to the Arduino
         self.ser.write(command.encode('utf-8'))
@@ -81,9 +116,28 @@ class Application(tk.Frame):
                                 command=self.send_command)
         send_button.grid(row=6, column=0, columnspan=4)
 
+        reset_button = tk.Button(self, text="Reset Command",
+                                command=self.reset_command)
+        reset_button.grid(row=6, column=10, columnspan=4)
 
 
 if __name__ == "__main__":
+    a1, a2, a3 = 47.0, 110.0, 26.0
+    d1, d4, d6 = 133.0, 117.50, 28.0
+
+    dh_table = [
+        RevoluteDH(d=d1, a=a1, alpha=-np.pi/2),    # joint 1
+        RevoluteDH(d=0, a=a2, alpha=0, offset=-np.pi/2),             # joint 2
+        RevoluteDH(d=0, a=a3, alpha=-np.pi/2),      # joint 3
+        RevoluteDH(d=d4, a=0, alpha=np.pi/2),       # joint 4
+        RevoluteDH(d=0, a=0, alpha=-np.pi/2),       # joint 5
+        RevoluteDH(d=d6, a=0, alpha=0)              # joint 6
+    ]
+
+    robot = DHRobot(dh_table)
+    fig, ax = plt.subplots()
+    robot.plot([0, np.radians(-78.51), np.radians(73.9),
+               0, -np.pi/2, 0], fig=fig, backend="pyplot")
     root = tk.Tk()
     app = Application(master=root)
     app.mainloop()

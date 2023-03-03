@@ -4,11 +4,14 @@ This project is based on https://www.youtube.com/watch?v=oFCUw1pXlnA&list=RDCMUC
 Here are the changes i made to make it more flexible:
     1. pull inverse kinematic and foward kinematic from Simple6Dof_Ver2.ino to python so that we can control the robot arm from PC by sending poses of end-effect to arudino through usb port.
 
-    2. implement trajectory planning (linear function with parabolic blends) learned from https://www.coursera.org/learn/robotics1/lecture/EddnO/7-3-gui-ji-gui-hua-shi-li-fang-fa-er
+    4. an python UI built by chatGPT to control the robot, also plot
+        the robot movemnt in real-time. it is amazing!
+
+    3. implement trajectory planning (linear function with parabolic blends) learned from https://www.coursera.org/learn/robotics1/lecture/EddnO/7-3-gui-ji-gui-hua-shi-li-fang-fa-er
     I set 2 via points in my program between init and final points.
     the robot arm will move to those points at designated time. this took me lots of time to make it work and the outcome is very cool.
 
-    3. add a 3d camera on top of the robot, capture an image to get an object's coordinate wrt the world frame for the robot arm to pick it up dynamically.
+    4. add a 3d camera on top of the robot, capture an image to get an object's coordinate wrt the world frame for the robot arm to pick it up dynamically.
 
 In the Robotics Toolbox for MATLAB, the reach function computes the workspace of a robot and returns the result in units that are consistent with the robot's kinematic model. The units used depend on the specific robot model and can vary depending on the configuration and parameters of the robot.
 

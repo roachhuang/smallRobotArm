@@ -32,5 +32,6 @@ def update(frame):
 
 
 ani = FuncAnimation(fig, update, frames=np.arange(100))
+# ani = FuncAnimation(plt.gcf(), update, frames=np.arange(100))
 plt.show()
 
