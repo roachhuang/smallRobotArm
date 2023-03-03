@@ -81,7 +81,7 @@ class RobotArm:
         Twf = pose2T([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
         # tool frame. end_effector is 50mm align with z6
         # Xtf = Point([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
-        # tool frame transformation matrix
+        # tool frame transformation matrix (wrt last joint frame!)
         # Ttf = Xtf.pos2tran()
         Ttf = pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
         # endEffectorPose = Point([

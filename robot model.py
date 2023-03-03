@@ -7,10 +7,10 @@ import spatialgeometry as sg
 env=swift.Swift()
 # ask swift to run in realtime or asap (good for demo and video recording, etc.)
 env.launch(realtime=True)
-
 # init the model
 robot = rtb.models.Panda()
 print(robot.urdf_string)
+
 # set the joint angles (coordinates) of the robot to be the rq config
 # q.d: joint vel
 robot.q = robot.qr

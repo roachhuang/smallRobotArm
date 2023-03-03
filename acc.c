@@ -10,7 +10,6 @@ float positiveAcceleration(float waitTime)
 }
 main()
 {
-
     const float UNIT_TD = 0.05625; // this timedelay is for one deg per sec.
 
     // float waitTime = (PI/(6400*36*(PI/180))); //36deg/s -> (180/(6400*36))*1000000 = 781 microsec. the largger the time is, the slower the motor run.

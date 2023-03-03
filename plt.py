@@ -36,6 +36,7 @@ for t1 in theta1:
         plt.plot([x1,x2], [y1,y2])
         plt.xlim([0,2])
         plt.ylim([0,2])
+        # plt.show()
         plt.savefig(filename)
 
 

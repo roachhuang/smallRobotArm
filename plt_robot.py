@@ -1,37 +1,30 @@
+from roboticstoolbox.backends.PyPlot import PyPlot
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
-from roboticstoolbox import DHRobot, RevoluteDH
+from roboticstoolbox import DHRobot, SerialLink
+from roboticstoolbox.tools import mesh_points
 
-a1, a2, a3 = 47.0, 110.0, 26.0
-d1, d4, d6 = 133.0, 117.50, 28.0
+# Define the DH table
+a = [0, 0.5, 0.3, 0.1]
+alpha = [0, np.pi/2, 0, np.pi/2]
+d = [0.1, 0, 0, 0.2]
+theta = [0, 0, 0, 0]
+dh_table = np.array([a, alpha, d, theta]).T
 
-dh_table = [
-    RevoluteDH(d=d1, a=a1, alpha=-np.pi/2),    # joint 1
-    RevoluteDH(d=0, a=a2, alpha=0, offset=-np.pi/2),             # joint 2
-    RevoluteDH(d=0, a=a3, alpha=-np.pi/2),      # joint 3
-    RevoluteDH(d=d4, a=0, alpha=np.pi/2),       # joint 4
-    RevoluteDH(d=0, a=0, alpha=-np.pi/2),       # joint 5
-    RevoluteDH(d=d6, a=0, alpha=0)              # joint 6
-]
+# Create a robot model using the DH table
+robot = SerialLink(dh_table)
 
-robot = DHRobot(dh_table)
-fig, ax = plt.subplots()
-# define the joint angles for a sample pose
-# q = np.array([0, np.radians(-78.51), np.radians(73.9), 0, -np.pi/2, 0])
+# Define the bounds of the workspace to plot
+workspace_limits = np.array([[-0.5, 0.5], [-0.5, 0.5], [0, 0.5]])
 
-# plot the robot in the specified pose
-# robot.plot(q, backend="pyplot", fig=fig)
+# Define the resolution of the workspace grid
+res = 0.05
 
+# Compute the workspace
+points = mesh_points(workspace_limits, res)
+in_workspace = robot.ets(pts=points).all(axis=1)
 
-def update(frame):
-    # example of joint angle update
-    q = frame / 100 * np.array([np.pi/2, np.pi/4, np.pi/2, 0, 0, 0])
-    robot.plot(q, fig=fig, backend="pyplot")
-    return ax.collections
-
-
-ani = FuncAnimation(fig, update, frames=np.arange(100))
-# ani = FuncAnimation(plt.gcf(), update, frames=np.arange(100))
-plt.show()
-
+# Create a PyPlot backend and plot the workspace points
+plot = PyPlot()
+plot.plot(points[in_workspace, 0], points[in_workspace, 1],
+          points[in_workspace, 2], '.', alpha=0.2)
+plot.show()
