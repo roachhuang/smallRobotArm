@@ -135,6 +135,7 @@ class RobotArm:
 
         T03 = T01@T12@T23
         inv_T03 = np.linalg.inv(T03)
+        # pose of frame6 measured from frame3
         T36 = inv_T03@T06
 
         # forth joint

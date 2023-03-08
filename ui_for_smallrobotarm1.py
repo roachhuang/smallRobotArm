@@ -63,7 +63,8 @@ class Application(tk.Frame):
         for i in range(6):
             self.sliders[i].set(0)
         robot.plot(np.radians(self.fromAngles), fig=fig, backend="PyPlot")
-
+        self.currJoint=self.fromAngles
+        
     def send_command(self):
         # read the joint angles from the sliders
         currInputVal=np.zeros(6)
