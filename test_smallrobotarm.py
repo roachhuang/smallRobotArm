@@ -68,9 +68,10 @@ def main():
         pos = smallRobotArm.fk(J)
         #print('fk:', pos.round(2))
     print('--------------------------------------\n')
-
+    # power on pose
     pos = smallRobotArm.fk([0.0, -78.51, 73.90, 0.0, -90, 0.0])
-    pos = smallRobotArm.fk([0.0, 0.0, 0.0, 0.0, 90.0, 0.0])
+    # home pose
+    # pos = smallRobotArm.fk([0.0, 0.0, 0.0, 0.0, 90.0, 0.0])
     print(pos)
     j = smallRobotArm.ik(pos)
     print(j)

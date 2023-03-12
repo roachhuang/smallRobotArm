@@ -1,7 +1,7 @@
-import open3d as o3d
+import open3d_1 as o3d
 import numpy as np
 import cv2
-
+print(o3d.__version__)
 # create a video capture object for the Kinect camera
 cap = cv2.VideoCapture(cv2.CAP_OPENNI)
 

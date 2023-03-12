@@ -23,7 +23,7 @@ class Application(tk.Frame):
         self.pack()
         self.create_widgets()
 
-        # initialize the serial connection to the Arduino
+        # initialize the serial connection to the Arduin
         self.ser = com.init_ser()
         # there must be a dealy here!!!
         sleep(1)
@@ -44,9 +44,11 @@ class Application(tk.Frame):
         new_value = current_value + increment
         slider.set(new_value)
 
-    def animate(self, q):
+    def animate(self, frame_number):
         # example of joint angle update
         # q = frame / 100 * np.array([np.pi/2, np.pi/4, np.pi/2, 0, 0, 0])
+        q = np.radians(self.currJoint)
+        # robot.plot(q/frame_number) # , fig=fig, backend="pyplot")
         robot.plot(q, fig=fig, backend="pyplot")
         return ax.collections
 
@@ -59,12 +61,12 @@ class Application(tk.Frame):
         # send the command to the Arduino
         self.ser.write(command.encode('utf-8'))
         self.prevInputVal = np.zeros(6)
-        self.currJoint = np.zeros(6)
+        # self.currJoint = np.zeros(6)
         for i in range(6):
             self.sliders[i].set(0)
-        robot.plot(np.radians(self.fromAngles), fig=fig, backend="PyPlot")
+        robot.plot(np.radians(self.fromAngles)) #, fig=fig, backend="PyPlot")
         self.currJoint=self.fromAngles
-        
+
     def send_command(self):
         # read the joint angles from the sliders
         currInputVal=np.zeros(6)
@@ -78,8 +80,9 @@ class Application(tk.Frame):
         self.currJoint = self.fromAngles+ dJoint
         self.fromAngles = self.currJoint
 
-        # construct the command string
-        anim = FuncAnimation(fig, self.animate(np.radians(self.currJoint)))
+        # construct the command string, delay of 100ms btw each frame
+        anim = FuncAnimation(fig, self.animate, frames=range(1, 0, -1), interval=50, blit=False)
+
         plt.show()
 
         command = "g{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}\n".format(*dJoint)
