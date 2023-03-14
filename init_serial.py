@@ -18,11 +18,12 @@ def init_ser():
         return None
 
     # Skip over COM1 port, if available
-    ports = [p for p in ports if "COM1" not in p.name]
+    ports = [p for p in ports if "ttyS0" not in p.name]
 
     for port in ports:
         try:
-            ser = serial.Serial(port.name, 115200, timeout=.1)
+            # ser = serial.Serial(port.name, 115200, timeout=.1)
+            ser = serial.Serial('/dev/ttyS4', 115200, timeout=.1)
             break
         except (OSError, serial.SerialException):
             print(f"Could not connect to serial port {port.name}")
