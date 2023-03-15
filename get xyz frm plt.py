@@ -2,18 +2,36 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 
-# Create a simple 3D scatter plot
+# Generate some random data
+x = np.random.rand(100)
+y = np.random.rand(100)
+z = x**2 + y**2
+
+# Create a scatter plot of the data
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
-x = np.random.randn(100)
-y = np.random.randn(100)
-z = np.random.randn(100)
-scatter = ax.scatter(x, y, z)
+scatter = ax.scatter(x, y, c=z)
 
-# Wait for the user to click a point and get its x, y, and z coordinates
-print("Click on a point to get its x, y, and z coordinates:")
-x_coord, y_coord, z_coord = plt.ginput(1)[0][:3]
-#z_coord = scatter.get_zdata()[np.argmin(np.abs(scatter.get_offsets() - [x_coord, y_coord]).sum(axis=1))]
-print(f"x={x_coord:.2f}, y={y_coord:.2f}, z={z_coord:.2f}")
+def get_coord(x,y):
+    # store the current mousebutton
+    b = ax.button_pressed
+    # set current mousebutton to something unreasonable
+    ax.button_pressed = -1
+    # get the coordinate string out
+    s = ax.format_coord(x,y)
+    # set the mousebutton back to its previous state
+    ax.button_pressed = b
+    return s
 
+def on_move(event):   
+    if event.inaxes == ax:
+        str_xyz =get_coord(event.xdata, event.ydata).rstrip()
+        list_xyz =str_xyz.split(',')
+        num_xyz = [float(value) for key, value in [pair.split('=') for pair in list_xyz]]         
+        print(num_xyz)
+    
+    # print(f"x: {x:.2f}, y: {y:.2f}, z: {z:.2f}")
+   
+#fig.canvas.mpl_connect('motion_notify_event', on_move)
+fig.canvas.callbacks.connect('button_press_event', on_move)
 plt.show()
