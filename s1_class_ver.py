@@ -113,7 +113,7 @@ def main() -> None:
     # r6=distance btw axis6 and end-effector
     r1, r2, r3, = 47.0, 110.0, 26.0
     # d1, d3, d4, d6 = 133.0, 0.0, 117.50, 28.0
-    dh_tbl = np.array([
+    std_dh_params = np.array([
         [radians(-90), r1, d1], [0, r2, 0], [radians(-90), r3, 0],
         [radians(90), 0, d4], [radians(-90), 0, 0], [0, 0, d6]
     ])
@@ -132,7 +132,7 @@ def main() -> None:
     initPose[0:3] = tc0[0:3, 3]
     initPose[3:6] = tZ1, tY, tZ2
     # create an instance of the robotarm.
-    smallRobotArm = robot.RobotArm(6, dh_tbl)
+    smallRobotArm = robot.RobotArm(6, std_dh_params)
     # print(smallRobotArm.dhTbl)
 
     # Print the transformation matrix in SE(3) format
