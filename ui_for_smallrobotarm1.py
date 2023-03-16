@@ -1,10 +1,11 @@
+
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from roboticstoolbox import DHRobot, RevoluteDH
 from spatialmath import SE3
 # from roboticstoolbox.backends.PyPlot import PyPlot
-
+import robotarm_class as smRbt
 import tkinter as tk
 from time import sleep
 import init_serial as com
@@ -13,6 +14,7 @@ font_size = 18
 slider_size = 14
 # power off pose
 REST_ANGLES = np.array([0.0, -78.51, 73.9, 0.0, -90.0, 0.0])
+
 
 def get_coord(x, y):
     # store the current mousebutton
@@ -24,15 +26,6 @@ def get_coord(x, y):
     # set the mousebutton back to its previous state
     ax.button_pressed = b
     return s
-
-
-def on_move(event):
-    # if event.inaxes == ax:
-    str_xyz = get_coord(event.xdata, event.ydata).rstrip()
-    list_xyz = str_xyz.split(',')
-    num_xyz = [float(value) for key, value in [pair.split('=')
-                                               for pair in list_xyz]]
-    print(num_xyz)
 
 
 class Application(tk.Frame):
@@ -70,17 +63,44 @@ class Application(tk.Frame):
         new_value = current_value + increment
         slider.set(new_value)
 
+    def on_move(self, event):
+        # if event.inaxes == ax:
+        str_xyz = get_coord(event.xdata, event.ydata).rstrip()
+        list_xyz = str_xyz.split(',')
+        num_xyz = [float(value) for key, value in [pair.split('=')
+                                                   for pair in list_xyz]]
+        pose = np.resize(num_xyz, 6)
+        pose[3:6] = self.__from_deg[3:6]
+        print(pose)
+        # j in deg
+        # j = sm_rbt_arm.ik(pose)
+        T = SE3(pose[0],  pose[1], pose[2]) * SE3.Rz(np.radians(pose[3])
+                                                     ) * SE3.Ry(np.radians(pose[4])) * SE3.Rz(np.radians(pose[5]))
+        j = robot.ikine_LM(T)
+        q = np.degrees(j.q)
+
+        for i in range(6):
+            self.sliders[i].set(q[i])
+        self.send_command()
+
     def animate(self, frame):
         # example of joint angle update
         # q = frame / 100 * np.array([np.pi/2, np.pi/4, np.pi/2, 0, 0, 0])
         q = np.radians(self.__from_deg + self.__d_deg/frame)
         robot.plot(q, fig=fig)  # , fig=fig, backend="pyplot")
-        if frame is 1:
-             self.__from_deg = self.__to_deg
+
+        # animate is async, so we need to do this at here
+        if frame == 1:
+            self.__from_deg = self.__to_deg
         # robot.plot(q, fig=fig, backend="pyplot")
         return ax.collections
 
     def reset_command(self):
+        for i in range(6):
+            self.sliders[i].set(0)
+        self.send_command()
+
+        '''
         self.__from_deg = REST_ANGLES
         self.__d_deg = self.__from_deg - self.__to_deg
         command = "g{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}\n".format(
@@ -94,6 +114,7 @@ class Application(tk.Frame):
             self.sliders[i].set(0)
         robot.plot(np.radians(self.__from_deg))  # , fig=fig, backend="PyPlot")
         self.__to_deg = self.__from_deg
+        '''
 
     def send_command(self):
         # read the joint angles from the sliders
@@ -103,16 +124,18 @@ class Application(tk.Frame):
             currInputVal[i] = float(self.sliders[i].get())
 
         self.__d_deg = currInputVal - self.__prevInputVal
-        self.__prevInputVal = currInputVal        
+        self.__prevInputVal = currInputVal
         self.__to_deg = self.__from_deg + self.__d_deg
 
         # construct the command string, delay of 100ms btw each frame
-        anim = FuncAnimation(fig, self.animate, frames=range(5, 0, -1), interval=20, blit=True, repeat=False)
+        anim = FuncAnimation(fig, self.animate, frames=range(
+            5, 0, -1), interval=20, blit=True, repeat=False)
         #anim = FuncAnimation(fig, self.animate, frames=range(10), interval=200, blit=True, repeat=False)
 
-        # plt.show()  
+        # plt.show()
 
-        command = "g{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}\n".format(*self.__d_deg)
+        command = "g{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}\n".format(
+            *self.__d_deg)
         print(command)
         # send the command to the Arduino
         self.ser.write(command.encode('utf-8'))
@@ -166,12 +189,13 @@ if __name__ == "__main__":
         RevoluteDH(d=d4, a=0, alpha=np.pi/2),       # joint 4
         RevoluteDH(d=0, a=0, alpha=-np.pi/2),       # joint 5
         RevoluteDH(d=d6, a=0, alpha=0),              # joint 6
-    ]   
+    ]
 
     frames = [
         SE3.Tx(0)*SE3.Ty(0)*SE3.Tz(20),
         SE3.Rz(np.pi)*SE3.Ry(-np.pi/2)*SE3.Rz(0)
     ]
+    sm_rbt_arm = smRbt.RobotArm(6, dh_params)
 
     # , base=frames[0],tool=frames[-1])
     robot = DHRobot(dh_params, name='SmallRobotArm')
@@ -181,11 +205,12 @@ if __name__ == "__main__":
     ax.set_xlim(-200, 200)
     ax.set_ylim(-200, 200)
     ax.set_zlim(0, 200)
-    fig.canvas.callbacks.connect('button_press_event', on_move)
+
     robot.plot([0, np.radians(-78.51), np.radians(73.9),
                0, -np.pi/2, 0], fig=fig, backend="pyplot")
 
     root = tk.Tk()
     # root.resizable(True, True)
     app = Application(master=root)
+    fig.canvas.callbacks.connect('button_press_event', app.on_move)
     app.mainloop()
