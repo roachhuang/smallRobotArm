@@ -81,6 +81,7 @@ def send2Arduino(ser, header: str, j, bWaitAck: bool):
     event_ok2send.clear()
     print(msg)
     if bWaitAck is True:
+        # wait till the event is set in rcvThread.
         event_ok2send.wait()
     # while event_ack.is_set() and bWaitAck is True:
     #    pass
@@ -97,7 +98,7 @@ def ReceiveThread(ser, event_run):
         if len(line) > 0:
             # get rid of the end of characters /n/r
             string = line.rstrip()
-            logging.info(string)
+            # logging.warning(string)
             print(string)
             if string == 'ack':
                 # receive ack frm arduion meaning it is free now
@@ -120,7 +121,7 @@ def main() -> None:
     # tool frame. this is for generating Tc6
     # Xtf = robot.Point(0.0, 0.0, 50.0, 180.0, -90.0, 0.0)
     # tool frame transformation matrix
-    # tc6 = Xtf.pos2tran()
+    # tc6 = Xtf.pos2tran(), 50mm is the distance btw frame6 to end-effector
     tc6 = robot.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
     # orientation for frame 6 is unchanged (x points up, z->front)
     t60 = robot.pose2T([164.5, 0.0, 241.0, 90.0, 180.0, -90])
@@ -152,9 +153,14 @@ def main() -> None:
     sleep(.5)
     ser.write(b"rst\n")
     sleep(.5)
-    j = smallRobotArm.ik(initPose)
-    # j=[0,0,0,0,90,0]
+    # j = smallRobotArm.ik(initPose)
+    j=[0,0,0,0,90,0]
     send2Arduino(ser, 'j', j, bWaitAck=True)
+    sleep(2)
+    #j = smallRobotArm.ik([264.5+19, 70.0+20.0, 60, 0.0, 0.0, 35.0])
+    j = smallRobotArm.ik([283.5, 90.0, 60.0, 0.0, 0.0, 35.0])
+    send2Arduino(ser, 'j', j, bWaitAck=True)
+    sleep(.5)
     '''
     T = SE3(initPose[0],  initPose[1], initPose[2]) * \
         SE3.Rz(np.radians(
@@ -174,13 +180,13 @@ def main() -> None:
         # current is(90,180,-90), after rotating the current orientation by 35 deg about z axis
         # the new zyz is (35,180,-55)
         # [2, 164.5+70,   0.0+25,    241.0-130,  145.0,   90.0, 180.0],
-        [2, 264.5+19,   70.0+20,    60,           0.0,    0.0,    35.0],
-        [2, 264.5+19,   70.0+20,    90,           0.0,    0.0,    35.0],
-        [0, 264.5-120,  70.0+60,    350.0,     0.0,    -60.0,  0.0],
-        [0, 264.5-120,  70.0+100,   355.0,     0.0,    -60.0,  0.0],
+        [0,  264.5+19,   70.0+20,    60,        0.0,    0.0,    35.0],
+        [8,  264.5+19,   70.0+20,    90,        0.0,    0.0,    35.0],
+        [20, 264.5-120,  70.0+60,    350.0,     0.0,    -60.0,  0.0],
+        [24, 264.5-120,  70.0+100,   355.0,     0.0,    -60.0,  0.0],
 
         # [21, 47.96, 0.0, 288.02, 180, 94.61, 180.0],
-        [21, 47.96, 0.0, 268.02, 180, 94.61, 180.0],
+        # [21, 47.96, 0.0, 268.02, 180, 94.61, 180.0],
         # [21, 51.98, 0, 218.2, 0.0, 0.0, 180.0],
 
     ], dtype=float)
@@ -208,7 +214,7 @@ def main() -> None:
                      'ti', 'q1', 'q2', 'q3', 'q4', 'q5', 'q6'])
     print(J.round(2))
 
-    if bTrajectory is False:
+    if bTrajectory is True:
         for joint in joints[:, 1:7]:
             send2Arduino(ser, 'j', joint, bWaitAck=True)
             # print('send cmd to arduino')
@@ -221,7 +227,7 @@ def main() -> None:
         logging.info(a)
         ts = joints[:, 0]
         # get rid of time col
-        joints = joints[:, 1: 7]
+        js = joints[:, 1: 7]
         # send2Arduino(ser, 'J', joints)
         # send2Arduino(ser, 'V', v)
         # send2Arduino(ser, 'A', a)
@@ -231,27 +237,29 @@ def main() -> None:
         # get time from col 0 of p
 
         start_time = curr_time = perf_counter()
-        Xx = np.zeros([6], dtype=float)
+        Xx = np.zeros([6], dtype=np.float32)
         # ts[-1] last one element
         while curr_time - start_time <= ts[-1]:
             dt = curr_time - start_time
-            # print('Time elasped:{time:.3f}'.format(time=t))
+            print('Time elasped:{time:.3f}'.format(time=dt))
+
             for col in range(DOF):
                 if dt >= ts[0] and dt <= ts[0] + 0.5:
-                    Xx[col] = joints[0, col]+eq.eq1(dt, v, a, col)
+                    Xx[col] = js[0, col]+eq.eq1(dt, v[0, col], a[0, col])
                 elif dt > ts[0] + 0.5 and dt <= ts[1] - 0.25:
-                    Xx[col] = joints[0, col] + eq.eq2(dt, v, col)
+                    Xx[col] = js[0, col] + eq.eq2(dt, v[1, col])
                 elif dt > ts[1] - 0.25 and dt <= ts[1] + 0.25:
-                    Xx[col] = joints[0, col] + eq.eq3(dt, ts, v, a, col)
+                    Xx[col] = js[0, col] + \
+                        eq.eq3(dt, ts[1], v[1, col], a[1, col])
                 elif dt > ts[1] + 0.25 and dt <= ts[2] - 0.25:
-                    Xx[col] = joints[1, col] + eq.eq4(dt, ts, v, col)
+                    Xx[col] = js[1, col] + eq.eq4(dt-ts[1], v[2, col])
                 elif dt > ts[2] - 0.25 and dt <= ts[2] + 0.25:
-                    Xx[col] = joints[1, col] + eq.eq5(dt, ts, v, a, col)
+                    Xx[col] = js[1, col] + eq.eq5(dt, ts, v[2, col], a[2, col])
                 elif dt > ts[2] + 0.25 and dt <= ts[totalPoints - 1] - 0.5:
-                    Xx[col] = joints[2, col] + eq.eq6(dt, ts, v, col)
+                    Xx[col] = js[2, col] + eq.eq6(dt-ts[2], v[3, col])
                 elif dt > ts[totalPoints - 1] - 0.5 and dt <= ts[totalPoints - 1]:
-                    Xx[col] = joints[2, col] + \
-                        eq.eq7(dt, ts, v, a, col, totalPoints)
+                    Xx[col] = js[2, col] + \
+                        eq.eq7(dt, ts, v[3, col], a[3, col], totalPoints)
 
             # event.set()
 
@@ -260,16 +268,16 @@ def main() -> None:
             # msg = f'm{Xx[0]:.2f},{Xx[1]:.2f},{Xx[2]:.2f},{Xx[3]:.2f},{Xx[4]:.2f},{Xx[5]:.2f}\n'
             # ask arduino to run goTractory(Xx)
             # ser.write(msg.encode())
-            send2Arduino(ser, 'm', Xx, bWaitAck=False)
+            send2Arduino(ser, 'm', Xx, bWaitAck=True)
             # while event.is_set():
             #    pass  # sleep(.1)
 
             # must be a delay here. ack takes too long causing discontinued arm movement.
-            sleep(1/1000000)
+            # sleep(1/100)
             curr_time = perf_counter()
     sleep(1)
     # ser.write(b"dis\n")
-    # find a way to terminate thread
+    # a way to terminate thread
     event_run.clear()
     t.join()
     ser.close()
