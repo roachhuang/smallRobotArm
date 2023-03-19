@@ -1,42 +1,34 @@
 import numpy as np
-import math
-import matplotlib.pyplot as plt
+from matplotlib import pyplot as plt
+from matplotlib.animation import FuncAnimation
+from roboticstoolbox import DHRobot, RevoluteDH
 
-L1=0.5
-L2=0.3
+# Define the robot arm using DH parameters
+dh_params = [
+    RevoluteDH(d=0.1, a=0, alpha=np.pi/2),
+    RevoluteDH(d=0, a=0.5, alpha=0),
+    RevoluteDH(d=0, a=0.5, alpha=0),
+    RevoluteDH(d=0, a=0, alpha=np.pi/2),
+]
+robot = DHRobot(dh_params)
 
-Thetastart=0
-Thetaend=90
-theta1=[]
-theta2=[]
-y=[]
-for i in range(Thetastart, Thetaend, 10):
-    temp=math.radians(i)
-    theta1.append(temp)
-    theta2.append(temp)
-    y.append(i)
+# Create a figure and axes for the animation
+fig, ax = plt.subplots()
+ax.set_xlim(-1, 1)
+ax.set_ylim(-1, 1)
 
-print(y)
-print(theta1)
-x0=0
-y0=0
+# Define the initial state of the robot arm
+q0 = np.array([0, np.pi/4, np.pi/2, np.pi/6])
 
-figno=1
+# Define a function to update the animation at each time step
+def update(frame):
+    q = q0 + np.array([np.sin(frame/100), np.cos(frame/100), 0, 0])
+    robot.plot(q, fig=fig)
+    #ax.set_title(f"Frame {frame}")
+    return ax.collections
 
-for t1 in theta1:
-    for t2 in theta2:
-        x1=L1*math.cos(t1)
-        y1=L2*math.sin(t1)
-        x2=x1+L2*math.cos(t2)
-        y2=y1+L2*math.sin(t2)
-        filename=str(figno)+'jpg'
-        figno+=1
-        plt.figure()
-        plt.plot([x0,x1], [y0,y1])
-        plt.plot([x1,x2], [y1,y2])
-        plt.xlim([0,2])
-        plt.ylim([0,2])
-        # plt.show()
-        plt.savefig(filename)
+# Create the animation
+anim = FuncAnimation(fig, update, frames=np.arange(0, 1000), interval=10, blit=True, repeat=False)
 
-
+# Show the animation
+plt.show()
