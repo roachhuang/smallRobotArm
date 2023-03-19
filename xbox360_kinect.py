@@ -1,48 +1,72 @@
-"""sudo apt-get update
-sudo apt-get install libfreenect2-dev python-opencv
-"""
+import open3d as o3d
+
 import numpy as np
-import cv2
-import freenect2
-import frame_convert2
 
-# create a Kinect sensor object
-kinect = freenect2.Kinect()
+# Transformation matrix from Kinect sensor frame to robot arm frame
+T_kinect_to_arm = np.array([[0.707,  0.707,  0.,  0.],
+                            [-0.707,  0.707,  0.,  0.],
+                            [0.,  0.,  1.,  0.],
+                            [0.,  0.,  0.,  1.]])
 
-# start the Kinect sensor and enable depth capture
-kinect.start()
-kinect.enable_depth()
 
-# capture a depth frame from the Kinect sensor
-frame = kinect.get_last_depth_frame()
+def get_depth():
+    depth, _ = freenect.sync_get_depth()
+    depth = depth.astype(np.float32)
+    depth[depth > 2047] = 2047
+    depth /= 2047
+    return depth
 
-# convert the depth frame to a 2D array of distances
-depth = frame_convert2.pretty_depth_cv(frame)
 
-# set the intrinsic parameters of the Kinect sensor
-fx = 365.456  # focal length in x direction
-fy = 365.456  # focal length in y direction
-cx = 256.0   # optical center x coordinate
-cy = 212.0   # optical center y coordinate
+depth = get_depth()
+pcd = o3d.geometry.PointCloud.create_from_depth_image(depth, intrinsic)
 
-# compute the world coordinates of each pixel in the depth frame
-rows, cols = depth.shape
-x, y = np.meshgrid(np.arange(cols), np.arange(rows))
-x = x.flatten()
-y = y.flatten()
-z = depth.flatten()
-X = (x - cx) * z / fx
-Y = (y - cy) * z / fy
-Z = z
+# Define color range for red objects
+color_range = [[200, 0, 0], [255, 50, 50]]
 
-# convert the world coordinates to a 3D point cloud
-points = np.column_stack((X, Y, Z))
+# Filter point cloud to isolate red objects
+red_objects = pcd.crop(o3d.geometry.AxisAlignedBoundingBox(
+    min_bound=[0, 0, 0], max_bound=[1, 1, 1]))
+red_objects = red_objects.voxel_down_sample(voxel_size=0.01)
+red_objects.paint_uniform_color([1, 0.706, 0])
+red_objects = red_objects.crop_point_cloud(red_objects)
+red_objects = red_objects.extract_clusters(
+    tolerance=0.05, min_points=50, max_points=100000)
 
-# find the centroid of the point cloud
-centroid = np.mean(points, axis=0)
+# Extract 3D coordinates of red object
+red_object = red_objects[0]
+red_object_center = red_object.get_center()
 
-# print the coordinates of the centroid
-print("Centroid:", centroid)
+# Transform red_object_center to robot arm frame
+red_object_center_arm_frame = T_kinect_to_arm @ np.append(red_object_center, 1)
+red_object_center_arm_frame = red_object_center_arm_frame[:3]
 
-# stop the Kinect sensor
-kinect.stop()
+# Send coordinates to robot arm control interface
+robot_arm.move_to(red_object_center)
+
+# Pick up object
+robot_arm.pickup()
+
+
+
+################################## ver 2
+while True:
+    # capture point cloud from Kinect
+    array, _ = freenect.sync_get_depth()
+    array = array.astype(np.uint16)
+    pcd = o3d.geometry.PointCloud.create_from_depth_image(
+        o3d.geometry.Image(array))
+
+    # extract red objects from point cloud
+    red_objects = pcd.select_by_index(
+        np.where(np.logical_and(np.logical_and(pcd.colors[:, 0] > 0.8, pcd.colors[:, 1] < 0.2), pcd.colors[:, 2] < 0.2)))
+    red_objects = red_objects.voxel_down_sample(voxel_size=0.01)
+    red_objects.paint_uniform_color([1, 0.706, 0])
+    red_objects = red_objects.crop_point_cloud(red_objects)
+    red_objects = red_objects.extract_clusters(
+        tolerance=0.05, min_points=50, max_points=100000)
+
+    # if a red object is found, pick it up with the robot arm
+    if len(red_objects) > 0:
+        target = red_objects[0].get_center()
+        robot_arm.move_to(target)
+        robot_arm.pickup()

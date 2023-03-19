@@ -7,15 +7,16 @@ import matplotlib.pyplot as plt
 # 開始規劃 trajectory
 DOF = 6
 
+
 def planTraj(p):
     '''input array p contains timing and joint angles at each points'''
     (totalPoints, num_cols) = np.shape(p)
     # 有 totalPoints 的2次段, 内有totalPoints-1 的linear 段
     # 幾條綫段
     segs = totalPoints - 1
-    #num_of_v = segs + 2  # 頭+尾 2 個, vini and vfin
+    # num_of_v = segs + 2  # 頭+尾 2 個, vini and vfin
     # substract 頭, 尾
-    #viaPoints = totalPoints - 2
+    # viaPoints = totalPoints - 2
     # get difference between points on each axis for calculating vel.
     diff = np.diff(p, axis=0)
 
@@ -35,7 +36,8 @@ def planTraj(p):
         v3s = np.append(v3s, diff[2, col] / (diff[2, 0] - durationOfPara / 2))
     #
     # 頭尾補0, coz, init and final points' vel are 0
-    v = np.array([np.zeros(num_cols-1), v1s, v2s, v3s, np.zeros(num_cols-1)], dtype=float)
+    v = np.array([np.zeros(num_cols-1), v1s, v2s, v3s,
+                 np.zeros(num_cols-1)], dtype=float)
     # (m, _) = np.shape(v)
     # v = np.insert(v, (0, m), 0, axis=0)
 
@@ -120,8 +122,11 @@ def planTraj(p):
     # inputPoints=np.empty((3, 90))
     fig_col = 3
     fig_row = int(DOF / fig_col)
-    fig = plt.figure()
-
+    #fig = plt.figure(facecolor='lightblue', figsize=(fig_row*3, fig_col*3))
+    fig = plt.figure(figsize=(fig_row*3, fig_col*3))
+    fig.subplots_adjust(wspace=0.25, hspace=0.25)
+    plt.title('Robot arm joints angle changes over time', fontsize=20, color='blue')
+    plt.grid()
     for col in range(num_cols-1):
         for t in timeAxis:
             if t >= ts[0] and t <= ts[0] + 0.5:
@@ -141,31 +146,32 @@ def planTraj(p):
         # this fig has 1 row, 3 col in one page
 
         # (rows, columns, panel number)
-        plt.subplot(fig_row, fig_col, col + 1, title=f'{col+1} to time')
+        ax = fig.add_subplot(fig_row, fig_col, col+1)
+        ax.set_xlabel('Time in sec.')
+        ax.set_ylabel('Degree')
+        # plt.subplot(fig_row, fig_col, col + 1, title=f'{col+1} to time')
         plt.plot(timeAxis, inputPoints[col], 'r')
-        plt.xlabel('Time')
-        plt.grid()
-        # plt.style.use('seaborn-whitegrid')
-    # plt.show()
+    plt.show()
 
-    fig = plt.figure()
-    ax = plt.axes(projection='3d')
+    fig = plt.figure(figsize=(9,9))
+    plt.title('Trajectory planning with Linear functions & parabolic blending', fontsize=20, color='blue')
+    ax = fig.add_subplot(1,1,1, projection='3d')
     # in the case of time, x, y and theta
-    ax.set_xlabel("X Label")
-    ax.set_ylabel("Y Label")
+    ax.set_xlabel("x-axis")
+    ax.set_ylabel("y-axis")
     if (num_cols == 4):
-        ax.set_zlabel("Time Label")
+        ax.set_zlabel("time-axis")
         # ax.plot3D(inputPoints[0], inputPoints[1], timeAxis, 'r')
         ax.scatter3D(inputPoints[0], inputPoints[1], timeAxis, c=timeAxis)
     else:
-        ax.set_zlabel("Z Label")
+        ax.set_zlabel("z-axis")
         # data = pd.DataFrame({'X':inputPoints[0], 'Y':inputPoints[1], 'Z':inputPoints[2],'Time':timeAxis})
         # fig = px.scatter_3d(data, x = "X", y = "Y", z = "Z", hover_data = ["Time"])
 
         # ax.plot3D(inputPoints[0], inputPoints[1], inputPoints[2], color='r', linestyle='dotted')
         ax.scatter3D(inputPoints[0], inputPoints[1], inputPoints[2], color='g')
 
-    # fig.show()
+    # plt.tight_layout()
     plt.show()
     # return vel and acc arrays
     return (v, a)
