@@ -208,8 +208,10 @@ class Application(tk.Frame):
         # self.chkbox_state.set(True)
 
 if __name__ == "__main__":
-    a1, a2, a3 = 47.0, 110.0, 26.0
-    d1, d4, d6 = 133.0, 117.50, 28.0
+    a1, a2, a3 = 47.0/100, 110.0/100, 26.0/100
+    d1, d4, d6 = 133.0/100, 117.50/100, 28.0/100
+    #a1, a2, a3 = 47.0, 110.0, 26.0
+    #d1, d4, d6 = 133.0, 117.50, 28.0
 
     dh_params = [
         RevoluteDH(d=d1, a=a1, alpha=-np.pi/2),    # joint 1
@@ -229,12 +231,19 @@ if __name__ == "__main__":
     # , base=frames[0],tool=frames[-1])
     robot = DHRobot(dh_params, name='SmallRobotArm')
     # fig, ax = plt.subplots()
+
+    # Generate some random data
+    x = np.random.rand(100)
+    y = np.random.rand(100)
+    z = x**2 + y**2
+    
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
+    # scatter = ax.scatter(x, y, c=z)
     #ax.set_xlim(-200, 200)
     #ax.set_ylim(-200, 200)
     #ax.set_zlim(0, 350)
-
+    #plt.show()
     robot.plot([0, np.radians(-78.51), np.radians(73.9),
                0, -np.pi/2, 0], fig=fig, backend="pyplot")
 
