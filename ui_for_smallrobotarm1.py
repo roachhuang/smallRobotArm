@@ -39,7 +39,7 @@ class Application(tk.Frame):
         self.__d_deg = 0
         self.master = master
         self.master.title("Robot Arm Control Panel")
-        self.master.geometry("1024x768")
+        # self.master.geometry("1024x768")
         self.master.resizable(True, True)
         self.pack()
         self.create_widgets()
@@ -73,7 +73,7 @@ class Application(tk.Frame):
                                                    for pair in list_xyz]]
         pose = np.resize(num_xyz, 6)
         pose[3:6] = self.__from_deg[3:6]
-        print(pose)
+        print('pose in fig:', list_xyz)
         # j in deg
         # j = sm_rbt_arm.ik(pose)
         T = SE3(pose[0],  pose[1], pose[2]) * SE3.Rz(np.radians(pose[3])
@@ -130,8 +130,9 @@ class Application(tk.Frame):
         self.__to_deg = self.__from_deg + self.__d_deg
 
         # construct the command string, delay of 100ms btw each frame
+        # interval was 5
         anim = FuncAnimation(fig, self.animate, frames=range(
-            5, 0, -1), interval=5, blit=True, repeat=False)       
+            5, 0, -1), interval=100, blit=True, repeat=False)       
 
         plt.show()
 
@@ -169,7 +170,7 @@ class Application(tk.Frame):
         self.sliders = []
         for i in range(6):
             self.joint_slider = tk.Scale(
-                self, from_=-180, to=180, orient=tk.HORIZONTAL, length=800, font=("Arial", slider_size))
+                self, from_=-180, to=180, orient=tk.HORIZONTAL, length=360, font=("Arial", slider_size))
             self.joint_slider.grid(row=i, column=1)
             self.sliders.append(self.joint_slider)
             # self.joint_slider.pack()
@@ -230,9 +231,9 @@ if __name__ == "__main__":
     # fig, ax = plt.subplots()
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    ax.set_xlim(-200, 200)
-    ax.set_ylim(-200, 200)
-    ax.set_zlim(0, 350)
+    #ax.set_xlim(-200, 200)
+    #ax.set_ylim(-200, 200)
+    #ax.set_zlim(0, 350)
 
     robot.plot([0, np.radians(-78.51), np.radians(73.9),
                0, -np.pi/2, 0], fig=fig, backend="pyplot")
