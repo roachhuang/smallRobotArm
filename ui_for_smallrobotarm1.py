@@ -231,7 +231,9 @@ if __name__ == "__main__":
     # , base=frames[0],tool=frames[-1])
     robot = DHRobot(dh_params, name='SmallRobotArm')
     # fig, ax = plt.subplots()
-
+    print(robot.dhunique)
+    robot.isspherical()
+    print(robot.d)
     # Generate some random data
     x = np.random.rand(100)
     y = np.random.rand(100)
