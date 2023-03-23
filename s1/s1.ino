@@ -139,7 +139,7 @@ void setup() {
 }
 
 void loop() {
-  String val;  
+  String val;
   // float velG = 0.25e-4;
 
   if (Serial.available() > 0) {
@@ -148,32 +148,35 @@ void loop() {
       digitalWrite(ledPin, LOW);
       // Serial.println("data == \"jn\"");
       val = data.substring(1, data.length());
-      
+
       float* ik = splitString(val);      // update array X
-      
+
       // goStrightLine(Ji, X, 0.25e-4, 0.75e-10, 0.5 * velG, 0.5 * velG);
       goStrightLine(Ji, ik, 0.15e-4, 0.35e-10, 0, 0 );
       Serial.println("ack");
       // des, src, size
       memcpy(Ji, ik, sizeof(Ji));
+      delete[] ik; // avoid memory leak
       velG = 0.25e-4;
     }
     else if (data.startsWith("m")) {
-      digitalWrite(ledPin, LOW);
+      // digitalWrite(ledPin, LOW);
       val = data.substring(1, data.length());
-      
-      float* j_of_time = splitString(val);
-      
-      goTrajectory(j_of_time);
+
+      float* j_over_time = split_string(val);
+
+      goTrajectory(j_over_time);
+      delete[] j_over_time;
       // Serial.println("ack m");
     }
     if (data.startsWith("i")) {
       val = data.substring(1, data.length());
-      
+
       float* ik = splitString(val);      // update array X
-      
+
       goStrightLine(Ji, ik, 0.15e-4, 0.35e-10, 0, 0 );
       Serial.println("ack");
+      delete[] ik;
       curPos1 = 0.0;  //
       curPos2 = 0.0;
       curPos3 = 0.0;
@@ -181,19 +184,20 @@ void loop() {
       curPos5 = 90.0;
       curPos6 = 0.0;
     }
-    else if (data.startsWith("g")) {           
-      val = data.substring(1, data.length());      
+    else if (data.startsWith("g")) {
+      val = data.substring(1, data.length());
       float* dTheta = splitString(val);
       float from[6] = {curPos1, curPos2, curPos3, curPos4, curPos5, curPos6};
       float to[6] = {curPos1, curPos2, curPos3, curPos4, curPos5, curPos6};
-      
-      for (int i = 0; i < 6; i++) {        
+
+      for (int i = 0; i < 6; i++) {
         //to[i] = (dTheta[i] != 0) ? from[i]+dTheta[i] : from[i];
-        to[i]=from[i]+dTheta[i];
+        to[i] = from[i] + dTheta[i];
         //Serial.println(from[i]);
         //Serial.println(to[i]);
       }
       goStrightLine(from, to, 0.25e-4, 0.75e-10, 0.0, 0.0);
+      delete[] dTheta;
     }
     /*
       else if (data.startsWith("J")) {
@@ -253,9 +257,31 @@ void loop() {
   // delay(10);
 }
 
+float* split_string(String str) {
+  float* arr = new float[6];
+  int StringCount = 0;
+  // Split the string into substrings
+  while (str.length() > 0)
+  {
+    int index = str.indexOf(',');
+    if (index == -1) // No space found
+    {
+      arr[StringCount++] = str.toFloat();
+      break;
+    }
+    else
+    {
+      arr[StringCount++] = str.substring(0, index).toFloat();
+      str = str.substring(index + 1);
+    }
+  }
+  return arr;
+}
+
 float* splitString(String val) {
   float* arr = new float[6];
-  
+  // float arr[6];
+
   char *p = strtok((char*)val.c_str(), ","); // Use strtok to split the String into individual values
   //while(p!=null && i < 6)
   for (int i = 0; i < 6; i++) {
