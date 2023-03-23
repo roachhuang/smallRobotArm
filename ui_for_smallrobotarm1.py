@@ -14,6 +14,7 @@ font_size = 18
 slider_size = 14
 # power off pose
 REST_ANGLES = np.array([0.0, -78.51, 73.9, 0.0, -90.0, 0.0])
+# Create a tkinter BooleanVar variable and set it to True to make the checkbox checked by default
 
 
 def get_coord(x, y):
@@ -31,6 +32,7 @@ def get_coord(x, y):
 class Application(tk.Frame):
     def __init__(self, master=None):
         super().__init__(master)
+        self.__cid = None
         self.__prevInputVal = np.zeros(6)
         self.__from_deg = REST_ANGLES
         self.__to_deg = np.zeros(6)
@@ -63,7 +65,7 @@ class Application(tk.Frame):
         new_value = current_value + increment
         slider.set(new_value)
 
-    def on_move(self, event):
+    def on_click(self, event):
         # if event.inaxes == ax:
         str_xyz = get_coord(event.xdata, event.ydata).rstrip()
         list_xyz = str_xyz.split(',')
@@ -129,10 +131,9 @@ class Application(tk.Frame):
 
         # construct the command string, delay of 100ms btw each frame
         anim = FuncAnimation(fig, self.animate, frames=range(
-            5, 0, -1), interval=20, blit=True, repeat=False)
-        #anim = FuncAnimation(fig, self.animate, frames=range(10), interval=200, blit=True, repeat=False)
+            5, 0, -1), interval=5, blit=True, repeat=False)       
 
-        # plt.show()
+        plt.show()
 
         command = "g{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}\n".format(
             *self.__d_deg)
@@ -140,43 +141,70 @@ class Application(tk.Frame):
         # send the command to the Arduino
         self.ser.write(command.encode('utf-8'))
 
+    def on_checkbox_click(self):
+        if self.chkbox_state.get() == False:
+            print('Checkbox is checked')
+            self.chkbox_state.set(True)
+            # Connect the function to the mouse click event
+            self.__cid = fig.canvas.callbacks.connect(
+                'button_press_event', self.on_click)
+            
+        else:
+            fig.canvas.mpl_disconnect(self.__cid)            
+            self.chkbox_state.set(False)
+            print('Checkbox is unchecked')
+
+    # run either pack or grid method, cannot both
     def create_widgets(self):
         # create labels for the joint sliders
         labels = ["Joint 1", "Joint 2", "Joint 3",
                   "Joint 4", "Joint 5", "Joint 6"]
         for i in range(len(labels)):
-            joint_label = tk.Label(
+            self.joint_label = tk.Label(
                 self, text=labels[i], font=("Arial", font_size))
-            joint_label.grid(row=i, column=0)
+            self.joint_label.grid(row=i, column=0)
+            # self.joint_label.pack()
 
         # create sliders for the joint angles
         self.sliders = []
         for i in range(6):
-            joint_slider = tk.Scale(
+            self.joint_slider = tk.Scale(
                 self, from_=-180, to=180, orient=tk.HORIZONTAL, length=800, font=("Arial", slider_size))
-            joint_slider.grid(row=i, column=1)
-            self.sliders.append(joint_slider)
+            self.joint_slider.grid(row=i, column=1)
+            self.sliders.append(self.joint_slider)
+            # self.joint_slider.pack()
 
         # create buttons to adjust slider values
         buttons = ["-", "+"]
         for i in range(2):
             for j in range(6):
-                joint_button = tk.Button(
+                self.joint_button = tk.Button(
                     self, text=buttons[i],
                     command=lambda slider=self.sliders[j], inc=10*(-1)**i:
                         self.adjust_slider_value(slider, -inc), width=8, height=2, font=("Arial", slider_size)
                 )
-                joint_button.grid(row=j, column=i+2, padx=10)
+                self.joint_button.grid(row=j, column=i+2, padx=10)
+                # self.joint_button.pack()
 
         # create a button to send the command to the Arduino
-        send_button = tk.Button(self, text="Send Command",
-                                command=self.send_command, width=16, height=2, font=("Arial", font_size))
-        send_button.grid(row=6, column=0, columnspan=4)
+        self.send_button = tk.Button(self, text="Send Command",
+                                     command=self.send_command, width=16, height=2, font=("Arial", font_size))
+        self.send_button.grid(row=6, column=0, columnspan=2)
+        # self.send_button.pack()
 
-        reset_button = tk.Button(self, text="Reset",
-                                 command=self.reset_command, width=16, height=2, font=("Arial", font_size))
-        reset_button.grid(row=6, column=2, columnspan=4)
+        self.reset_button = tk.Button(self, text="Reset",
+                                      command=self.reset_command, width=16, height=2, font=("Arial", font_size))
+        self.reset_button.grid(row=6, column=2, columnspan=2)
+        # self.reset_button.pack()
 
+        # Create a checkbox widget
+        self.chkbox_state = tk.BooleanVar()        
+        self.checkbox = tk.Checkbutton(self, text='mouse click event on figure canvas',
+                                       variable=self.chkbox_state, command=self.on_checkbox_click)
+
+        # Pack the checkbox widget onto the window
+        self.checkbox.grid(row=7, column=1, columnspan=2)
+        # self.chkbox_state.set(True)
 
 if __name__ == "__main__":
     a1, a2, a3 = 47.0, 110.0, 26.0
@@ -204,13 +232,15 @@ if __name__ == "__main__":
     ax = fig.add_subplot(111, projection='3d')
     ax.set_xlim(-200, 200)
     ax.set_ylim(-200, 200)
-    ax.set_zlim(0, 200)
+    ax.set_zlim(0, 350)
 
     robot.plot([0, np.radians(-78.51), np.radians(73.9),
                0, -np.pi/2, 0], fig=fig, backend="pyplot")
 
     root = tk.Tk()
+
     # root.resizable(True, True)
     app = Application(master=root)
-    fig.canvas.callbacks.connect('button_press_event', app.on_move)
+
+    #fig.canvas.callbacks.connect('button_press_event', app.on_move)
     app.mainloop()
