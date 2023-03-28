@@ -12,7 +12,7 @@ def eq1(t, v0, a0):
 def eq2(t, v1):
     ''' in 0.5, 1.75 '''
     dt = t - 0.25
-    #v1 = v[1, col]
+    # v1 = v[1, col]
     # linear segment.
     return v1 * dt
 
@@ -26,11 +26,8 @@ def eq3(t, ts1, v1, acc1):
     return v1 * dt1 + 0.5 * acc1 * dt2**2
 
 
-def eq4(dt, v2):
-    ''' in 2.25, 5.75'''
-    #dt = t - ts[1]
-    # v2 = v[2, col]
-    return v2 * dt
+#  in 2.25, 5.75
+def eq4(dt, v2): return v2*dt
 
 
 def eq5(t, ts, v2, acc2):
@@ -42,11 +39,8 @@ def eq5(t, ts, v2, acc2):
     return v2 * dt1 + 1 / 2 * acc2 * dt2**2
 
 
-def eq6(dt: float, v3) -> float:
-    ''' 6.25, 8.5 '''
-    #dt = t - ts[2]
-    #v3 = v[3, col]
-    return v3 * dt
+# 6.25, 8.5
+def eq6(dt, v3): return v3*dt
 
 # col - 0:x, 1:y, 2:theta
 
@@ -55,6 +49,6 @@ def eq7(t, ts, v3, acc3, totalPoints):
     '''# 8.5 ~9s'''
     dt1 = t - ts[2]
     dt2 = t - (ts[totalPoints - 1] - 0.5)
-    #v3 = v[3, col]
-    #acc3 = a[3, col]
+    # v3 = v[3, col]
+    # acc3 = a[3, col]
     return v3 * dt1 + 1 / 2 * acc3 * dt2**2
