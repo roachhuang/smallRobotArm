@@ -13,7 +13,7 @@ def init_ser():
     """
     ports = list(serial.tools.list_ports.comports())
     ser = None
-
+    
     if not ports:
         print("No serial ports found.")
         return None

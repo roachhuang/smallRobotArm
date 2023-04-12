@@ -4,6 +4,7 @@ from math import pi, cos, acos, sin, atan2, sqrt, radians
 from sympy import symbols, nsimplify, Matrix
 import numpy as np
 from spatialmath import SE3
+from abc import ABC, abstractmethod
 
 
 def pose2T(pose):
@@ -24,11 +25,10 @@ def euler_zyz_from_matrix(matrix):
     return phi, theta, psi
 
 
-class RobotArm:
-    def __init__(self, DOF: int, std_dh_tbl: np.ndarray):
+class RobotArm(ABC):
+    def __init__(self, std_dh_tbl: np.ndarray):
         self.dhTbl = std_dh_tbl
-        self.DOF = DOF
-
+        
     def get_ti2i_1(self, i, theta=None) -> np.ndarray:
         ''' return transfermation matrix from dh tbl'''
         # fill in dh tbl wrt robot arms' dh params
@@ -44,6 +44,7 @@ class RobotArm:
         # the reason for using sympy's Matrix is that we need to apply it with sympy's simplify func
         # to eliminate sth likes 1.xxxxxe-14 * sin(qx)
         # Ti_2_i-1=Tzi-1(thetai)TZr(di)TXq(ai)TXp(alphai)
+        # this matrix is transformation matrix for std dh table
         m = Matrix([[cos(th), -sin(th)*cos(alfa), sin(th)*sin(alfa), ai*cos(th)],
                     [sin(th), cos(th)*cos(alfa), -
                      cos(th)*sin(alfa), ai*sin(th)],
@@ -58,6 +59,16 @@ class RobotArm:
             # Matrix objects have a numpy method that returns a numpy.ndarray
             return np.array(m).astype(np.float64)
         #return m
+
+    @abstractmethod
+    def ik(self): pass    
+
+    @abstractmethod
+    def fk(self, Jfk): pass    
+    
+class SmallRbtArm(RobotArm):
+    def __init__(self, std_dh_tbl: np.ndarray):
+        super().__init__(std_dh_tbl)
 
     def ik(self, Xik):
         '''
@@ -121,7 +132,7 @@ class RobotArm:
 
         # third joint
         Jik[2] = pi - acos((r2**2 + r3**2 + d4**2 - (Xsw[2] - d1) * (Xsw[2] - d1) - (sqrt(Xsw[0]**2 + Xsw[1]**2 - d3**2) -
-                                                                                     r1) * (sqrt(Xsw[0]**2 + Xsw[1]**2 - d3**2) - r1)) / (2 * r2 * sqrt(r3**2 + d4**2))) - atan2(d4, r3)
+                                                                                    r1) * (sqrt(Xsw[0]**2 + Xsw[1]**2 - d3**2) - r1)) / (2 * r2 * sqrt(r3**2 + d4**2))) - atan2(d4, r3)
         # Jik(2) = pi-acos((r(2) ^ 2+r(3) ^ 2+d(4) ^ 2-(Xsw(3)-d(1)) ^ 2-(sqrt(Xsw(1) ^ 2+Xsw(2) ^ 2-d(3) ^ 2)-r(1)) ^ 2)/(2*r(2)*sqrt(r(3) ^ 2+d(4) ^ 2)))-atan(d(4)/r(3))
 
         # last three joints
