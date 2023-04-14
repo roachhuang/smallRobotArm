@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import cv2
 
 
+'''
 # there seems no difference if this code is run or not
 # initialize Freenect
 ctx = freenect.init()
@@ -15,16 +16,25 @@ freenect.set_video_mode(
     device, freenect.RESOLUTION_MEDIUM, freenect.DEPTH_11BIT)
 freenect.close_device(device)
 freenect.shutdown(ctx)
+'''
 
+def get_depth():
+    depth, _ = freenect.sync_get_depth()  
+    #depth = depth.astype(np.uint16)
+    #depth = cv2.flip(depth, 0)
+    return depth
 
 # grab a depth frame from the Kinect
-depth, timestamp = freenect.sync_get_depth()
+# depth, timestamp = freenect.sync_get_depth()
+depth = get_depth()
 
 # convert the depth frame to a point cloud using Open3D
 intrinsics = o3d.camera.PinholeCameraIntrinsic(
     640, 480, fx=594.21, fy=591.04, cx=339.5, cy=242.7)
 pcd = o3d.geometry.PointCloud.create_from_depth_image(
     o3d.geometry.Image(depth), intrinsics)
+
+origin = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.5)
 
 
 bbox = o3d.geometry.AxisAlignedBoundingBox(min_bound=(-1, -1, -1), max_bound=(1, 1, 1))
@@ -39,8 +49,6 @@ model_pcd.paint_uniform_color([0.7, 0.7, 0.7])
 model_pcd.compute_vertex_normals()
 
 
-
-
 # Compute normals for point cloud
 # pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
 
@@ -53,10 +61,8 @@ model_pcd.compute_vertex_normals()
 
 
 # display the point cloud
-o3d.visualization.draw_geometries([pcd])
+# geometries to draw:
+geometries = [pcd, origin]
+o3d.visualization.draw_geometries(geometries)
 
-# release the Kinect device
-freenect.close_device(device)
 
-# release Freenect
-freenect.shutdown()

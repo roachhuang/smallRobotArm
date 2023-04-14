@@ -9,7 +9,6 @@ fy = 5.7375619782082447e+02
 cx = 3.1837902690380988e+02
 cy = 2.3743481382791673e+02
 
-
 # Set up Open3D visualization
 #vis = o3d.visualization.Visualizer()
 #vis.create_window()
@@ -48,18 +47,20 @@ mask = cv2.bitwise_or(mask1, mask2)
 res = cv2.bitwise_and(bgr, bgr, mask=mask.astype(np.uint8))
 
 # Display the resulting image
-cv2.imshow('Red color detection', np.hstack([bgr, res]))
+# cv2.imshow('Red color detection', np.hstack([bgr, res]))
+
 #cv2.waitKey(0)
 #cv2.destroyAllWindows()
 
 # Find contours of red object in mask
-contours, _ = cv2.findContours(mask2, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+# contours, _ = cv2.findContours(mask2, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
 
 intrinsics = o3d.camera.PinholeCameraIntrinsic(depth.shape[1], depth.shape[0], fx, fy, cx, cy)
 # Create Open3D point cloud from depth image
 # Convert the depth image to float32 format
-depth = depth.astype('float32') / 1000.0
+# depth = depth.astype('float32') / 1000.0
+depth = depth.astype('float32')
 rgbd_image = o3d.geometry.RGBDImage.create_from_color_and_depth(
     o3d.geometry.Image(rgb), o3d.geometry.Image(depth))
       
@@ -73,15 +74,24 @@ pcd.transform([[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])
 o3d.visualization.draw_geometries([pcd])
 
 #cv2.imshow('rgbd', np.asarray(rgbd_image.color,dtype=np.uint8))
-# Convert point cloud to numpy array, all zeros!!! why???
+# Convert point cloud to numpy array, dtype=float
 arr_rgb = np.asarray(pcd.colors, dtype=np.float32) 
 
 # Define a red color range. need to nomalize them by dividing them by 255 
 lower_red = np.array([100, 0, 0])/255.0
 upper_red = np.array([255, 100, 100])/255.0
-mask = np.logical_and(arr_rgb > lower_red, arr_rgb < upper_red).all(axis=1)
+# mask = np.logical_and(arr_rgb > lower_red, arr_rgb < upper_red).all(axis=1)
+
+# create a binary mask for the red color range
+red_mask = (arr_rgb[:, 0] > 0.8) & (arr_rgb[:, 1] < 0.2) & (arr_rgb[:, 2] < 0.2)
 # Create new point cloud with only the red points
-red_pcd = pcd.select_by_index(np.where(mask)[0])
+red_pcd = pcd.select_by_index(np.where(red_mask)[0])
+pt_red_pcd = np.asarray(red_pcd.points)
+centroid = np.mean(pt_red_pcd, axis=0)
+print('centroid', centroid)
+
+
+# visualize the transformed red box point cloud
 o3d.visualization.draw_geometries([red_pcd])
 
 # Apply morphological operations

@@ -14,7 +14,9 @@ dq = np.array([0.01, 0.01])
 
 # Create figure and axis for animation
 fig, ax = plt.subplots()
-
+# Set axis limits
+ax.set_xlim(-1, 1)
+ax.set_ylim(-1, 1)
 # Define update function
 
 
@@ -23,14 +25,10 @@ def update(frame, robot, q, ax):
     q = q0 + frame*dq
 
     # Clear previous plot
-    ax.clear()
+    # ax.clear()
 
     # Plot robot arm with new joint angles
     robot.plot(q=q)
-
-    # Set axis limits
-    ax.set_xlim(-1, 1)
-    ax.set_ylim(-1, 1)
 
     # Return plot objects to be redrawn
     return ax.collections
@@ -38,7 +36,7 @@ def update(frame, robot, q, ax):
 
 # Create animation
 animation = FuncAnimation(fig, update, fargs=(
-    robot, q0, ax), frames=range(100), interval=50, blit=False)
+    robot, q0, ax), frames=range(50), interval=50, blit=True)
 
 # Show plot
 plt.show()

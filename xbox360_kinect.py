@@ -1,5 +1,5 @@
 import open3d as o3d
-
+import freenect
 import numpy as np
 
 # Transformation matrix from Kinect sensor frame to robot arm frame
@@ -16,9 +16,15 @@ def get_depth():
     depth /= 2047
     return depth
 
+fx = 5.7616540758591043e+02
+fy = 5.7375619782082447e+02
+cx = 3.1837902690380988e+02
+cy = 2.3743481382791673e+02
 
 depth = get_depth()
-pcd = o3d.geometry.PointCloud.create_from_depth_image(depth, intrinsic)
+intrinsics = o3d.camera.PinholeCameraIntrinsic(depth.shape[1], depth.shape[0], fx, fy, cx, cy)
+pcd = o3d.geometry.PointCloud.create_from_depth_image(
+    o3d.geometry.Image(depth), intrinsics)
 
 # Define color range for red objects
 color_range = [[200, 0, 0], [255, 50, 50]]
@@ -47,8 +53,7 @@ robot_arm.move_to(red_object_center)
 robot_arm.pickup()
 
 
-
-################################## ver 2
+# ver 2
 while True:
     # capture point cloud from Kinect
     array, _ = freenect.sync_get_depth()

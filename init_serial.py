@@ -12,6 +12,8 @@ def init_ser():
     """
     ports = list(serial.tools.list_ports.comports())
     ser = None
+    ser = serial.Serial('/dev/ttyUSB0', 115200, timeout=.1)
+    return ser
 
     if not ports:
         print("No serial ports found.")
