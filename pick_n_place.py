@@ -15,7 +15,7 @@ R_RC = np.array([
 T_RC = np.eye(4)   # identity matrix, placeholder
 T_RC[:3, :3] = R_RC[:3, :3]
 # T_RC[:3, 3] = (350, 65, 625)
-T_RC[:3, 3] = (440, 1, 625)
+T_RC[:3, 3] = (335, 10, 598)
 print(T_RC)
 
 
@@ -35,7 +35,7 @@ def depth_to_3d(x, y, depth):
     return (x_, y_, z)
 
 
-run = True
+
 a1, a2, a3 = 47.0, 110.0, 26.0
 d1, d4, d6 = 133.0, 117.50, 28.0
 std_dh_params = np.array([
@@ -43,7 +43,7 @@ std_dh_params = np.array([
     [np.radians(90), 0, d4], [np.radians(-90), 0, 0], [0, 0, d6]
 ])
 
-smallRobotArm = robot.smRbtArm(std_dh_params)
+smallRobotArm = robot.SmallRbtArm(std_dh_params)
 # initialize the serial connection to the Arduin
 ser = com.init_ser()
 # there must be a dealy here!!!
@@ -53,6 +53,8 @@ sleep(.5)
 ser.write(b"rst\n")
 sleep(.5)
 
+run = True
+bPick_and_place = True
 
 while run == True:
     # Get depth and RGB frames from Kinect
@@ -107,20 +109,27 @@ while run == True:
                                                                               cY - 20), cv2.FONT_ITALIC, 1, (255, 0, 0), 1, cv2.LINE_AA)
 
             cv2.drawContours(rgb, cnts, -1, (0, 255, 0), 2)
-
-            try:
-                j = smallRobotArm.ik(obj_pose)
-                msg = '{}{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}\n'.format(
-                    'j', *j,)
-                ser.write(msg.encode('utf-8'))
-                run = False
-            except:
-                print('ik error!')
+            if bPick_and_place == True:
+                try:
+                    j = smallRobotArm.ik(obj_pose)
+                    msg = '{}{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}\n'.format(
+                        'j', *j,)
+                    ser.write(msg.encode('utf-8'))
+                    sleep(8)
+                    # home pose
+                    j=[0,0,0,0,90,0]
+                    msg = '{}{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}\n'.format(
+                        'j', *j,)
+                    ser.write(msg.encode('utf-8'))    
+                    sleep(15)
+                    # run = False
+                except:
+                    print('ik error!')
 
     cv2.imshow("img", rgb)
     # cv2.imshow("msk", red_mask)
 
-    if cv2.waitKey(10) & 0xff == ord('q'):
+    if cv2.waitKey(500) & 0xff == ord('q'):
         break
 
 cv2.destroyAllWindows()
