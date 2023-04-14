@@ -1,5 +1,6 @@
 import serial.tools.list_ports
 import serial
+import platform
 
 
 def init_ser():
@@ -20,12 +21,15 @@ def init_ser():
         return None
 
     # Skip over COM1 port, if available
-    ports = [p for p in ports if "ttyS0" not in p.name]
+    if platform.system() == 'linux':
+        ports = [p for p in ports if "ttyS0" not in p.name]
+    else:
+        ports = [p for p in ports if "COM1" not in p.name]
 
     for port in ports:
         try:
-            # ser = serial.Serial(port.name, 115200, timeout=.1)
-            ser = serial.Serial('/dev/ttyS4', 115200, timeout=.1)
+            ser = serial.Serial(port.name, 115200, timeout=.1)
+            #ser = serial.Serial('/dev/ttyS4', 115200, timeout=.1)
             break
         except (OSError, serial.SerialException):
             print(f"Could not connect to serial port {port.name}")

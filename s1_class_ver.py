@@ -111,11 +111,9 @@ def main() -> None:
     event_run = Event()
     event_run.clear()
     np.set_printoptions(precision=2, suppress=True)
-    # r6=distance btw axis6 and end-effector
-    r1, r2, r3, = 47.0, 110.0, 26.0
-    # d1, d3, d4, d6 = 133.0, 0.0, 117.50, 28.0
+    # r6=distance btw axis6 and end-effector      
     std_dh_params = np.array([
-        [radians(-90), r1, d1], [0, r2, 0], [radians(-90), r3, 0],
+        [radians(-90), a1, d1], [0, a2, 0], [radians(-90), a3, 0],
         [radians(90), 0, d4], [radians(-90), 0, 0], [0, 0, d6]
     ])
     # tool frame. this is for generating Tc6
@@ -133,7 +131,7 @@ def main() -> None:
     initPose[0:3] = tc0[0:3, 3]
     initPose[3:6] = tZ1, tY, tZ2
     # create an instance of the robotarm.
-    smallRobotArm = robot.RobotArm(6, std_dh_params)
+    smallRobotArm = robot.smRbtArm(std_dh_params)
     # print(smallRobotArm.dhTbl)
 
     # Print the transformation matrix in SE(3) format
@@ -176,7 +174,8 @@ def main() -> None:
     home postion = [301.85, 0.0, 168.6, -180, -84.0, 0]
     """
     # end-effector's position and orientation
-    poses = np.array([
+    poses = np.array(
+        [
         # current is(90,180,-90), after rotating the current orientation by 35 deg about z axis
         # the new zyz is (35,180,-55)
         # [2, 164.5+70,   0.0+25,    241.0-130,  145.0,   90.0, 180.0],
@@ -273,7 +272,7 @@ def main() -> None:
             #    pass  # sleep(.1)
 
             # must be a delay here. ack takes too long causing discontinued arm movement.
-            # sleep(1/100)
+            sleep(1/100)
             curr_time = perf_counter()
     sleep(1)
     # ser.write(b"dis\n")
