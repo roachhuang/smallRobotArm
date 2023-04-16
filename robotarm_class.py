@@ -29,6 +29,7 @@ def euler_zyz_from_matrix(matrix):
 class RobotArm(ABC):
     def __init__(self, std_dh_tbl: np.ndarray):
         self.dhTbl = std_dh_tbl
+        # self.ser = com.init_ser()
         
     def get_ti2i_1(self, i, theta=None) -> np.ndarray:
         ''' return transfermation matrix from dh tbl'''

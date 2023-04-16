@@ -1,5 +1,5 @@
 from time import sleep
-import init_serial as com
+import serial_class as com
 import robotarm_class as robot
 import freenect
 import numpy as np
