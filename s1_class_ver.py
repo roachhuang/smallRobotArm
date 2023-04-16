@@ -111,7 +111,7 @@ def main() -> None:
     event_run = Event()
     event_run.clear()
     np.set_printoptions(precision=2, suppress=True)
-    # r6=distance btw axis6 and end-effector      
+    # r6=distance btw axis6 and end-effector
     std_dh_params = np.array([
         [radians(-90), a1, d1], [0, a2, 0], [radians(-90), a3, 0],
         [radians(90), 0, d4], [radians(-90), 0, 0], [0, 0, d6]
@@ -131,7 +131,7 @@ def main() -> None:
     initPose[0:3] = tc0[0:3, 3]
     initPose[3:6] = tZ1, tY, tZ2
     # create an instance of the robotarm.
-    smallRobotArm = robot.smRbtArm(std_dh_params)
+    smallRobotArm = robot.SmallRbtArm(std_dh_params)
     # print(smallRobotArm.dhTbl)
 
     # Print the transformation matrix in SE(3) format
@@ -152,7 +152,7 @@ def main() -> None:
     ser.write(b"rst\n")
     sleep(.5)
     # j = smallRobotArm.ik(initPose)
-    j=[0,0,0,0,90,0]
+    j = [0, 0, 0, 0, 90, 0]
     send2Arduino(ser, 'j', j, bWaitAck=True)
     sleep(2)
     #j = smallRobotArm.ik([264.5+19, 70.0+20.0, 60, 0.0, 0.0, 35.0])
@@ -176,26 +176,27 @@ def main() -> None:
     # end-effector's position and orientation
     poses = np.array(
         [
-        # current is(90,180,-90), after rotating the current orientation by 35 deg about z axis
-        # the new zyz is (35,180,-55)
-        # [2, 164.5+70,   0.0+25,    241.0-130,  145.0,   90.0, 180.0],
-        [0,  264.5+19,   70.0+20,    60,        0.0,    0.0,    35.0],
-        [8,  264.5+19,   70.0+20,    90,        0.0,    0.0,    35.0],
-        [20, 264.5-120,  70.0+60,    350.0,     0.0,    -60.0,  0.0],
-        [24, 264.5-120,  70.0+100,   355.0,     0.0,    -60.0,  0.0],
+            # current is(90,180,-90), after rotating the current orientation by 35 deg about z axis
+            # the new zyz is (35,180,-55)
+            # [2, 164.5+70,   0.0+25,    241.0-130,  145.0,   90.0, 180.0],
+            [0,  264.5+19,   70.0+20,    60,        0.0,    0.0,    35.0],
+            [8,  264.5+19,   70.0+20,    90,        0.0,    0.0,    35.0],
+            [20, 264.5-120,  70.0+60,    350.0,     0.0,    -60.0,  0.0],
+            [24, 264.5-120,  70.0+100,   355.0,     0.0,    -60.0,  0.0],
 
-        # [21, 47.96, 0.0, 288.02, 180, 94.61, 180.0],
-        # [21, 47.96, 0.0, 268.02, 180, 94.61, 180.0],
-        # [21, 51.98, 0, 218.2, 0.0, 0.0, 180.0],
+            # [21, 47.96, 0.0, 288.02, 180, 94.61, 180.0],
+            # [21, 47.96, 0.0, 268.02, 180, 94.61, 180.0],
+            # [21, 51.98, 0, 218.2, 0.0, 0.0, 180.0],
 
-    ], dtype=float)
+        ], dtype=float)
     # give time col to joints
     joints = poses
 
-    for (i, pose) in enumerate(poses, start=0):
-        # col 0 are time data
-        start_time = perf_counter()
-        joints[i, 1: 7] = smallRobotArm.ik(pose[1: 7])
+    if bTrajectory == False:
+        for (i, pose) in enumerate(poses, start=0):
+            # col 0 are time data
+            j = smallRobotArm.ik(pose[1: 7])
+            send2Arduino(ser, 'j', j, bWaitAck=True)
         '''
         T = SE3(pose[1],  pose[2], pose[3]) * \
             SE3.Rz(np.radians(
@@ -203,22 +204,19 @@ def main() -> None:
         iks = smRobot.ikine_LM(T)
         q = np.degrees(iks.q)
         # joints[i, 1:7] = q.round(2)
-        '''
-        end_time = perf_counter()
-        print(
-            f'It took {end_time- start_time: 0.2f} second(s) to complete IK.')
-
-    # display easily readable ik resutls on the screen
-    J = pd.DataFrame(joints, columns=[
-                     'ti', 'q1', 'q2', 'q3', 'q4', 'q5', 'q6'])
-    print(J.round(2))
-
-    if bTrajectory is True:
-        for joint in joints[:, 1:7]:
-            send2Arduino(ser, 'j', joint, bWaitAck=True)
-            # print('send cmd to arduino')
+        '''                    
+          
     ###################################################################
     else:
+        for (i, pose) in enumerate(poses, start=0):
+            # col 0 are time data
+            joints[i, 1: 7] = smallRobotArm.ik(pose[1: 7])
+
+        # display easily readable ik resutls on the screen
+        J = pd.DataFrame(joints, columns=[
+            'ti', 'q1', 'q2', 'q3', 'q4', 'q5', 'q6'])
+        print(J.round(2))
+
         print('--- Start trajectory planning ---')
         (v, a) = pt.planTraj(joints)
         (totalPoints, _) = np.shape(joints)
@@ -226,13 +224,8 @@ def main() -> None:
         logging.info(a)
         ts = joints[:, 0]
         # get rid of time col
-        js = joints[:, 1: 7]
-        # send2Arduino(ser, 'J', joints)
-        # send2Arduino(ser, 'V', v)
-        # send2Arduino(ser, 'A', a)
-        sleep(1)
-        # ser.write(b"T\n")
-        # zero = np.zeros([6], dtype=str)
+        js = joints[:, 1: 7]        
+        sleep(1)        
         # get time from col 0 of p
 
         start_time = curr_time = perf_counter()
@@ -240,7 +233,7 @@ def main() -> None:
         # ts[-1] last one element
         while curr_time - start_time <= ts[-1]:
             dt = curr_time - start_time
-            print('Time elasped:{time:.3f}'.format(time=dt))
+            print('Time elasped:{time:.4f}'.format(time=dt))
 
             for col in range(DOF):
                 if dt >= ts[0] and dt <= ts[0] + 0.5:
@@ -258,19 +251,10 @@ def main() -> None:
                     Xx[col] = js[2, col] + eq.eq6(dt-ts[2], v[3, col])
                 elif dt > ts[totalPoints - 1] - 0.5 and dt <= ts[totalPoints - 1]:
                     Xx[col] = js[2, col] + \
-                        eq.eq7(dt, ts, v[3, col], a[3, col], totalPoints)
-
-            # event.set()
-
-            # msg='m'+','.join(Xx.astype(str))
-            # msg = 'm%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\n' % (Xx[0], Xx[1], Xx[2], Xx[3], Xx[4], Xx[5])
-            # msg = f'm{Xx[0]:.2f},{Xx[1]:.2f},{Xx[2]:.2f},{Xx[3]:.2f},{Xx[4]:.2f},{Xx[5]:.2f}\n'
-            # ask arduino to run goTractory(Xx)
-            # ser.write(msg.encode())
-            send2Arduino(ser, 'm', Xx, bWaitAck=True)
-            # while event.is_set():
-            #    pass  # sleep(.1)
-
+                        eq.eq7(dt, ts, v[3, col], a[3, col], totalPoints)                     
+            
+            # ask arduino to run goTractory(Xx)            
+            send2Arduino(ser, 'm', Xx, bWaitAck=False)    
             # must be a delay here. ack takes too long causing discontinued arm movement.
             sleep(1/100)
             curr_time = perf_counter()
