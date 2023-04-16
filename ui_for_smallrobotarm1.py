@@ -8,7 +8,7 @@ from spatialmath import SE3
 import robotarm_class as smRbt
 import tkinter as tk
 from time import sleep
-import init_serial as com
+import serial_class as com
 
 font_size = 18
 slider_size = 14
