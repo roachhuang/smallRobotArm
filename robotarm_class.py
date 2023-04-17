@@ -5,6 +5,7 @@ from sympy import symbols, nsimplify, Matrix
 import numpy as np
 import helpers as hlp
 from spatialmath import SE3
+import serial_class as ser
 from abc import ABC, abstractmethod
 
 
@@ -74,6 +75,16 @@ class RobotArm(ABC):
 class SmallRbtArm(RobotArm):
     def __init__(self, std_dh_tbl: np.ndarray):
         super().__init__(std_dh_tbl)
+        self.conn = ser.SerialPort() 
+        
+        
+    def enable(self):
+        # motors are disabled in arduino's setup()
+        self.conn.ser.write(b"en\n")
+        #sleep(.5)
+        self.conn.ser.write(b"rst\n")
+        #sleep(.5)         
+
 
     @hlp.timer  
     def ik(self, Xik):
@@ -223,30 +234,7 @@ class SmallRbtArm(RobotArm):
         Xfk[3:6] = np.degrees(Xfk[3:6])
         return Xfk
     
-    
-    def send2Arduino(ser, header: str, j, bWaitAck: bool):
-        global event_ok2send
-
-        """send robot cmd to arduino
-
-        Args:
-            ser (_type_): _description_
-            header (str): cmd type
-            j (float): theta in deg for 6 axes
-            bWaitAck (bool): wait for ack from arduino or not
-        """
-        # msg = f'{header}{j[0]:.2f},{j[1]:.2f},{j[2]:.2f},{j[3]:.2f},{j[4]:.2f},{j[5]:.2f}\n'
-        msg = '{}{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}\n'.format(header, *j,)
-        ser.write(msg.encode('utf-8'))
-        event_ok2send.clear()
-        print(msg)
-        if bWaitAck is True:
-            # wait till the event is set in rcvThread.
-            event_ok2send.wait()
-        # while event_ack.is_set() and bWaitAck is True:
-        #    pass
-
     def moveTo(self, end_effector_pose):
         #return super().moveTo(end_effector_pose)
         j = self.ik(end_effector_pose)
-        self.send2Arduino('j', j, bWaitAck=True)
+        self.conn.send2Arduino('j', j, bWaitAck=True)

@@ -1,33 +1,9 @@
-"""_summary_
-Measure the position of the target location relative to the table frame,
-using a measuring tape, laser range finder, or other measurement tool.
-
-Calculate the position of the target location in the robot's base frame,
-by transforming the measured position from the table frame to the robot's
-base frame. This can be done using a coordinate transformation matrix
-that describes the position and orientation of the table frame in the
-robot's base frame.
-
-Determine the desired orientation of the end-effector at the target
-location. Depending on your application, this may be a fixed orientation
-(e.g. always pointing straight down), or it may be a variable orientation
-that depends on the specific task.
-
-Combine the calculated position and orientation into a homogeneous
-transformation matrix T, as described in my previous answer.
-This matrix represents the pose that you will use as input to the inverse
-kinematics algorithm.
-    Returns:
-        _type_: _description_
-"""
 from math import radians
-#from threading import Thread, Event
 from time import sleep, perf_counter
-# from serial.threaded import ReaderThread, Protocol
 import logging
 import pandas as pd
 import numpy as np
-import serial_class as com
+# import serial_class as com
 import equations as eq
 import robotarm_class as robot
 import plan_traj as pt
@@ -54,65 +30,9 @@ smRobot = DHRobot(std_dh_table)
 # {x, y, z, ZYZ Euler angles}
 # Xhome = [164.5, 0.0, 241.0, 90.0, 180.0, -90.0]
 
-# event_ok2send = Event()
-
-"""
-This module provides functions for manipulating strings.
-
-The functions included in this module are:
-
-- send2Arduino: send robot cmd to arudino at 115200bps
-- receiveThread: thread to receive incoming data from arduino
-- init_ser: init serial port (auto select port#)
-"""
-
-'''
-def send2Arduino(ser, header: str, j, bWaitAck: bool):
-    """send robot cmd to arduino
-
-    Args:
-        ser (_type_): _description_
-        header (str): cmd type
-        j (float): theta in deg for 6 axes
-        bWaitAck (bool): wait for ack from arduino or not
-    """
-    # msg = f'{header}{j[0]:.2f},{j[1]:.2f},{j[2]:.2f},{j[3]:.2f},{j[4]:.2f},{j[5]:.2f}\n'
-    msg = '{}{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}\n'.format(header, *j,)
-    ser.write(msg.encode('utf-8'))
-    event_ok2send.clear()
-    print(msg)
-    if bWaitAck is True:
-        # wait till the event is set in rcvThread.
-        event_ok2send.wait()
-    # while event_ack.is_set() and bWaitAck is True:
-    #    pass
-
-
-def ReceiveThread(ser, event_run):
-    """
-    input string is retrieved as a byte string, which works
-    differently than a standard string. The decode() method is to convert
-    the string from a byte string to a standard string.
-    """
-    while event_run.is_set():
-        line = ser.readline().decode('utf-8')
-        if len(line) > 0:
-            # get rid of the end of characters /n/r
-            string = line.rstrip()
-            # logging.warning(string)
-            print(string)
-            if string == 'ack':
-                # receive ack frm arduion meaning it is free now
-                event_ok2send.set()
-
-'''
-
-
 def main() -> None:
     DOF = 6
-    bTrajectory = True
-    #event_run = Event()
-    # event_run.clear()
+    bTrajectory = False 
     np.set_printoptions(precision=2, suppress=True)
     # r6=distance btw axis6 and end-effector
     std_dh_params = np.array([
@@ -141,30 +61,27 @@ def main() -> None:
     print("dhTbl =\n" + np.array2string(smallRobotArm.dhTbl, separator=', ',
                                         formatter={'float': '{: 0.2f}'.format}))
     # init serial
-    conn = com.SerialPort()
-    # serConn = com.init_ser()
-
-    # ser.reset_input_buffer()
-    # ser.reset_output_buffer()
-    # event_run.set()
-    # event_ok2send.set()
-    #t = Thread(target=ReceiveThread, args=[ser, event_run])
-    # t.start()
+    #conn = com.SerialPort()   
     # there must be a delay here
     sleep(1)
+    smallRobotArm.enable()
 
     # motors are disabled in arduino's setup()
-    conn.ser.write(b"en\n")
-    sleep(.5)
-    conn.ser.write(b"rst\n")
-    sleep(.5)
+    #conn.ser.write(b"en\n")
+    #sleep(.5)
+    #conn.ser.write(b"rst\n")
+    #sleep(.5)
+
     # j = smallRobotArm.ik(initPose)
-    j = [0, 0, 0, 0, 90, 0]
-    conn.send2Arduino('j', j, bWaitAck=True)
+    smallRobotArm.moveTo(initPose)
+
+    #j = [0, 0, 0, 0, 90, 0]
+    # conn.send2Arduino('j', j, bWaitAck=True)
+
     sleep(2)
-    #j = smallRobotArm.ik([264.5+19, 70.0+20.0, 60, 0.0, 0.0, 35.0])
-    j = smallRobotArm.ik([283.5, 90.0, 60.0, 0.0, 0.0, 35.0])
-    conn.send2Arduino('j', j, bWaitAck=True)
+    smallRobotArm.moveTo([283.5, 90.0, 60.0, 0.0, 0.0, 35.0])    
+    #j = smallRobotArm.ik([283.5, 90.0, 60.0, 0.0, 0.0, 35.0])
+    #conn.send2Arduino('j', j, bWaitAck=True)
     sleep(.5)
     '''
     T = SE3(initPose[0],  initPose[1], initPose[2]) * \
@@ -201,9 +118,10 @@ def main() -> None:
 
     if bTrajectory == False:
         for (i, pose) in enumerate(poses, start=0):
+            smallRobotArm.moveTo(pose[1: 7])
             # col 0 are time data
-            j = smallRobotArm.ik(pose[1: 7])
-            conn.send2Arduino('j', j, bWaitAck=True)
+            #j = smallRobotArm.ik(pose[1: 7])
+            #conn.send2Arduino('j', j, bWaitAck=True)
         '''
         T = SE3(pose[1],  pose[2], pose[3]) * \
             SE3.Rz(np.radians(
@@ -261,18 +179,18 @@ def main() -> None:
                         eq.eq7(dt, ts, v[3, col], a[3, col], totalPoints)
 
             # ask arduino to run goTractory(Xx)
-            conn.send2Arduino('m', Xx, bWaitAck=False)
+            #conn.send2Arduino('m', Xx, bWaitAck=False)
+            smallRobotArm.conn.send2Arduino('m', Xx, bWaitAck=False)
             # must be a delay here. ack takes too long causing discontinued arm movement.
             sleep(1/100)
             curr_time = perf_counter()
     sleep(1)
     # ser.write(b"dis\n")
     # a way to terminate thread
-    conn.event_run.clear()
-    conn.t.join()
-    conn.ser.close()
+    smallRobotArm.conn.event_run.clear()
+    smallRobotArm.conn.t.join()
+    smallRobotArm.conn.ser.close()
     print('THREAD TERMINATED!')
-
 
 if __name__ == "__main__":
     main()
