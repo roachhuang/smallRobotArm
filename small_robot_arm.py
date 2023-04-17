@@ -187,7 +187,7 @@ def main() -> None:
     sleep(1)
     # ser.write(b"dis\n")
     # a way to terminate thread
-    smallRobotArm.conn.event_run.clear()
+    smallRobotArm.conn.event_run = False
     smallRobotArm.conn.t.join()
     smallRobotArm.conn.ser.close()
     print('THREAD TERMINATED!')

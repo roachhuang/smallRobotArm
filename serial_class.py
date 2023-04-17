@@ -12,20 +12,25 @@ class SerialPort():
             self._event_ok2send = Event()
             self._event_ok2send.set()
 
-            self.event_run = Event()
-            self.event_run.set()
+            self._event_run = Event()
+            self._event_run.set()
 
-            self.t = Thread(target=self._ReceiveThread, args=[self.event_run])
+            self.t = Thread(target=self._ReceiveThread, args=[])
             self.t.start()
             # do something with the serial connection
         else:
             print("Could not find a suitable serial port.")
 
-    def set_event_run(self):
-        self.event_run.set()
+    @property
+    def event_run(self):
+        return self._event_run.is_set()    
 
-    def clear_event_run(self):
-        self.event_run.clear()
+    @event_run.setter
+    def event_run(self, state):
+        if state == True:
+            self._event_run.set()
+        else:
+            self._event_run.clear()
 
     def _get_serial_port(self):
         """Automatically detects and returns the serial port."""
@@ -55,19 +60,19 @@ class SerialPort():
         # while event_ack.is_set() and bWaitAck is True:
         #    pass
 
-    def _ReceiveThread(self, event_run):
+    def _ReceiveThread(self):
         """
         input string is retrieved as a byte string, which works
         differently than a standard string. The decode() method is to convert
         the string from a byte string to a standard string.
         """
-        while event_run.is_set():            
+        while self.event_run == True:            
             line = self.ser.readline().decode('utf-8')
             if len(line) > 0:
                 # get rid of the end of characters /n/r
                 string = line.rstrip()
                 # logging.warning(string)
-                print(string)
+                # print(string)
                 if string == 'ack':
                     # receive ack frm arduion meaning it is free now
                     self._event_ok2send.set()
