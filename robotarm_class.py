@@ -76,7 +76,7 @@ class SmallRbtArm(RobotArm):
     def __init__(self, std_dh_tbl: np.ndarray):
         super().__init__(std_dh_tbl)
         self.conn = ser.SerialPort() 
-        
+        self.conn.connect()
         
     def enable(self):
         # motors are disabled in arduino's setup()

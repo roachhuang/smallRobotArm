@@ -5,21 +5,26 @@ from threading import Thread, Event
 
 class SerialPort():
     def __init__(self):                
+       self.ser = None
+       self._event_run = Event()
+       self._event_ok2send = Event()
+       
+    def connect(self):
         port = self._get_serial_port()
         if port:
             self.ser = serial.Serial(port, baudrate=115200, timeout=1)
-            print(f"Connected to serial port {self.ser.name}")
-            self._event_ok2send = Event()
-            self._event_ok2send.set()
-
-            self._event_run = Event()
+            print(f"Connected to serial port {self.ser.name}")            
+            self._event_ok2send.set()            
             self._event_run.set()
-
             self.t = Thread(target=self._ReceiveThread, args=[])
-            self.t.start()
-            # do something with the serial connection
+            self.t.start()            
         else:
             print("Could not find a suitable serial port.")
+
+    def disconnect(self):
+        self.event_run = False
+        self.t.join()
+        self.ser.close()
 
     @property
     def event_run(self):
