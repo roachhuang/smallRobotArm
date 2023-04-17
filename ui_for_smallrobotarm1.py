@@ -45,13 +45,13 @@ class Application(tk.Frame):
         self.create_widgets()
 
         # initialize the serial connection to the Arduin
-        self.ser = com.init_ser()
+        #self.ser = com.init_ser()
         # there must be a dealy here!!!
-        sleep(1)
-        self.ser.write(b"en\n")
-        sleep(.5)
-        self.ser.write(b"rst\n")
-        sleep(.5)
+        #sleep(1)
+        #self.ser.write(b"en\n")
+        #sleep(.5)
+        #self.ser.write(b"rst\n")
+        #sleep(.5)
 
     def adjust_slider_value(self, slider, increment):
         """
@@ -140,7 +140,8 @@ class Application(tk.Frame):
             *self.__d_deg)
         print(command)
         # send the command to the Arduino
-        self.ser.write(command.encode('utf-8'))
+        # self.ser.write(command.encode('utf-8'))
+        smallRobotArm.conn.send2Arduino('g', self.__d_deg, False)
 
     def on_checkbox_click(self):
         if self.chkbox_state.get() == False:
@@ -226,7 +227,11 @@ if __name__ == "__main__":
         SE3.Tx(0)*SE3.Ty(0)*SE3.Tz(20),
         SE3.Rz(np.pi)*SE3.Ry(-np.pi/2)*SE3.Rz(0)
     ]
-    sm_rbt_arm = smRbt.RobotArm(6, dh_params)
+    # sm_rbt_arm = smRbt.RobotArm(dh_params)
+    smallRobotArm = smRbt.SmallRbtArm(dh_params)
+    sleep(1)
+    smallRobotArm.enable()
+
 
     # , base=frames[0],tool=frames[-1])
     robot = DHRobot(dh_params, name='SmallRobotArm')

@@ -1,5 +1,5 @@
 from time import sleep
-import serial_class as com
+# import serial_class as com
 import robotarm_class as robot
 import freenect
 import numpy as np
@@ -44,14 +44,8 @@ std_dh_params = np.array([
 ])
 
 smallRobotArm = robot.SmallRbtArm(std_dh_params)
-# initialize the serial connection to the Arduin
-ser = com.init_ser()
-# there must be a dealy here!!!
 sleep(1)
-ser.write(b"en\n")
-sleep(.5)
-ser.write(b"rst\n")
-sleep(.5)
+smallRobotArm.enable()
 
 run = True
 bPick_and_place = True
@@ -111,16 +105,17 @@ while run == True:
             cv2.drawContours(rgb, cnts, -1, (0, 255, 0), 2)
             if bPick_and_place == True:
                 try:
-                    j = smallRobotArm.ik(obj_pose)
-                    msg = '{}{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}\n'.format(
-                        'j', *j,)
-                    ser.write(msg.encode('utf-8'))
+                    smallRobotArm.moveTo(obj_pose)                   
                     sleep(8)
-                    # home pose
-                    j=[0,0,0,0,90,0]
+
+                    # home pose                    
+                    initPose =smallRobotArm.fk([0,0,0,0,90,0])
+                    smallRobotArm.moveTo(initPose)
+                    '''
                     msg = '{}{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}\n'.format(
                         'j', *j,)
                     ser.write(msg.encode('utf-8'))    
+                    '''
                     sleep(15)
                     # run = False
                 except:
