@@ -39,7 +39,7 @@ def main():
                        [0, 0, d6]])
 
     # stdDh.setDhTbl(dh_tbl)
-    smallRobotArm = robot.RobotArm(6, dh_tbl)
+    smallRobotArm = robot.SmallRbtArm(dh_tbl)
 
     # p = (x, y, z, ZYZ euler angles)
     Poses = np.array([[164.5, 0.0, 241.0, 90.0, 180.0, -90],
