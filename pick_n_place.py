@@ -15,7 +15,7 @@ R_RC = np.array([
 T_RC = np.eye(4)   # identity matrix, placeholder
 T_RC[:3, :3] = R_RC[:3, :3]
 # T_RC[:3, 3] = (350, 65, 625)
-T_RC[:3, 3] = (335, 10, 590)
+T_RC[:3, 3] = (335, 10, 584)
 print(T_RC)
 
 
@@ -33,7 +33,6 @@ def depth_to_3d(x, y, depth):
     y_ = (y - cy) * z / fy
 
     return (x_, y_, z)
-
 
 
 a1, a2, a3 = 47.0, 110.0, 26.0
@@ -84,23 +83,31 @@ while run == True:
         # area is in pix
         if area > 1000:
             x, y, w, h = cv2.boundingRect(c)
-            cv2.rectangle(rgb, (x,y), (x+w, y+h), (0, 255, 0), 2)           
+            cv2.rectangle(rgb, (x, y), (x+w, y+h), (0, 255, 0), 2)
             # calculate center and radius of minimum enclosing circle
             (x, y), radius = cv2.minEnclosingCircle(c)
             # cast to integers
             center = (int(x), int(y))
-
+            '''
             M = cv2.moments(c)
             if M["m00"] != 0:
                 cX = int(M["m10"] / M["m00"])
                 cY = int(M["m01"] / M["m00"])
             else:
                 cX, cY = 0, 0
-            cv2.circle(rgb, (cX, cY), 7, (255, 255, 255), 2)
-            x, y, z = depth_to_3d(cX, cY, depth)
+            '''
+            cv2.circle(rgb, (center[0], center[1]), 6, (255, 255, 255), 2)
+
+            x, y, z = depth_to_3d(center[0], center[1], depth)
             T_CO = robot.pose2T([x, y, z, 0, 0, 35])
             T_RO = T_RC @ T_CO
             obj_position = T_RO[0:3, 3]
+            # 50mm above the object
+            if obj_position[2] <= 0:
+                obj_position[2] = 65
+            else:
+                obj_position[2] = obj_position[2] + 65
+
             obj_zyz = robot.euler_zyz_from_matrix(T_RO)
             #obj_zyz_in_rad = np.array(obj_zyz)
             obj_zyz_in_rad = np.array([0, 0, 0])
@@ -109,21 +116,21 @@ while run == True:
             obj_pose = np.around(obj_pose, decimals=2)
             print(obj_pose)
 
-            cv2.putText(rgb, 'x:{:.2f}, y:{:.2f}, z:{:.2f}'.format(x, y, z), (cX - 20,
-                                                                              cY - 20), cv2.FONT_ITALIC, 1, (255, 0, 0), 1, cv2.LINE_AA)
+            cv2.putText(rgb, 'x:{:.2f}, y:{:.2f}, z:{:.2f}'.format(x, y, z), (center[0] - 20,
+                                                                              center[1] - 20), cv2.FONT_ITALIC, 1, (255, 0, 0), 1, cv2.LINE_AA)
 
             # cv2.drawContours(rgb, cnts, -1, (0, 255, 0), 2)
             if bPick_and_place == True:
                 try:
                     smallRobotArm.moveTo(obj_pose)
-                    smallRobotArm.grab()                   
+                    smallRobotArm.grab()
                     sleep(2)
-                    # home pose                    
-                    initPose =smallRobotArm.fk([0,0,0,0,90,0])
+                    # home pose
+                    initPose = smallRobotArm.fk([0, 0, 0, 0, 90, 0])
                     smallRobotArm.moveTo(initPose)
-                    smallRobotArm.drop()                    
+                    smallRobotArm.drop()
                     # wait till any key is pressed
-                    cv2.waitKey(0)                   
+                    cv2.waitKey(0)
                 except:
                     print('ik error!')
 

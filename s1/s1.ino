@@ -154,7 +154,7 @@ void loop() {
       // Serial.println("data == \"jn\"");
       val = data.substring(1, data.length());
 
-      float* ik = splitString(val);      // update array X
+      float* ik = split_string(val);      // update array X
 
       // goStrightLine(Ji, X, 0.25e-4, 0.75e-10, 0.5 * velG, 0.5 * velG);
       goStrightLine(Ji, ik, 0.15e-4, 0.35e-10, 0, 0 );
@@ -204,9 +204,9 @@ void loop() {
       goStrightLine(from, to, 0.25e-4, 0.75e-10, 0.0, 0.0);
       delete[] dTheta;
     }
-    else if (data == 'eOn')
+    else if (data == "eOn")
       digitalWrite(END_EFFECTOR_PIN, HIGH);
-    else if (data == 'eOff')
+    else if (data == "eOff")
       digitalWrite(END_EFFECTOR_PIN, LOW);
 
     else if (data == "en") {
@@ -268,26 +268,7 @@ float* splitString(String val) {
     // with a NULL pointer as the first argument will return the next token, and so on until there are no more tokens
     p = strtok(NULL, ",");
   }
-  return arr;
-  /*
-    int StringCount = 0;
-    // Split the string into substrings
-    while (str.length() > 0)
-    {
-    int index = str.indexOf('\t');
-    if (index == -1) // No space found
-    {
-      arr[StringCount++] = str.toFloat();
-      break;
-    }
-    else
-    {
-      arr[StringCount++] = str.substring(0, index).toFloat();
-      str = str.substring(index + 1);
-    }
-    }
-    // return X;
-  */
+  return arr;  
 }
 
 void goStrightLine(float * xfi, float * xff, float vel0, float acc0, float velini, float velfin) {
@@ -548,180 +529,3 @@ void goTrajectory(float Jf[]) {
     }
   }
 }
-
-/*
-  const int totalPoints = 4;
-  const int ts[4] = {0, 8, 16, 20};
-  // t = elapsed time; i = joint_num
-  float eq1(double t, int i) {
-  double dt = t - 0;
-  return V[0][i] * dt + 1 / 2 * A[0][i] * dt * dt;
-  }
-  float eq2(double t, int i) {
-  return V[1][i] * (t - 0.25);
-  }
-
-  float eq3(float t, int i) {
-  float dt1, dt2;
-  dt1 = t - 0.25;
-  dt2 = t - (ts[1] - 0.25);
-  return V[1][i] * dt1 + 1 / 2 * A[1][i] * dt2 * dt2;
-  }
-  float eq4(double t, int i) {
-  float dt = t - ts[1];
-  return V[2][i] * dt;
-  }
-  float eq5(float t, int i) {
-  float dt1, dt2;
-  dt1 = t - ts[1];
-  dt2 = t - (ts[2] - 0.25);
-  return V[2][i] * dt1 + 1 / 2 * A[2][i] * dt2 * dt2;
-  }
-  float eq6(float t, int i) {
-  float dt = t - ts[2];
-  return V[3][i] * dt;
-  }
-  float eq7(float t, int i) {
-  float dt1, dt2;
-  dt1 = t - ts[2];
-  dt2 = t - (ts[totalPoints - 1] - 0.5);
-  return V[3][i] * dt1 + 1 / 2 * A[3][i] * dt2 * dt2;
-  }
-
-  void traj() {
-  float Xx[6];
-  double t;
-  uint32_t start_time = millis();
-  uint32_t curr_time = millis();
-  while (millis() - start_time < 12 * 1000) {
-    t = (double)(curr_time - start_time) / 1000.0;
-    // elasped_time = millis() - start_time;
-    Serial.println(t);
-    /*
-      for (int i = 0; i < 6; i++) {
-      if (t >= ts[0] && t <= (ts[0] + 0.5))
-        Xx[i] = J[0][i] + eq1(t, i);
-      else if (t > (ts[0] + 0.5) && t <= (ts[1] - 0.25))
-        Xx[i] = J[0][i] + eq2(t, i);
-      else if (t > (ts[1] - 0.25) && t <= (ts[1] + 0.25))
-        Xx[i] = J[0][i] + eq3(t, i);
-      else if (t > (ts[1] + 0.25) && t <= (ts[2] - 0.25))
-        Xx[i] = J[1][i] + eq4(t, i);
-      else if ( t > (ts[2] - 0.25) && t <= (ts[2] + 0.25))
-        Xx[i] = J[1][i] + eq5(t, i);
-      else if (t > (ts[2] + 0.25) && t <= (ts[totalPoints - 1] - 0.5))
-        Xx[i] = J[2][i] + eq6(t, i);
-      else if ( t > (ts[totalPoints - 1] - 0.5) && t <= ts[totalPoints - 1])
-        Xx[i] = J[2][i] + eq7(t, i);
-      }
-
-
-    //char buf[40];
-    //sprintf(buf,"Xx=%.2f,%.2f,%.2f", Xx[0],Xx[1],Xx[2]);
-    //Serial.print(Xx[0]);
-    //Serial.print(Xx[1]);
-    //Serial.println(Xx[2]);
-    //goTrajectory(Xx);
-    curr_time = millis();
-  }
-  }
-
-  void goHome() {
-  // go to the home position (all joints equal to 0)
-  // joint #2
-  digitalWrite(DIR2_PIN, HIGH);
-  int delValue = 4000; // delay value after pulse
-  int incValue = 7; //
-  int accRate = 530; // accel in 1st 530 steps and deccel in last 530 steps, and constant vel in btw.
-  // 1.8 deg / 32 microstep = 0.05625deg/step, 2791*2 * 0.05625 = 314.8 deg, 314.8 /dl2 -> 314.8/4=78.7 degrees (actual degrees moved)
-  int totSteps = 2791 * 2;
-  for (int i = 0; i < totSteps; i++)
-  {
-    if (totSteps > (2 * accRate + 1)) { // does the totSteps big enough for doing half accel and half deccel
-      if (i < accRate) {
-        //acceleration in step 0 and 530
-        delValue = delValue - incValue;
-      } else if (i > (totSteps - accRate)) {
-        //decceleration in last 530 (accRate) steps
-        delValue = delValue + incValue;
-      }
-    } else {
-      //no space for proper acceleration/decceleration
-      // do half acc and half deccel, no constant vel.
-      if (i < ((totSteps - (totSteps % 2)) / 2)) {
-        //acceleration
-        delValue = delValue - incValue;
-      } else if (i > ((totSteps + (totSteps % 2)) / 2)) {
-        //decceleration
-        delValue = delValue + incValue;
-      }
-    }
-    digitalWrite(PUL2_PIN, HIGH);
-    delayMicroseconds(delValue);
-    digitalWrite(PUL2_PIN, LOW);
-    delayMicroseconds(delValue);
-  }
-  // joint #3 (note that join3 and joint2's motor are in opposite direction.
-  digitalWrite(DIR3_PIN, HIGH);
-  delValue = 4000;
-  incValue = 7;
-  accRate = 530;
-  totSteps = 6569;
-  for (int i = 0; i < totSteps; i++)
-  {
-    if (totSteps > (2 * accRate + 1)) {
-      if (i < accRate) {
-        //acceleration
-        delValue = delValue - incValue;
-      } else if (i > (totSteps - accRate)) {
-        //decceleration
-        delValue = delValue + incValue;
-      }
-    } else {
-      //no space for proper acceleration/decceleration
-      if (i < ((totSteps - (totSteps % 2)) / 2)) {
-        //acceleration
-        delValue = delValue - incValue;
-      } else if (i > ((totSteps + (totSteps % 2)) / 2)) {
-        //decceleration
-        delValue = delValue + incValue;
-      }
-    }
-    digitalWrite(PUL3_PIN, HIGH);
-    delayMicroseconds(delValue);
-    digitalWrite(PUL3_PIN, LOW);
-    delayMicroseconds(delValue);
-  }
-  // joint #5
-  digitalWrite(DIR5_PIN, HIGH);
-  delValue = 4000;
-  incValue = 7;
-  accRate = 530;
-  totSteps = 90 / dl5;
-  for (int i = 0; i < totSteps; i++)
-  {
-    if (totSteps > (2 * accRate + 1)) {
-      if (i < accRate) {
-        //acceleration
-        delValue = delValue - incValue;
-      } else if (i > (totSteps - accRate)) {
-        //decceleration
-        delValue = delValue + incValue;
-      }
-    } else {
-      //no space for proper acceleration/decceleration
-      if (i < ((totSteps - (totSteps % 2)) / 2)) {
-        //acceleration
-        delValue = delValue - incValue;
-      } else if (i > ((totSteps + (totSteps % 2)) / 2)) {
-        //decceleration
-        delValue = delValue + incValue;
-      }
-    }
-    digitalWrite(PUL5_PIN, HIGH);
-    delayMicroseconds(delValue);
-    digitalWrite(PUL5_PIN, LOW);
-    delayMicroseconds(delValue);
-  }
-  }
-*/
