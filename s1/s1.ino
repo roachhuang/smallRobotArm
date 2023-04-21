@@ -5,6 +5,8 @@
 
 //#define PI 3.1415926535897932384626433832795
 
+// kk-p20/15
+#define END_EFFECTOR_PIN 16
 //driver for the axis 1
 #define PUL1_PIN 39
 #define DIR1_PIN 37
@@ -83,6 +85,9 @@ float* splitString(String val);
 void setup() {
   pinMode(ledPin, OUTPUT);
   digitalWrite(ledPin , HIGH );
+
+  pinMode(END_EFFECTOR_PIN, OUTPUT);
+  digitalWrite(END_EFFECTOR_PIN, LOW);
 
   pinMode(PUL1_PIN, OUTPUT);
   pinMode(DIR1_PIN, OUTPUT);
@@ -199,38 +204,11 @@ void loop() {
       goStrightLine(from, to, 0.25e-4, 0.75e-10, 0.0, 0.0);
       delete[] dTheta;
     }
-    /*
-      else if (data.startsWith("J")) {
-      val = data.substring(1, data.length());
-      splitString(val, X);      // update array X
-      Serial.println("ack");
-      // des, src, size
-      memcpy(&J[i][0], X, sizeof(X));
-      i++;
-      }
-      else if (data.startsWith("V")) {
-      val = data.substring(1, data.length());
-      splitString(val, X);      // update array X
-      Serial.println("ack");
-      // des, src, size
-      memcpy(&V[j][0], X, sizeof(X));
-      j++;
-      //Serial.println(j);
-      }
-      else if (data.startsWith("A")) {
-      val = data.substring(1, data.length());
-      splitString(val, X);      // update array X
-      Serial.println("ack");
-      // des, src, size
-      memcpy(&A[k][0], X, sizeof(X));
-      k++;
-      //Serial.println(k);
-      }
-      else if (data.startsWith("T")) {
-      i = j = k = 0;
-      // traj();
-      }
-    */
+    else if (data == 'eOn')
+      digitalWrite(END_EFFECTOR_PIN, HIGH);
+    else if (data == 'eOff')
+      digitalWrite(END_EFFECTOR_PIN, LOW);
+
     else if (data == "en") {
       digitalWrite(EN321_PIN, LOW);
       digitalWrite(EN4_PIN, LOW);

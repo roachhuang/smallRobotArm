@@ -78,6 +78,12 @@ class SmallRbtArm(RobotArm):
         self.conn = ser.SerialPort() 
         self.conn.connect()
         
+    def grab(self):
+        self.conn.ser.write(b"eOn\n")
+
+    def drop(self):
+        self.conn.ser.write(b"eOff\n")
+
     def enable(self):
         # motors are disabled in arduino's setup()
         self.conn.ser.write(b"en\n")

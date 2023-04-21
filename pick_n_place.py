@@ -15,7 +15,7 @@ R_RC = np.array([
 T_RC = np.eye(4)   # identity matrix, placeholder
 T_RC[:3, :3] = R_RC[:3, :3]
 # T_RC[:3, 3] = (350, 65, 625)
-T_RC[:3, 3] = (335, 10, 598)
+T_RC[:3, 3] = (335, 10, 590)
 print(T_RC)
 
 
@@ -60,7 +60,9 @@ while run == True:
     #cy= int(height/2)
 
     rgb = cv2.cvtColor(flipped_bgr, cv2.COLOR_BGR2RGB)
+    cv2.imshow("img", rgb)
 
+    # this is good for calibration
     cv2.line(rgb, (int(w/2), 0), (int(w/2), h), (0, 255, 0), 1)
     cv2.line(rgb, (0, int(h/2)), (w, int(h/2)), (0, 255, 0), 1)
     cv2.circle(rgb, (int(w/2), int(h/2)), 10, (0, 255, 0), 1)
@@ -79,7 +81,15 @@ while run == True:
         dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     for c in cnts:
         area = cv2.contourArea(c)
+        # area is in pix
         if area > 1000:
+            x, y, w, h = cv2.boundingRect(c)
+            cv2.rectangle(rgb, (x,y), (x+w, y+h), (0, 255, 0), 2)           
+            # calculate center and radius of minimum enclosing circle
+            (x, y), radius = cv2.minEnclosingCircle(c)
+            # cast to integers
+            center = (int(x), int(y))
+
             M = cv2.moments(c)
             if M["m00"] != 0:
                 cX = int(M["m10"] / M["m00"])
@@ -102,27 +112,25 @@ while run == True:
             cv2.putText(rgb, 'x:{:.2f}, y:{:.2f}, z:{:.2f}'.format(x, y, z), (cX - 20,
                                                                               cY - 20), cv2.FONT_ITALIC, 1, (255, 0, 0), 1, cv2.LINE_AA)
 
-            cv2.drawContours(rgb, cnts, -1, (0, 255, 0), 2)
+            # cv2.drawContours(rgb, cnts, -1, (0, 255, 0), 2)
             if bPick_and_place == True:
                 try:
-                    smallRobotArm.moveTo(obj_pose)                   
-                    sleep(8)
-
+                    smallRobotArm.moveTo(obj_pose)
+                    smallRobotArm.grab()                   
+                    sleep(2)
                     # home pose                    
                     initPose =smallRobotArm.fk([0,0,0,0,90,0])
                     smallRobotArm.moveTo(initPose)
-                    '''
-                    msg = '{}{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}\n'.format(
-                        'j', *j,)
-                    ser.write(msg.encode('utf-8'))    
-                    '''
-                    sleep(15)
-                    # run = False
+                    smallRobotArm.drop()                    
+                    # wait till any key is pressed
+                    cv2.waitKey(0)                   
                 except:
                     print('ik error!')
 
-    cv2.imshow("img", rgb)
-    # cv2.imshow("msk", red_mask)
+        # cv2.imshow("img", rgb)
+        # cv2.imshow("msk", red_mask)
+
+    cv2.drawContours(rgb, cnts, -1, (0, 255, 0), 2)
 
     if cv2.waitKey(500) & 0xff == ord('q'):
         break
