@@ -117,8 +117,9 @@ def main() -> None:
     joints = poses
 
     if bTrajectory == False:
-        for (i, pose) in enumerate(poses, start=0):
-            smallRobotArm.moveTo(pose[1: 7])
+        for pose in poses:
+            _, *p = pose
+            smallRobotArm.moveTo(p)
             # col 0 are time data
             #j = smallRobotArm.ik(pose[1: 7])
             #conn.send2Arduino('j', j, bWaitAck=True)
