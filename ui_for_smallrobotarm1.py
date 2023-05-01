@@ -94,6 +94,9 @@ class Application(tk.Frame):
         # animate is async, so we need to do this at here
         if frame == 1:
             self.__from_deg = self.__to_deg
+            self.send_button.configure(state='normal')
+            self.reset_button.configure(state='normal')
+
         # robot.plot(q, fig=fig, backend="pyplot")
         return ax.collections
 
@@ -139,9 +142,11 @@ class Application(tk.Frame):
         command = "g{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}\n".format(
             *self.__d_deg)
         print(command)
-        # send the command to the Arduino
-        # self.ser.write(command.encode('utf-8'))
-        smallRobotArm.conn.send2Arduino('g', self.__d_deg, False)
+        # send the command to the Arduino  
+        cmd = {'header': 'g', 'joint_angle': self.__d_deg, 'ack': False}
+        smallRobotArm.conn.send2Arduino(cmd)
+        self.send_button.configure(state='disabled')
+        self.reset_button.configure(state='disabled')
 
     def on_checkbox_click(self):
         if self.chkbox_state.get() == False:
