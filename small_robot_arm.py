@@ -30,9 +30,10 @@ smRobot = DHRobot(std_dh_table)
 # {x, y, z, ZYZ Euler angles}
 # Xhome = [164.5, 0.0, 241.0, 90.0, 180.0, -90.0]
 
+
 def main() -> None:
     DOF = 6
-    bTrajectory = False 
+    bTrajectory = False
     np.set_printoptions(precision=2, suppress=True)
     # r6=distance btw axis6 and end-effector
     std_dh_params = np.array([
@@ -61,16 +62,16 @@ def main() -> None:
     print("dhTbl =\n" + np.array2string(smallRobotArm.dhTbl, separator=', ',
                                         formatter={'float': '{: 0.2f}'.format}))
     # init serial
-    #conn = com.SerialPort()   
+    #conn = com.SerialPort()
     # there must be a delay here
     sleep(1)
     smallRobotArm.enable()
 
     # motors are disabled in arduino's setup()
-    #conn.ser.write(b"en\n")
-    #sleep(.5)
-    #conn.ser.write(b"rst\n")
-    #sleep(.5)
+    # conn.ser.write(b"en\n")
+    # sleep(.5)
+    # conn.ser.write(b"rst\n")
+    # sleep(.5)
 
     # j = smallRobotArm.ik(initPose)
     smallRobotArm.moveTo(initPose)
@@ -79,7 +80,7 @@ def main() -> None:
     # conn.send2Arduino('j', j, bWaitAck=True)
 
     sleep(2)
-    smallRobotArm.moveTo([283.5, 90.0, 60.0, 0.0, 0.0, 35.0])    
+    smallRobotArm.moveTo([283.5, 90.0, 60.0, 0.0, 0.0, 35.0])
     #j = smallRobotArm.ik([283.5, 90.0, 60.0, 0.0, 0.0, 35.0])
     #conn.send2Arduino('j', j, bWaitAck=True)
     sleep(.5)
@@ -136,7 +137,8 @@ def main() -> None:
     else:
         for (i, pose) in enumerate(poses, start=0):
             # col 0 are time data
-            joints[i, 1: 7] = smallRobotArm.ik(pose[1: 7])
+            _, *p = pose
+            joints[i, 1: 7] = smallRobotArm.ik(p)
 
         # display easily readable ik resutls on the screen
         J = pd.DataFrame(joints, columns=[
@@ -180,8 +182,8 @@ def main() -> None:
                         eq.eq7(dt, ts, v[3, col], a[3, col], totalPoints)
 
             # ask arduino to run goTractory(Xx)
-            #conn.send2Arduino('m', Xx, bWaitAck=False)
-            smallRobotArm.conn.send2Arduino('m', Xx, bWaitAck=False)
+            cmd = {'header': 'm', 'joint_angle': Xx, 'ack': False}
+            smallRobotArm.conn.send2Arduino(cmd)
             # must be a delay here. ack takes too long causing discontinued arm movement.
             sleep(1/100)
             curr_time = perf_counter()
@@ -190,9 +192,10 @@ def main() -> None:
     # a way to terminate thread
     smallRobotArm.conn.disconnect()
     #event_run = False
-    #smallRobotArm.conn.t.join()
-    #smallRobotArm.conn.ser.close()
+    # smallRobotArm.conn.t.join()
+    # smallRobotArm.conn.ser.close()
     print('THREAD TERMINATED!')
+
 
 if __name__ == "__main__":
     main()

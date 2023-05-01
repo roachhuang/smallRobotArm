@@ -93,7 +93,7 @@ class SmallRbtArm(RobotArm):
 
 
     @hlp.timer  
-    def ik(self, Xik):
+    def ik(self, Xik:list):
         '''
         Xik: end-effector pose in cartension space, orientation(j4,5,6) are in deg
         return: 2 decimaled joints angles in degrees.
@@ -243,4 +243,5 @@ class SmallRbtArm(RobotArm):
     def moveTo(self, end_effector_pose):
         #return super().moveTo(end_effector_pose)
         j = self.ik(end_effector_pose)
-        self.conn.send2Arduino('j', j, bWaitAck=True)
+        cmd = {'header': 'j', 'joint_angle': j, 'ack':True}
+        self.conn.send2Arduino(cmd)
