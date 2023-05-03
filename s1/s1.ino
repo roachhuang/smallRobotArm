@@ -174,7 +174,8 @@ void loop() {
       delete[] j_over_time;
       // Serial.println("ack m");
     }
-    if (data.startsWith("i")) {
+    /*
+    else if (data.startsWith("i")) {
       val = data.substring(1, data.length());
 
       float* ik = splitString(val);      // update array X
@@ -189,6 +190,7 @@ void loop() {
       curPos5 = 90.0;
       curPos6 = 0.0;
     }
+    */
     else if (data.startsWith("g")) {
       val = data.substring(1, data.length());
       float* dTheta = splitString(val);
@@ -221,6 +223,7 @@ void loop() {
       digitalWrite(EN5_PIN, HIGH);
       digitalWrite(EN6_PIN, HIGH);
     }
+    // home all axes
     else if (data == "rst") {
       curPos1 = 0.0;
       curPos2 = -78.51;
