@@ -89,7 +89,7 @@ class Application(tk.Frame):
         # example of joint angle update
         # q = frame / 100 * np.array([np.pi/2, np.pi/4, np.pi/2, 0, 0, 0])
         q = np.radians(self.__from_deg + self.__d_deg/frame)
-        robot.plot(q, fig=fig)  # , fig=fig, backend="pyplot")
+        robot.plot(q, fig=fig, block=False)  # , fig=fig, backend="pyplot")
 
         # animate is async, so we need to do this at here
         if frame == 1:
@@ -135,7 +135,7 @@ class Application(tk.Frame):
         # construct the command string, delay of 100ms btw each frame
         # interval was 5
         anim = FuncAnimation(fig, self.animate, frames=range(
-            5, 0, -1), interval=100, blit=True, repeat=False)       
+            5, 0, -1), interval=50, blit=True, repeat=False)       
 
         plt.show()
 
@@ -257,8 +257,7 @@ if __name__ == "__main__":
     #ax.set_zlim(0, 350)
     #plt.show()
     robot.plot([0, np.radians(-78.51), np.radians(73.9),
-               0, -np.pi/2, 0], fig=fig, backend="pyplot")
-
+               0, -np.pi/2, 0], fig=fig, backend="pyplot", block=False)
     root = tk.Tk()
 
     # root.resizable(True, True)
