@@ -59,7 +59,7 @@ class SerialPort():
         msg = '{}{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}\n'.format(cmd['header'], *cmd['joint_angle'])
         self.ser.write(msg.encode('utf-8'))
         self._event_ok2send.clear()
-        print(msg)
+        # print(msg)
         if cmd['ack'] is True:
             # wait till the event is set in rcvThread.
             self._event_ok2send.wait()            

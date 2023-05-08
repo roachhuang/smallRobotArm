@@ -61,18 +61,10 @@ def main() -> None:
     # Print the transformation matrix in SE(3) format
     print("dhTbl =\n" + np.array2string(smallRobotArm.dhTbl, separator=', ',
                                         formatter={'float': '{: 0.2f}'.format}))
-    # init serial
-    #conn = com.SerialPort()
-    # there must be a delay here
+  
+    # there must be a delay here right after sieal is initialized
     sleep(1)
-    smallRobotArm.enable()
-
-    # motors are disabled in arduino's setup()
-    # conn.ser.write(b"en\n")
-    # sleep(.5)
-    # conn.ser.write(b"rst\n")
-    # sleep(.5)
-
+    smallRobotArm.enable() 
     # j = smallRobotArm.ik(initPose)
     smallRobotArm.moveTo(initPose)
     #j = [0, 0, 0, 0, 90, 0]
@@ -113,8 +105,11 @@ def main() -> None:
             _, *p = pose
             smallRobotArm.moveTo(p)
             # col 0 are time data
-            #j = smallRobotArm.ik(pose[1: 7])
-            #conn.send2Arduino('j', j, bWaitAck=True)
+        # this is home pos but axis 6 is not moved back to its origin pos. maybe tool frame isn't considered            
+        smallRobotArm.moveTo([47.96, 0.0, 268.02, 180, 94.61, 180.0])
+        # cut the power of motors
+        smallRobotArm.disable()
+
         '''
         T = SE3(pose[1],  pose[2], pose[3]) * \
             SE3.Rz(np.radians(
@@ -126,6 +121,8 @@ def main() -> None:
 
     ###################################################################
     else:
+        smallRobotArm.moveTo([264.5+19, 70.0+20, 60, 0.0, 0.0, 35.0])
+
         for (i, pose) in enumerate(poses, start=0):
             # col 0 are time data
             _, *p = pose
@@ -152,7 +149,7 @@ def main() -> None:
         # ts[-1] last one element
         while curr_time - start_time <= ts[-1]:
             dt = curr_time - start_time
-            print('Time elasped:{time:.4f}'.format(time=dt))
+            # print('Time elasped:{time:.4f}'.format(time=dt))
 
             for col in range(DOF):
                 if dt >= ts[0] and dt <= ts[0] + 0.5:
@@ -180,9 +177,7 @@ def main() -> None:
             curr_time = perf_counter()
 
     sleep(2)
-    # this is home pos but axis 6 is not moved back to its origin pos. maybe tool frame isn't considered
-    smallRobotArm.moveTo([47.96, 0.0, 268.02, 180, 94.61, 180.0])
-    smallRobotArm.disable()
+    
     # a way to terminate thread
     smallRobotArm.conn.disconnect()  
     print('THREAD TERMINATED!')

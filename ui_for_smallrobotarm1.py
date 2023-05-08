@@ -137,7 +137,7 @@ class Application(tk.Frame):
         # construct the command string, delay of 100ms btw each frame
         # interval was 5
         anim = FuncAnimation(fig, self.animate, frames=range(
-            5, 0, -1), interval=50, blit=True, repeat=False)       
+            3, 0, -1), interval=50, blit=True, repeat=False)       
 
         plt.show()
 

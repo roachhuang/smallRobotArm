@@ -31,7 +31,7 @@ class RobotArm(ABC):
     def __init__(self, std_dh_tbl: np.ndarray):
         self.dhTbl = std_dh_tbl
         # self.ser = com.init_ser()
-        
+
     def get_ti2i_1(self, i, theta=None) -> np.ndarray:
         ''' return transfermation matrix from dh tbl'''
         # fill in dh tbl wrt robot arms' dh params
@@ -39,10 +39,7 @@ class RobotArm(ABC):
         # array idx starts frm 0, so i-1
         alfa, ai, di, th = symbols('alfa, ai, di, th')
         alfa, ai, di = self.dhTbl[i - 1, :]
-        if theta is None:
-            th = f'q{i}'
-        else:
-            th = theta
+        th = f'q{i}' if theta is None else theta
 
         # the reason for using sympy's Matrix is that we need to apply it with sympy's simplify func
         # to eliminate sth likes 1.xxxxxe-14 * sin(qx)
@@ -60,24 +57,25 @@ class RobotArm(ABC):
             return np.array(m)
         else:
             # Matrix objects have a numpy method that returns a numpy.ndarray
-            return np.array(m).astype(np.float64)
-        #return m
+            return np.array(m).astype(np.float)
+        # return m
 
-    @abstractmethod      
-    def ik(self): pass    
+    @abstractmethod
+    def ik(self): pass
 
-    @abstractmethod    
+    @abstractmethod
     def fk(self, Jfk): pass
 
-    @abstractmethod       
+    @abstractmethod
     def moveTo(self, end_effector_pose): pass
+
 
 class SmallRbtArm(RobotArm):
     def __init__(self, std_dh_tbl: np.ndarray):
         super().__init__(std_dh_tbl)
-        self.conn = ser.SerialPort() 
+        self.conn = ser.SerialPort()
         self.conn.connect()
-        
+
     def grab(self):
         self.conn.ser.write(b"eOn\n")
 
@@ -87,14 +85,21 @@ class SmallRbtArm(RobotArm):
     def enable(self):
         # motors are disabled in arduino's setup()
         self.conn.ser.write(b"en\n")
-        #sleep(.5)
+        # sleep(.5)
         self.conn.ser.write(b"rst\n")
-        #sleep(.5)         
-    def disable(self):        
+        # sleep(.5)
+
+    def disable(self):
         self.conn.ser.write(b'dis\n')
 
-    @hlp.timer  
-    def ik(self, Xik:list):
+    def moveTo(self, end_effector_pose):
+        # return super().moveTo(end_effector_pose)
+        j = self.ik(end_effector_pose)
+        cmd = {'header': 'j', 'joint_angle': j, 'ack': True}
+        self.conn.send2Arduino(cmd)
+
+    @hlp.timer
+    def ik(self, Xik: list):
         '''
         Xik: end-effector pose in cartension space, orientation(j4,5,6) are in deg
         return: 2 decimaled joints angles in degrees.
@@ -128,7 +133,7 @@ class SmallRbtArm(RobotArm):
 
         # find T06
         # inTwf[16], inTtf[16], Tw6[16], T06[16]
-        invTwf = np.linalg.inv(Twf) # Tw0 is not take into account now...
+        invTwf = np.linalg.inv(Twf)  # Tw0 is not take into account now...
         invTtf = np.linalg.inv(Ttf)
         # Tcw=T0w*T60*Tc6 => T60=invT0w*Tcw*invTc6
         # Tw6 = Twt@invTtf
@@ -156,7 +161,7 @@ class SmallRbtArm(RobotArm):
 
         # third joint
         Jik[2] = pi - acos((r2**2 + r3**2 + d4**2 - (Xsw[2] - d1) * (Xsw[2] - d1) - (sqrt(Xsw[0]**2 + Xsw[1]**2 - d3**2) -
-                                                                                    r1) * (sqrt(Xsw[0]**2 + Xsw[1]**2 - d3**2) - r1)) / (2 * r2 * sqrt(r3**2 + d4**2))) - atan2(d4, r3)
+                                                                                     r1) * (sqrt(Xsw[0]**2 + Xsw[1]**2 - d3**2) - r1)) / (2 * r2 * sqrt(r3**2 + d4**2))) - atan2(d4, r3)
         # Jik(2) = pi-acos((r(2) ^ 2+r(3) ^ 2+d(4) ^ 2-(Xsw(3)-d(1)) ^ 2-(sqrt(Xsw(1) ^ 2+Xsw(2) ^ 2-d(3) ^ 2)-r(1)) ^ 2)/(2*r(2)*sqrt(r(3) ^ 2+d(4) ^ 2)))-atan(d(4)/r(3))
 
         # last three joints
@@ -240,9 +245,3 @@ class SmallRbtArm(RobotArm):
         Xfk[5] = atan2(T[2, 1]/sin(Xfk[4]), -T[2, 0]/sin(Xfk[4]))
         Xfk[3:6] = np.degrees(Xfk[3:6])
         return Xfk
-    
-    def moveTo(self, end_effector_pose):
-        #return super().moveTo(end_effector_pose)
-        j = self.ik(end_effector_pose)
-        cmd = {'header': 'j', 'joint_angle': j, 'ack':True}
-        self.conn.send2Arduino(cmd)
