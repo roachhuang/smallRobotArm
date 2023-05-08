@@ -104,6 +104,7 @@ class Application(tk.Frame):
         for i in range(6):
             self.sliders[i].set(0)
         self.send_command()
+        smallRobotArm.disable()
 
         '''
         self.__from_deg = REST_ANGLES
@@ -122,6 +123,7 @@ class Application(tk.Frame):
         '''
 
     def send_command(self):
+        smallRobotArm.enable()
         # read the joint angles from the sliders
         currInputVal = np.zeros(6)
 

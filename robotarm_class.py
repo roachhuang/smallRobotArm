@@ -90,7 +90,8 @@ class SmallRbtArm(RobotArm):
         #sleep(.5)
         self.conn.ser.write(b"rst\n")
         #sleep(.5)         
-
+    def disable(self):        
+        self.conn.ser.write(b'dis\n')
 
     @hlp.timer  
     def ik(self, Xik:list):

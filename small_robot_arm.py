@@ -75,15 +75,11 @@ def main() -> None:
 
     # j = smallRobotArm.ik(initPose)
     smallRobotArm.moveTo(initPose)
-
     #j = [0, 0, 0, 0, 90, 0]
     # conn.send2Arduino('j', j, bWaitAck=True)
 
     sleep(2)
-    smallRobotArm.moveTo([283.5, 90.0, 60.0, 0.0, 0.0, 35.0])
-    #j = smallRobotArm.ik([283.5, 90.0, 60.0, 0.0, 0.0, 35.0])
-    #conn.send2Arduino('j', j, bWaitAck=True)
-    sleep(.5)
+    
     '''
     T = SE3(initPose[0],  initPose[1], initPose[2]) * \
         SE3.Rz(np.radians(
@@ -107,13 +103,8 @@ def main() -> None:
             [0,  264.5+19,   70.0+20,    60,        0.0,    0.0,    35.0],
             [8,  264.5+19,   70.0+20,    90,        0.0,    0.0,    35.0],
             [20, 264.5-120,  70.0+60,    350.0,     0.0,    -60.0,  0.0],
-            [24, 264.5-120,  70.0+100,   355.0,     0.0,    -60.0,  0.0],
-
-            # [21, 47.96, 0.0, 288.02, 180, 94.61, 180.0],
-            # [21, 47.96, 0.0, 268.02, 180, 94.61, 180.0],
-            # [21, 51.98, 0, 218.2, 0.0, 0.0, 180.0],
-
-        ], dtype=float)
+            [24, 264.5-120,  70.0+100,   355.0,     0.0,    -60.0,  0.0],], dtype=float)
+    
     # give time col to joints
     joints = poses
 
@@ -187,15 +178,14 @@ def main() -> None:
             # must be a delay here. ack takes too long causing discontinued arm movement.
             sleep(1/100)
             curr_time = perf_counter()
-    sleep(1)
-    # ser.write(b"dis\n")
-    # a way to terminate thread
-    smallRobotArm.conn.disconnect()
-    #event_run = False
-    # smallRobotArm.conn.t.join()
-    # smallRobotArm.conn.ser.close()
-    print('THREAD TERMINATED!')
 
+    sleep(2)
+    # this is home pos but axis 6 is not moved back to its origin pos. maybe tool frame isn't considered
+    smallRobotArm.moveTo([47.96, 0.0, 268.02, 180, 94.61, 180.0])
+    smallRobotArm.disable()
+    # a way to terminate thread
+    smallRobotArm.conn.disconnect()  
+    print('THREAD TERMINATED!')
 
 if __name__ == "__main__":
     main()
