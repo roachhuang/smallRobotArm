@@ -89,11 +89,14 @@ class Application(tk.Frame):
         # example of joint angle update
         # q = frame / 100 * np.array([np.pi/2, np.pi/4, np.pi/2, 0, 0, 0])
         q = np.radians(self.__from_deg + self.__d_deg/frame)
-        robot.plot(q, fig=fig)  # , fig=fig, backend="pyplot")
+        robot.plot(q, fig=fig, block=False)  # , fig=fig, backend="pyplot")
 
         # animate is async, so we need to do this at here
         if frame == 1:
             self.__from_deg = self.__to_deg
+            self.send_button.configure(state='normal')
+            self.reset_button.configure(state='normal')
+
         # robot.plot(q, fig=fig, backend="pyplot")
         return ax.collections
 
@@ -101,6 +104,7 @@ class Application(tk.Frame):
         for i in range(6):
             self.sliders[i].set(0)
         self.send_command()
+        smallRobotArm.disable()
 
         '''
         self.__from_deg = REST_ANGLES
@@ -119,6 +123,7 @@ class Application(tk.Frame):
         '''
 
     def send_command(self):
+        smallRobotArm.enable()
         # read the joint angles from the sliders
         currInputVal = np.zeros(6)
 
@@ -132,16 +137,18 @@ class Application(tk.Frame):
         # construct the command string, delay of 100ms btw each frame
         # interval was 5
         anim = FuncAnimation(fig, self.animate, frames=range(
-            5, 0, -1), interval=100, blit=True, repeat=False)       
+            3, 0, -1), interval=50, blit=True, repeat=False)       
 
         plt.show()
 
         command = "g{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}\n".format(
             *self.__d_deg)
         print(command)
-        # send the command to the Arduino
-        # self.ser.write(command.encode('utf-8'))
-        smallRobotArm.conn.send2Arduino('g', self.__d_deg, False)
+        # send the command to the Arduino  
+        cmd = {'header': 'g', 'joint_angle': self.__d_deg, 'ack': False}
+        smallRobotArm.conn.send2Arduino(cmd)
+        self.send_button.configure(state='disabled')
+        self.reset_button.configure(state='disabled')
 
     def on_checkbox_click(self):
         if self.chkbox_state.get() == False:
@@ -252,8 +259,7 @@ if __name__ == "__main__":
     #ax.set_zlim(0, 350)
     #plt.show()
     robot.plot([0, np.radians(-78.51), np.radians(73.9),
-               0, -np.pi/2, 0], fig=fig, backend="pyplot")
-
+               0, -np.pi/2, 0], fig=fig, backend="pyplot", block=False)
     root = tk.Tk()
 
     # root.resizable(True, True)

@@ -30,9 +30,10 @@ smRobot = DHRobot(std_dh_table)
 # {x, y, z, ZYZ Euler angles}
 # Xhome = [164.5, 0.0, 241.0, 90.0, 180.0, -90.0]
 
+
 def main() -> None:
     DOF = 6
-    bTrajectory = False 
+    bTrajectory = False
     np.set_printoptions(precision=2, suppress=True)
     # r6=distance btw axis6 and end-effector
     std_dh_params = np.array([
@@ -60,29 +61,17 @@ def main() -> None:
     # Print the transformation matrix in SE(3) format
     print("dhTbl =\n" + np.array2string(smallRobotArm.dhTbl, separator=', ',
                                         formatter={'float': '{: 0.2f}'.format}))
-    # init serial
-    #conn = com.SerialPort()   
-    # there must be a delay here
+  
+    # there must be a delay here right after sieal is initialized
     sleep(1)
-    smallRobotArm.enable()
-
-    # motors are disabled in arduino's setup()
-    #conn.ser.write(b"en\n")
-    #sleep(.5)
-    #conn.ser.write(b"rst\n")
-    #sleep(.5)
-
+    smallRobotArm.enable() 
     # j = smallRobotArm.ik(initPose)
     smallRobotArm.moveTo(initPose)
-
     #j = [0, 0, 0, 0, 90, 0]
     # conn.send2Arduino('j', j, bWaitAck=True)
 
     sleep(2)
-    smallRobotArm.moveTo([283.5, 90.0, 60.0, 0.0, 0.0, 35.0])    
-    #j = smallRobotArm.ik([283.5, 90.0, 60.0, 0.0, 0.0, 35.0])
-    #conn.send2Arduino('j', j, bWaitAck=True)
-    sleep(.5)
+    
     '''
     T = SE3(initPose[0],  initPose[1], initPose[2]) * \
         SE3.Rz(np.radians(
@@ -106,22 +95,21 @@ def main() -> None:
             [0,  264.5+19,   70.0+20,    60,        0.0,    0.0,    35.0],
             [8,  264.5+19,   70.0+20,    90,        0.0,    0.0,    35.0],
             [20, 264.5-120,  70.0+60,    350.0,     0.0,    -60.0,  0.0],
-            [24, 264.5-120,  70.0+100,   355.0,     0.0,    -60.0,  0.0],
-
-            # [21, 47.96, 0.0, 288.02, 180, 94.61, 180.0],
-            # [21, 47.96, 0.0, 268.02, 180, 94.61, 180.0],
-            # [21, 51.98, 0, 218.2, 0.0, 0.0, 180.0],
-
-        ], dtype=float)
+            [24, 264.5-120,  70.0+100,   355.0,     0.0,    -60.0,  0.0],], dtype=float)
+    
     # give time col to joints
     joints = poses
 
     if bTrajectory == False:
-        for (i, pose) in enumerate(poses, start=0):
-            smallRobotArm.moveTo(pose[1: 7])
+        for pose in poses:
+            _, *p = pose
+            smallRobotArm.moveTo(p)
             # col 0 are time data
-            #j = smallRobotArm.ik(pose[1: 7])
-            #conn.send2Arduino('j', j, bWaitAck=True)
+        # this is home pos but axis 6 is not moved back to its origin pos. maybe tool frame isn't considered            
+        smallRobotArm.moveTo([47.96, 0.0, 268.02, 180, 94.61, 180.0])
+        # cut the power of motors
+        smallRobotArm.disable()
+
         '''
         T = SE3(pose[1],  pose[2], pose[3]) * \
             SE3.Rz(np.radians(
@@ -133,9 +121,12 @@ def main() -> None:
 
     ###################################################################
     else:
+        smallRobotArm.moveTo([264.5+19, 70.0+20, 60, 0.0, 0.0, 35.0])
+
         for (i, pose) in enumerate(poses, start=0):
             # col 0 are time data
-            joints[i, 1: 7] = smallRobotArm.ik(pose[1: 7])
+            _, *p = pose
+            joints[i, 1: 7] = smallRobotArm.ik(p)
 
         # display easily readable ik resutls on the screen
         J = pd.DataFrame(joints, columns=[
@@ -158,7 +149,7 @@ def main() -> None:
         # ts[-1] last one element
         while curr_time - start_time <= ts[-1]:
             dt = curr_time - start_time
-            print('Time elasped:{time:.4f}'.format(time=dt))
+            # print('Time elasped:{time:.4f}'.format(time=dt))
 
             for col in range(DOF):
                 if dt >= ts[0] and dt <= ts[0] + 0.5:
@@ -179,18 +170,16 @@ def main() -> None:
                         eq.eq7(dt, ts, v[3, col], a[3, col], totalPoints)
 
             # ask arduino to run goTractory(Xx)
-            #conn.send2Arduino('m', Xx, bWaitAck=False)
-            smallRobotArm.conn.send2Arduino('m', Xx, bWaitAck=False)
+            cmd = {'header': 'm', 'joint_angle': Xx, 'ack': False}
+            smallRobotArm.conn.send2Arduino(cmd)
             # must be a delay here. ack takes too long causing discontinued arm movement.
             sleep(1/100)
             curr_time = perf_counter()
-    sleep(1)
-    # ser.write(b"dis\n")
+
+    sleep(2)
+    
     # a way to terminate thread
-    smallRobotArm.conn.disconnect()
-    #event_run = False
-    #smallRobotArm.conn.t.join()
-    #smallRobotArm.conn.ser.close()
+    smallRobotArm.conn.disconnect()  
     print('THREAD TERMINATED!')
 
 if __name__ == "__main__":
