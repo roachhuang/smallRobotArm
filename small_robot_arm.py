@@ -61,17 +61,17 @@ def main() -> None:
     # Print the transformation matrix in SE(3) format
     print("dhTbl =\n" + np.array2string(smallRobotArm.dhTbl, separator=', ',
                                         formatter={'float': '{: 0.2f}'.format}))
-  
+
     # there must be a delay here right after sieal is initialized
     sleep(1)
-    smallRobotArm.enable() 
+    smallRobotArm.enable()
     # j = smallRobotArm.ik(initPose)
     smallRobotArm.moveTo(initPose)
     #j = [0, 0, 0, 0, 90, 0]
     # conn.send2Arduino('j', j, bWaitAck=True)
 
     sleep(2)
-    
+
     '''
     T = SE3(initPose[0],  initPose[1], initPose[2]) * \
         SE3.Rz(np.radians(
@@ -95,8 +95,8 @@ def main() -> None:
             [0,  264.5+19,   70.0+20,    60,        0.0,    0.0,    35.0],
             [8,  264.5+19,   70.0+20,    90,        0.0,    0.0,    35.0],
             [20, 264.5-120,  70.0+60,    350.0,     0.0,    -60.0,  0.0],
-            [24, 264.5-120,  70.0+100,   355.0,     0.0,    -60.0,  0.0],], dtype=float)
-    
+            [24, 264.5-120,  70.0+100,   355.0,     0.0,    -60.0,  0.0], ], dtype=float)
+
     # give time col to joints
     joints = poses
 
@@ -105,10 +105,9 @@ def main() -> None:
             _, *p = pose
             smallRobotArm.moveTo(p)
             # col 0 are time data
-        # this is home pos but axis 6 is not moved back to its origin pos. maybe tool frame isn't considered            
-        smallRobotArm.moveTo([47.96, 0.0, 268.02, 180, 94.61, 180.0])
-        # cut the power of motors
-        smallRobotArm.disable()
+        # this is home pos but axis 6 is not moved back to its origin pos. maybe tool frame isn't considered
+        # smallRobotArm.moveTo([47.96, 0.0, 268.02, 180, 94.61, 180.0])
+        # cut the power of motors      
 
         '''
         T = SE3(pose[1],  pose[2], pose[3]) * \
@@ -176,10 +175,16 @@ def main() -> None:
             sleep(1/100)
             curr_time = perf_counter()
 
+        # this is to set ji in arduino coz of from and to args for goStrightLine
+        ji = smallRobotArm.ik([264.5-120, 70.0+100, 355.0, 0.0, -60.0, 0.0])
+        cmd = {'header': 'c', 'joint_angle': ji, 'ack': False}
+        smallRobotArm.conn.send2Arduino(cmd)
+
+    smallRobotArm.moveTo([47.96, 0.0, 268.02, 180, 94.61, 180.0])
     sleep(2)
-    
+    smallRobotArm.disable()
     # a way to terminate thread
-    smallRobotArm.conn.disconnect()  
+    smallRobotArm.conn.disconnect()
     print('THREAD TERMINATED!')
 
 if __name__ == "__main__":

@@ -150,7 +150,7 @@ void loop() {
   if (Serial.available() > 0) {
     String data = Serial.readStringUntil('\n');
     if (data.startsWith("j")) {
-      digitalWrite(ledPin, LOW);
+      // digitalWrite(ledPin, LOW);
       // Serial.println("data == \"jn\"");
       val = data.substring(1, data.length());
 
@@ -174,23 +174,12 @@ void loop() {
       delete[] j_over_time;
       // Serial.println("ack m");
     }
-    /*
-    else if (data.startsWith("i")) {
+    else if (data.startsWith("c")){
       val = data.substring(1, data.length());
-
-      float* ik = splitString(val);      // update array X
-
-      goStrightLine(Ji, ik, 0.15e-4, 0.35e-10, 0, 0 );
-      Serial.println("ack");
-      delete[] ik;
-      curPos1 = 0.0;  //
-      curPos2 = 0.0;
-      curPos3 = 0.0;
-      curPos4 = 0.0;
-      curPos5 = 90.0;
-      curPos6 = 0.0;
+      float* ik = split_string(val);      // update array X   
+      memcpy(Ji, ik, sizeof(Ji));
+      delete[] ik; // avoid memory leak
     }
-    */
     else if (data.startsWith("g")) {
       val = data.substring(1, data.length());
       float* dTheta = splitString(val);
