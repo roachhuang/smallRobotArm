@@ -57,7 +57,7 @@ class RobotArm(ABC):
             return np.array(m)
         else:
             # Matrix objects have a numpy method that returns a numpy.ndarray
-            return np.array(m).astype(np.float)
+            return np.array(m).astype(np.float32)
         # return m
 
     @abstractmethod
