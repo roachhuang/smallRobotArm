@@ -1,4 +1,6 @@
+# pip3 install pyserial
 import serial.tools.list_ports
+
 import serial
 import platform
 from threading import Thread, Event

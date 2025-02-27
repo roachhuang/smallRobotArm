@@ -6,7 +6,11 @@ from roboticstoolbox import DHRobot, RevoluteDH
 from spatialmath import SE3
 # from roboticstoolbox.backends.PyPlot import PyPlot
 import robotarm_class as smRbt
+
+#sudo apt update
+#sudo apt install python3-tk -y
 import tkinter as tk
+
 from time import sleep
 import serial_class as com
 
@@ -136,7 +140,7 @@ class Application(tk.Frame):
 
         # construct the command string, delay of 100ms btw each frame
         # interval was 5
-        anim = FuncAnimation(fig, self.animate, frames=range(
+        self.anim = FuncAnimation(fig, self.animate, frames=range(
             3, 0, -1), interval=50, blit=True, repeat=False)       
 
         plt.show()
