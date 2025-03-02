@@ -1,8 +1,5 @@
-# import pandas as pd
-from math import pi, cos, acos, sin, atan2, sqrt, radians
-
 # the reason for importing cos and sin from sympy is Rot case (can't import them from math, plz note!!!)
-from sympy import symbols #, nsimplify, Matrix
+from sympy import symbols  # , nsimplify, Matrix
 import numpy as np
 import helpers as hlp
 
@@ -68,8 +65,6 @@ Extrinsic rotations mean.
 So the rotations are all happening around the same global axis.
 Uses the Euler angle sequence 'z-y-z'
 """
-
-
 def create_T_scipy(pose):
     """Creates SE3 transformation matrix from pose using scipy."""
 
@@ -132,7 +127,8 @@ class RobotArm(ABC):
         #         [0, 0, 0, 1],
         #     ]
         # )
-        m = np.array([
+        m = np.array(
+            [
                 [
                     np.cos(th),
                     -np.sin(th) * np.cos(alfa),
@@ -147,18 +143,21 @@ class RobotArm(ABC):
                 ],
                 [0, np.sin(alfa), np.cos(alfa), di],
                 [0, 0, 0, 1],
-            ])
+            ]
+        )
 
         if theta is None:
             # m = nsimplify(m, tolerance=1e-10, rational=True)
             # # print(f't{i}-{i-1}: {m}')
             # return np.array(m)
-            #------------------------------------------------------------
+            # ------------------------------------------------------------
             # For symbolic-like behavior (approximation with rationals)
             # NumPy doesn't have a direct equivalent to nsimplify with rational=True
             # This part requires more advanced techniques or a different library if you need exact rational approximations.
             # Here we approximate with floats and round to a certain tolerance.
-            m = np.round(m, decimals=10) #approximates the symbolic nsimplify tolerance.
+            m = np.round(
+                m, decimals=10
+            )  # approximates the symbolic nsimplify tolerance.
             return m
         else:
             # Matrix objects have a numpy method that returns a numpy.ndarray
@@ -221,7 +220,7 @@ class SmallRbtArm(RobotArm):
 
         Jik = np.zeros((6,), dtype=float)
         # DH table
-        th_offset = np.array([0.0, radians(-90), 0.0, 0.0, 0.0, 0.0])
+        th_offset = np.array([0.0, np.radians(-90), 0.0, 0.0, 0.0, 0.0])
 
         # work frame
         # Xwf = Point([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
@@ -260,50 +259,50 @@ class SmallRbtArm(RobotArm):
         # joints variable
         # Jik=zeros(6,1);
         # first joint
-        Jik[0] = atan2(Xsw[1], Xsw[0]) - atan2(
-            d3, sqrt(Xsw[0] ** 2 + Xsw[1] ** 2 - d3**2)
+        Jik[0] = np.arctan2(Xsw[1], Xsw[0]) - np.arctan2(
+            d3, np.sqrt(Xsw[0] ** 2 + Xsw[1] ** 2 - d3**2)
         )
 
         # second joint
         Jik[1] = (
-            pi / 2.0
-            - acos(
+            np.pi / 2.0
+            - np.arccos(
                 (
                     r2**2
                     + (Xsw[2] - d1) * (Xsw[2] - d1)
-                    + (sqrt(Xsw[0] ** 2 + Xsw[1] ** 2 - d3**2) - r1)
-                    * (sqrt(Xsw[0] ** 2 + Xsw[1] ** 2 - d3**2) - r1)
+                    + (np.sqrt(Xsw[0] ** 2 + Xsw[1] ** 2 - d3**2) - r1)
+                    * (np.sqrt(Xsw[0] ** 2 + Xsw[1] ** 2 - d3**2) - r1)
                     - (r3**2 + d4**2)
                 )
                 / (
                     2.0
                     * r2
-                    * sqrt(
+                    * np.sqrt(
                         (Xsw[2] - d1) * (Xsw[2] - d1)
-                        + (sqrt(Xsw[0] ** 2 + Xsw[1] ** 2 - d3**2) - r1)
-                        * (sqrt(Xsw[0] ** 2 + Xsw[1] ** 2 - d3**2) - r1)
+                        + (np.sqrt(Xsw[0] ** 2 + Xsw[1] ** 2 - d3**2) - r1)
+                        * (np.sqrt(Xsw[0] ** 2 + Xsw[1] ** 2 - d3**2) - r1)
                     )
                 )
             )
-            - atan2((Xsw[2] - d1), (sqrt(Xsw[0] ** 2 + Xsw[1] ** 2 - d3**2) - r1))
+            - np.arctan2((Xsw[2] - d1), (np.sqrt(Xsw[0] ** 2 + Xsw[1] ** 2 - d3**2) - r1))
         )
         # Jik(1) = pi/2-acos((r(2) ^ 2+(Xsw(3)-d(1)) ^ 2+(sqrt(Xsw(1) ^ 2+Xsw(2) ^ 2-d(3) ^ 2)-r(1)) ^ 2-(r(3) ^ 2+d(4) ^ 2))/(2*r(2)*sqrt((Xsw(3)-d(1)) ^ 2+(sqrt(Xsw(1) ^ 2+Xsw(2) ^ 2-d(3) ^ 2)-r(1)) ^ 2)))-atan((Xsw(3)-d(1))/(sqrt(Xsw(1) ^ 2+Xsw(2) ^ 2-d(3) ^ 2)-r(1)))
 
         # third joint
         Jik[2] = (
-            pi
-            - acos(
+            np.pi
+            - np.arccos(
                 (
                     r2**2
                     + r3**2
                     + d4**2
                     - (Xsw[2] - d1) * (Xsw[2] - d1)
-                    - (sqrt(Xsw[0] ** 2 + Xsw[1] ** 2 - d3**2) - r1)
-                    * (sqrt(Xsw[0] ** 2 + Xsw[1] ** 2 - d3**2) - r1)
+                    - (np.sqrt(Xsw[0] ** 2 + Xsw[1] ** 2 - d3**2) - r1)
+                    * (np.sqrt(Xsw[0] ** 2 + Xsw[1] ** 2 - d3**2) - r1)
                 )
-                / (2 * r2 * sqrt(r3**2 + d4**2))
+                / (2 * r2 * np.sqrt(r3**2 + d4**2))
             )
-            - atan2(d4, r3)
+            - np.arctan2(d4, r3)
         )
         # Jik(2) = pi-acos((r(2) ^ 2+r(3) ^ 2+d(4) ^ 2-(Xsw(3)-d(1)) ^ 2-(sqrt(Xsw(1) ^ 2+Xsw(2) ^ 2-d(3) ^ 2)-r(1)) ^ 2)/(2*r(2)*sqrt(r(3) ^ 2+d(4) ^ 2)))-atan(d(4)/r(3))
 
@@ -321,13 +320,13 @@ class SmallRbtArm(RobotArm):
         T36 = inv_T03 @ T06
 
         # forth joint
-        Jik[3] = atan2(-T36[1][2], -T36[0][2])
+        Jik[3] = np.arctan2(-T36[1][2], -T36[0][2])
 
         # fifth joint
-        Jik[4] = atan2(sqrt(T36[0][2] ** 2 + T36[1][2] ** 2), T36[2][2])
+        Jik[4] = np.arctan2(np.sqrt(T36[0][2] ** 2 + T36[1][2] ** 2), T36[2][2])
 
         # sixth joints
-        Jik[5] = atan2(-T36[2][1], T36[2][0])
+        Jik[5] = np.arctan2(-T36[2][1], T36[2][0])
         # rad to deg
         Jik = np.degrees(Jik)
         Jik = np.round_(Jik, decimals=2)
@@ -382,8 +381,8 @@ class SmallRbtArm(RobotArm):
         # calculate pos from transformation matrix
         (Xfk[0], Xfk[1], Xfk[2]) = T[0:3, 3]
 
-        Xfk[4] = atan2(sqrt(T[2, 0] ** 2 + T[2, 1] ** 2), T[2, 2])
-        Xfk[3] = atan2(T[1, 2] / sin(Xfk[4]), T[0, 2] / sin(Xfk[4]))
-        Xfk[5] = atan2(T[2, 1] / sin(Xfk[4]), -T[2, 0] / sin(Xfk[4]))
+        Xfk[4] = np.arctan2(np.sqrt(T[2, 0] ** 2 + T[2, 1] ** 2), T[2, 2])
+        Xfk[3] = np.arctan2(T[1, 2] / np.sin(Xfk[4]), T[0, 2] / np.sin(Xfk[4]))
+        Xfk[5] = np.arctan2(T[2, 1] / np.sin(Xfk[4]), -T[2, 0] / np.sin(Xfk[4]))
         Xfk[3:6] = np.degrees(Xfk[3:6])
         return Xfk

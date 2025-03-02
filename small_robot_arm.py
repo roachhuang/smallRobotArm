@@ -1,4 +1,3 @@
-from math import radians
 from time import sleep, perf_counter
 import logging
 import pandas as pd
@@ -9,8 +8,10 @@ import equations as eq
 import robotarm_class as robot
 import plan_traj as pt
 from roboticstoolbox import DHRobot, RevoluteDH
+
 # from spatialmath import SE3
 from scipy.spatial.transform import Rotation as R
+from scipy.interpolate import CubicSpline
 
 # Define your DH table parameters
 # 50 is distance btw 6th axis and end-effector
@@ -40,11 +41,11 @@ def main() -> None:
     # r6=distance btw axis6 and end-effector
     std_dh_params = np.array(
         [
-            [radians(-90), a1, d1],
+            [np.radians(-90), a1, d1],
             [0, a2, 0],
-            [radians(-90), a3, 0],
-            [radians(90), 0, d4],
-            [radians(-90), 0, 0],
+            [np.radians(-90), a3, 0],
+            [np.radians(90), 0, d4],
+            [np.radians(-90), 0, 0],
             [0, 0, d6],
         ]
     )
@@ -72,7 +73,7 @@ def main() -> None:
     initPose = np.zeros(6)
     initPose[0:3] = tc0[0:3, 3]
     initPose[3:6] = tZ1, tY, tZ2
-    print(f'initial pose: {initPose}')
+    print(f"initial pose: {initPose}")
     # create an instance of the robotarm.
     smallRobotArm = robot.SmallRbtArm(std_dh_params)
     # print(smallRobotArm.dhTbl)
@@ -124,7 +125,7 @@ def main() -> None:
     )
 
     # give time col to joints
-    joints = poses
+    joints = poses.copy()
 
     if bTrajectory == False:
         for pose in poses:
@@ -170,6 +171,24 @@ def main() -> None:
 
         start_time = curr_time = perf_counter()
         Xx = np.zeros([6], dtype=np.float32)
+        
+        '''
+        # Create CubicSpline interpolators for each joint
+        splines = [CubicSpline(ts, js[:, col]) for col in range(DOF - 1)]
+
+        while curr_time - start_time <= ts[-1]:
+            dt = curr_time - start_time
+            curr_time = perf_counter()
+
+            for col in range(DOF - 1):
+                Xx[col] = splines[col](dt)
+            # ask arduino to run goTractory(Xx)
+            cmd = {"header": "m", "joint_angle": Xx, "ack": False}
+            smallRobotArm.conn.send2Arduino(cmd)
+            # must be a delay here. ack takes too long causing discontinued arm movement.
+            sleep(1 / 100)
+        '''
+                
         # ts[-1] last one element
         while curr_time - start_time <= ts[-1]:
             dt = curr_time - start_time
@@ -199,6 +218,7 @@ def main() -> None:
             # must be a delay here. ack takes too long causing discontinued arm movement.
             sleep(1 / 100)
             curr_time = perf_counter()
+        
 
         # this is to set ji in arduino coz of from and to args for goStrightLine
         ji = smallRobotArm.ik([264.5 - 120, 70.0 + 100, 355.0, 0.0, -60.0, 0.0])
