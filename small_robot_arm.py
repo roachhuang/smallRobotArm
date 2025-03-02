@@ -170,7 +170,7 @@ def main() -> None:
         # get time from col 0 of p
 
         start_time = curr_time = perf_counter()
-        Xx = np.zeros([6], dtype=np.float32)
+        Xx = np.zeros([6], dtype=np.float64)
         
         '''
         # Create CubicSpline interpolators for each joint

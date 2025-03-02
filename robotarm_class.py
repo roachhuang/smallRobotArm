@@ -107,7 +107,21 @@ class RobotArm(ABC):
         # self.ser = com.init_ser()
 
     def get_ti2i_1(self, i, theta=None) -> np.ndarray:
-        """return transfermation matrix from dh tbl"""
+        """
+        todo: examin intpu theta's procision by checking its number of decimal points.
+        Creates a DH transformation matrix using NumPy.
+
+        Args:
+            th: Theta (joint angle or variable).
+            alfa: Alpha (twist angle).
+            ai: ai (link length).
+            di: di (link offset).
+            theta: If None, returns a rounded matrix (approximating symbolic).
+            tolerance: Tolerance for rounding (used if theta is None).
+
+        Returns:
+            NumPy array representing the DH transformation matrix.       
+        """
         # fill in dh tbl wrt robot arms' dh params
 
         # array idx starts frm 0, so i-1
@@ -155,14 +169,16 @@ class RobotArm(ABC):
             # NumPy doesn't have a direct equivalent to nsimplify with rational=True
             # This part requires more advanced techniques or a different library if you need exact rational approximations.
             # Here we approximate with floats and round to a certain tolerance.
+            decimals = int(-np.log10(1e-8)) # calculates the number of decimals needed
+            # 6-10 decimals is common for robotics, we use 8 here.
             m = np.round(
-                m, decimals=10
+                m, decimals
             )  # approximates the symbolic nsimplify tolerance.
             return m
         else:
             # Matrix objects have a numpy method that returns a numpy.ndarray
-            # return np.array(m).astype(np.float32)
-            return m.astype(np.float32)
+            # float32 maintains only approximately 7 decimal digits fo precision internally.
+            return m.astype(np.float64)
         # return m
 
     @abstractmethod
