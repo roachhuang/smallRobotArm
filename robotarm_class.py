@@ -125,9 +125,10 @@ class RobotArm(ABC):
         # fill in dh tbl wrt robot arms' dh params
 
         # array idx starts frm 0, so i-1
-        alfa, ai, di, th = symbols("alfa, ai, di, th")
+        # alfa, ai, di, th = symbols("alfa, ai, di, th")
         alfa, ai, di = self.dhTbl[i - 1, :]
-        th = f"q{i}" if theta is None else theta
+        # th = f"q{i}" if theta is None else theta
+        th=theta
 
         # the reason for using sympy's Matrix is that we need to apply it with sympy's simplify func
         # to eliminate sth likes 1.xxxxxe-14 * sin(qx)
