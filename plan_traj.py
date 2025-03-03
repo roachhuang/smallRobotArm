@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.interpolate import CubicSpline
+
 # import plotly.express as px
 # plt.ion()
 
@@ -10,7 +11,7 @@ DOF = 6
 
 
 def planTraj(p):
-     # in 0, 0.5s. col[1~3]: x, y, z
+    # in 0, 0.5s. col[1~3]: x, y, z
     def eq1(t, col):
         dt = t - 0
         v0 = v[0, col]
@@ -63,7 +64,7 @@ def planTraj(p):
         v3 = v[3, col]
         a3 = a[3, col]
         return p[2, col + 1] + v3 * dt1 + 1 / 2 * a3 * dt2**2
-    
+
     """input array p contains timing and joint angles at each points"""
     (totalPoints, num_cols) = np.shape(p)
     # 有 totalPoints 的2次段, 内有totalPoints-1 的linear 段
@@ -92,7 +93,8 @@ def planTraj(p):
     #
     # 頭尾補0, coz, init and final points' velocity are 0
     v = np.array(
-        [np.zeros(num_cols - 1), v1s, v2s, v3s, np.zeros(num_cols - 1)], dtype=float
+        [np.zeros(num_cols - 1), v1s, v2s, v3s, np.zeros(num_cols - 1)],
+        dtype=np.float64,
     )
     # (m, _) = np.shape(v)
     # v = np.insert(v, (0, m), 0, axis=0)
@@ -115,8 +117,8 @@ def planTraj(p):
 
     # 0s ~ final second, step:0.1
     timeAxis = np.arange(ts[0], ts[-1], 0.1)
-    inputPoints = [[] * 1 for _ in range(num_cols - 1)]   
-    
+    inputPoints = [[] * 1 for _ in range(num_cols - 1)]
+
     # col - 0~2, denote x, y or theta data
     # inputPoints=np.empty((3, 90))
     fig_col = 3
@@ -126,8 +128,8 @@ def planTraj(p):
     fig.subplots_adjust(wspace=0.25, hspace=0.25)
     plt.title("Robot arm joints angle changes over time", fontsize=20, color="blue")
     plt.grid()
-    
-    '''        
+
+    """        
     # Use CubicSpline interpolation
     splines = [CubicSpline(ts, p[:, col + 1]) for col in range(num_cols - 1)]
     for col in range(num_cols - 1):
@@ -139,8 +141,8 @@ def planTraj(p):
         ax.set_ylabel('Degree')
         plt.plot(timeAxis, splines[col](timeAxis), 'r')
     plt.show()
-    '''   
-    
+    """
+
     for col in range(num_cols - 1):
         for t in timeAxis:
             if t >= ts[0] and t <= ts[0] + 0.5:
@@ -165,8 +167,8 @@ def planTraj(p):
         ax.set_ylabel("Degree")
         # plt.subplot(fig_row, fig_col, col + 1, title=f'{col+1} to time')
         plt.plot(timeAxis, inputPoints[col], "r")
-    plt.show()    
-    
+    plt.show()
+
     fig = plt.figure(figsize=(9, 9))
     plt.title(
         "Trajectory planning with Linear functions & parabolic blending",
