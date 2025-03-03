@@ -49,14 +49,17 @@ def main() -> None:
             [0, 0, d6],
         ]
     )
+    # create an instance of the robotarm.
+    smallRobotArm = robot.SmallRbtArm(std_dh_params)
+    
     # tool frame. this is for generating Tc6
     # Xtf = robot.Point(0.0, 0.0, 50.0, 180.0, -90.0, 0.0)
     # tool frame transformation matrix
     # tc6 = Xtf.pos2tran(), 50mm is the distance btw frame6 to end-effector
-    tc6 = robot.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
+    tc6 = smallRobotArm.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
 
     # orientation for frame 6 is unchanged (x points up, z->front)
-    t60 = robot.pose2T([164.5, 0.0, 241.0, 90.0, 180.0, -90])
+    t60 = smallRobotArm.pose2T([164.5, 0.0, 241.0, 90.0, 180.0, -90])
     # t60 = robot.pose2T([164.5, 0.0, 241.0, 180.0, -90.0, 0])
     tc0 = t60 @ tc6
 
@@ -74,8 +77,7 @@ def main() -> None:
     initPose[0:3] = tc0[0:3, 3]
     initPose[3:6] = tZ1, tY, tZ2
     print(f"initial pose: {initPose}")
-    # create an instance of the robotarm.
-    smallRobotArm = robot.SmallRbtArm(std_dh_params)
+   
     # print(smallRobotArm.dhTbl)
 
     # Print the transformation matrix in SE(3) format
@@ -121,7 +123,7 @@ def main() -> None:
             [20, 264.5 - 120, 70.0 + 60, 350.0, 0.0, -60.0, 0.0],
             [24, 264.5 - 120, 70.0 + 100, 355.0, 0.0, -60.0, 0.0],
         ],
-        dtype=float,
+        dtype=np.float64,
     )
 
     # give time col to joints
