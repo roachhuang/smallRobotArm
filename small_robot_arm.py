@@ -3,7 +3,6 @@ import logging
 import pandas as pd
 import numpy as np
 
-# import serial_class as com
 import equations as eq
 import robotarm_class as robot
 import plan_traj as pt
@@ -14,7 +13,7 @@ from scipy.spatial.transform import Rotation as R
 from scipy.interpolate import CubicSpline
 
 # Define your DH table parameters
-# 50 is distance btw 6th axis and end-effector
+# 50 is distance btw 6th axis and the extended end-effector
 a1, a2, a3 = 47.0, 110.0, 26.0
 d1, d4, d6 = 133.0, 117.50, 28.0
 
@@ -66,8 +65,9 @@ def main() -> None:
     # create a roatation object from the rotation part of the tc0 matrix
     r_tc0 = R.from_matrix(tc0[:3, :3])
     # Extract Euler angles (ZYZ in degrees) from the rotation matrix.
+    # todo: figure out xyz or zyz???
     tZ1, tY, tZ2 = r_tc0.as_euler(
-        "zyz", degrees=True
+        "ZYZ", degrees=True
     )  # if your original data was xyz, then change to xyz
 
     # T_se3 = SE3(tc0)
@@ -78,15 +78,13 @@ def main() -> None:
     initPose[3:6] = tZ1, tY, tZ2
     print(f"initial pose: {initPose}")
    
-    # print(smallRobotArm.dhTbl)
-
     # Print the transformation matrix in SE(3) format
-    print(
-        "dhTbl =\n"
-        + np.array2string(
-            smallRobotArm.dhTbl, separator=", ", formatter={"float": "{: 0.2f}".format}
-        )
-    )
+    # print(
+    #     "dhTbl =\n"
+    #     + np.array2string(
+    #         smallRobotArm.dhTbl, separator=", ", formatter={"float": "{: 0.2f}".format}
+    #     )
+    # )
 
     # there must be a delay here right after sieal is initialized
     sleep(1)
@@ -125,7 +123,7 @@ def main() -> None:
         ],
         dtype=np.float64,
     )
-
+    
     # give time col to joints
     joints = poses.copy()
 
@@ -149,6 +147,7 @@ def main() -> None:
 
     ###################################################################
     else:
+        # this line is required coz reach to this pose at 0 sec as the poses says.
         smallRobotArm.moveTo([264.5 + 19, 70.0 + 20, 60, 0.0, 0.0, 35.0])
 
         for i, pose in enumerate(poses, start=0):
@@ -230,8 +229,10 @@ def main() -> None:
     # smallRobotArm.moveTo([47.96, 0.0, 268.02, 180, 94.61, 180.0])
     # initPose[0:3] = [11.31000000e02, 1.94968772e-31, 2.78500000e02]
     # initPose[3:6] = [10.00000000e00, 1.27222187e-14, 1.80000000e02]
-    smallRobotArm.moveTo(initPose)
+    smallRobotArm.moveTo(initPose)    
     sleep(2)
+   
+    smallRobotArm.moveTo(q)
     # smallRobotArm.disable()
     # a way to terminate thread
     smallRobotArm.conn.disconnect()

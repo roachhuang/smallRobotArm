@@ -20,15 +20,6 @@ So the rotations are all happening around the same global axis.
 Uses the Euler angle sequence 'z-y-z'
 """
 
-
-def euler_zyz_from_matrix(matrix) -> tuple:
-    R = matrix[:3, :3]
-    phi = np.arctan2(R[1, 0], R[0, 0])
-    theta = np.arccos(R[2, 0])
-    psi = np.arctan2(R[2, 1], R[2, 2])
-    return (phi, theta, psi)
-
-
 class RobotArm(ABC):
     def __init__(self, std_dh_tbl: np.array):
         self.dhTbl = std_dh_tbl
@@ -37,21 +28,25 @@ class RobotArm(ABC):
         """Creates SE3 transformation matrix from pose using scipy."""
 
         x, y, z, roll, pitch, yaw = pose
-
+        # todo: figure out xyz or zyz?
+        r = R.from_euler("ZYZ", [np.radians(roll), np.radians(pitch), np.radians(yaw)])
+        
         # Translation matrix
         translation_matrix = np.eye(4)
         translation_matrix[:3, 3] = [x, y, z]
 
-        # Rotation matrices
-        r_z1 = R.from_euler("z", np.radians(roll))
-        r_y = R.from_euler("y", np.radians(pitch))
-        r_z2 = R.from_euler("z", np.radians(yaw))
-
-        rotation_matrix = (r_z1 * r_y * r_z2).as_matrix()
+        # # Rotation matrices
+        # r_z1 = R.from_euler("z", np.radians(roll))
+        # r_y = R.from_euler("y", np.radians(pitch))
+        # r_z2 = R.from_euler("z", np.radians(yaw))
+       
+        
+        # rotation_matrix = (r_x * r_y * r_z).as_matrix()        
+        # rotation_matrix = (r_z1 * r_y * r_z2).as_matrix()
 
         # Homogeneous transformation matrix
         T = np.eye(4)
-        T[:3, :3] = rotation_matrix
+        T[:3, :3] = r.as_matrix() # rotation_matrix
         T[:3, 3] = [x, y, z]
 
         # Alternatively, you can multiply the translation and rotation matrix.
@@ -96,6 +91,10 @@ class RobotArm(ABC):
         #         [0, 0, 0, 1],
         #     ]
         # )
+
+        """ standard DH table's T_i_to_i-1 coz smallrobotarm is uing std DH tbl.
+            the m matrix will be difference if using craig dh table. see ntu 3-3
+        """
         m = np.array(
             [
                 [
@@ -171,13 +170,14 @@ class SmallRbtArm(RobotArm):
     def moveTo(self, end_effector_pose):
         # return super().moveTo(end_effector_pose)
         j = self.ik(end_effector_pose)
+        print('q:', j)
         cmd = {"header": "j", "joint_angle": j, "ack": True}
         self.conn.send2Arduino(cmd)
 
     @hlp.timer
-    def ik(self, Xik: list) -> list:
+    def ik(self, pose: list) -> list:
         """
-        Xik: end-effector pose in cartension space, orientation(j4,5,6) are in deg
+        pose: end-effector pose in cartension space, orientation(j4,5,6) are in deg
         return: 2 decimaled joints angles in degrees.
         """
         (_, r1, d1) = self.dhTbl[0, :]
@@ -188,7 +188,8 @@ class SmallRbtArm(RobotArm):
 
         Jik = np.zeros((6,), dtype=np.float64)
         # DH table
-        th_offset = np.array([0.0, np.radians(-90), 0.0, 0.0, 0.0, 0.0])
+        # th_offset = np.array([0.0, np.radians(-90), 0.0, 0.0, 0.0, 0.0])
+        th_offset = np.array([0.0, np.pi / 2, 0.0, 0.0, 0.0, 0.0])
 
         # work frame
         # Xwf = Point([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
@@ -199,13 +200,17 @@ class SmallRbtArm(RobotArm):
         # Xtf = Point([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
         # tool frame transformation matrix (wrt last joint frame!)
         # Ttf = Xtf.pos2tran()
+
+        # Ttf = self.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
         Ttf = self.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
+
         # endEffectorPose = Point([
         #    Xik[0], Xik[1], Xik[2], Xik[3], Xik[4], Xik[5]])
         # tc_0 transformation matrix
         # Twt = endEffectorPose.pos2tran()  # Twt=pos2tran(Xik)
         # Twt = T0c
-        Twt = self.pose2T(Xik)
+        # map tool frame to world frame
+        Twt = self.pose2T(pose)
 
         # find T06
         # inTwf[16], inTtf[16], Tw6[16], T06[16]
@@ -217,18 +222,18 @@ class SmallRbtArm(RobotArm):
 
         # print('T06: ', np.around(T06,2))
 
-        # positon of the spherical wrist
-        Xsw = [0.0, 0.0, 0.0]
-        # Xsw=T06(1:3,4)-d(6)*T06(1:3,3);
-        Xsw[0] = T06[0][3] - d6 * T06[0][2]
-        Xsw[1] = T06[1][3] - d6 * T06[1][2]
-        Xsw[2] = T06[2][3] - d6 * T06[2][2]
+        # positon of the spherical wrist, and use analytical IK formulas to calculate the first three joint angles based on wrist_position and std_dh params.
+        wrist_position = [0.0, 0.0, 0.0]
+        wrist_position = T06[:3, 3] - d6 * T06[:3, 2]
+        # wrist_position[0] = T06[0][3] - d6 * T06[0][2]
+        # wrist_position[1] = T06[1][3] - d6 * T06[1][2]
+        # wrist_position[2] = T06[2][3] - d6 * T06[2][2]
 
         # joints variable
         # Jik=zeros(6,1);
         # first joint
-        Jik[0] = np.arctan2(Xsw[1], Xsw[0]) - np.arctan2(
-            d3, np.sqrt(Xsw[0] ** 2 + Xsw[1] ** 2 - d3**2)
+        Jik[0] = np.arctan2(wrist_position[1], wrist_position[0]) - np.arctan2(
+            d3, np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
         )
 
         # second joint
@@ -237,26 +242,26 @@ class SmallRbtArm(RobotArm):
             - np.arccos(
                 (
                     r2**2
-                    + (Xsw[2] - d1) * (Xsw[2] - d1)
-                    + (np.sqrt(Xsw[0] ** 2 + Xsw[1] ** 2 - d3**2) - r1)
-                    * (np.sqrt(Xsw[0] ** 2 + Xsw[1] ** 2 - d3**2) - r1)
+                    + (wrist_position[2] - d1) * (wrist_position[2] - d1)
+                    + (np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2) - r1)
+                    * (np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2) - r1)
                     - (r3**2 + d4**2)
                 )
                 / (
                     2.0
                     * r2
                     * np.sqrt(
-                        (Xsw[2] - d1) * (Xsw[2] - d1)
-                        + (np.sqrt(Xsw[0] ** 2 + Xsw[1] ** 2 - d3**2) - r1)
-                        * (np.sqrt(Xsw[0] ** 2 + Xsw[1] ** 2 - d3**2) - r1)
+                        (wrist_position[2] - d1) * (wrist_position[2] - d1)
+                        + (np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2) - r1)
+                        * (np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2) - r1)
                     )
                 )
             )
             - np.arctan2(
-                (Xsw[2] - d1), (np.sqrt(Xsw[0] ** 2 + Xsw[1] ** 2 - d3**2) - r1)
+                (wrist_position[2] - d1), (np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2) - r1)
             )
         )
-        # Jik(1) = pi/2-acos((r(2) ^ 2+(Xsw(3)-d(1)) ^ 2+(sqrt(Xsw(1) ^ 2+Xsw(2) ^ 2-d(3) ^ 2)-r(1)) ^ 2-(r(3) ^ 2+d(4) ^ 2))/(2*r(2)*sqrt((Xsw(3)-d(1)) ^ 2+(sqrt(Xsw(1) ^ 2+Xsw(2) ^ 2-d(3) ^ 2)-r(1)) ^ 2)))-atan((Xsw(3)-d(1))/(sqrt(Xsw(1) ^ 2+Xsw(2) ^ 2-d(3) ^ 2)-r(1)))
+        # Jik(1) = pi/2-acos((r(2) ^ 2+(wrist_position(3)-d(1)) ^ 2+(sqrt(wrist_position(1) ^ 2+wrist_position(2) ^ 2-d(3) ^ 2)-r(1)) ^ 2-(r(3) ^ 2+d(4) ^ 2))/(2*r(2)*sqrt((wrist_position(3)-d(1)) ^ 2+(sqrt(wrist_position(1) ^ 2+wrist_position(2) ^ 2-d(3) ^ 2)-r(1)) ^ 2)))-atan((wrist_position(3)-d(1))/(sqrt(wrist_position(1) ^ 2+wrist_position(2) ^ 2-d(3) ^ 2)-r(1)))
 
         # third joint
         Jik[2] = (
@@ -266,21 +271,21 @@ class SmallRbtArm(RobotArm):
                     r2**2
                     + r3**2
                     + d4**2
-                    - (Xsw[2] - d1) * (Xsw[2] - d1)
-                    - (np.sqrt(Xsw[0] ** 2 + Xsw[1] ** 2 - d3**2) - r1)
-                    * (np.sqrt(Xsw[0] ** 2 + Xsw[1] ** 2 - d3**2) - r1)
+                    - (wrist_position[2] - d1) * (wrist_position[2] - d1)
+                    - (np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2) - r1)
+                    * (np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2) - r1)
                 )
                 / (2 * r2 * np.sqrt(r3**2 + d4**2))
             )
             - np.arctan2(d4, r3)
         )
-        # Jik(2) = pi-acos((r(2) ^ 2+r(3) ^ 2+d(4) ^ 2-(Xsw(3)-d(1)) ^ 2-(sqrt(Xsw(1) ^ 2+Xsw(2) ^ 2-d(3) ^ 2)-r(1)) ^ 2)/(2*r(2)*sqrt(r(3) ^ 2+d(4) ^ 2)))-atan(d(4)/r(3))
+        # Jik(2) = pi-acos((r(2) ^ 2+r(3) ^ 2+d(4) ^ 2-(wrist_position(3)-d(1)) ^ 2-(sqrt(wrist_position(1) ^ 2+wrist_position(2) ^ 2-d(3) ^ 2)-r(1)) ^ 2)/(2*r(2)*sqrt(r(3) ^ 2+d(4) ^ 2)))-atan(d(4)/r(3))
 
         # last three joints
         T01 = T12 = T23 = T03 = inv_T03 = T36 = np.zeros((4, 4), dtype=np.float64)
 
         T01 = self.get_ti2i_1(1, Jik[0] + th_offset[0])
-        # note here is a -90 coz of dh table. figure out why
+        # todo: note here is a -90 coz of dh table. figure out why
         T12 = self.get_ti2i_1(2, Jik[1] + th_offset[1])
         T23 = self.get_ti2i_1(3, Jik[2] + th_offset[2])
 
@@ -288,7 +293,7 @@ class SmallRbtArm(RobotArm):
         inv_T03 = np.linalg.inv(T03)
         # pose of frame6 measured from frame3
         T36 = inv_T03 @ T06
-
+        # use use trigonometric functions to extract the last three join angles from T36.
         # forth joint
         Jik[3] = np.arctan2(-T36[1][2], -T36[0][2])
 
@@ -309,10 +314,10 @@ class SmallRbtArm(RobotArm):
         output: Xfk - pos value for the calculation of the forward kinematics
         """
         # Denavit-Hartenberg matrix
-        th_temp = np.array([0.0, -90.0, 0.0, 0.0, 0.0, 0.0])
+        th_offset = np.array([0.0, -90.0, 0.0, 0.0, 0.0, 0.0])
         theta = np.zeros((6,), dtype=np.float64)
         # theta=[Jfk(1); -90+Jfk(2); Jfk(3); Jfk(4); Jfk(5); Jfk(6)];
-        theta = np.add(Jfk, th_temp)
+        theta = np.add(Jfk, th_offset)
 
         # alfa = self.dhTbl[0:6, 0]
         # from deg to rad
@@ -331,6 +336,8 @@ class SmallRbtArm(RobotArm):
         # Tft = Xtf.pos2tran()  # Ttf=pos2tran(Xtf);
 
         Twf = self.pose2T([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        # std_dh_tbl seems no need to give last link's offset for end-effector. todo:to be confirm.
+        # Tft = self.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
         Tft = self.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
 
         # DH homogeneous transformation matrix
