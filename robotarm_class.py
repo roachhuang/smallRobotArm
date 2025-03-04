@@ -9,7 +9,8 @@ import serial_class as ser
 from abc import ABC, abstractmethod
 
 """
-This notation can sometimes be used to emphasize that the rotations are happening in a specific order, and can be used to describe either intrinsic or extrinsic rotations, but often when people write Z-Y-Z they are talking about extrinsic rotations.
+This notation can sometimes be used to emphasize that the rotations are happening in a specific order, and can be used to describe either intrinsic or extrinsic rotations,
+but often when people write Z-Y-Z they are talking about extrinsic rotations.
 Extrinsic rotations mean.
 
     Rotate around the initial Z-axis.
@@ -20,17 +21,24 @@ So the rotations are all happening around the same global axis.
 Uses the Euler angle sequence 'z-y-z'
 """
 
+
 class RobotArm(ABC):
     def __init__(self, std_dh_tbl: np.array):
         self.dhTbl = std_dh_tbl
 
     def pose2T(self, pose: list) -> np.array:
-        """Creates SE3 transformation matrix from pose using scipy."""
+        """
+        Args: position (x,y,z) + 3 rotation angles in ZYZ order
+        Returns: transformation matrix from pose
+                                             
+        Robots with spherical wrists (where the last three joint axes intersect at a point)
+        a.k.a. a4=a5=a6=0 (std dh tbl) often use "zyz" to represent the orientation of the wrist.
+        NOTE: uppercase 'ZYZ' for intrinsic rotation.        
+        """
+        # avoid roll, pitch and yaw with zyz coz of misleading
+        x, y, z, psi, theta, phi = pose  
+        r = R.from_euler("ZYZ", [np.radians(psi), np.radians(theta), np.radians(phi)])
 
-        x, y, z, roll, pitch, yaw = pose
-        # todo: figure out xyz or zyz?
-        r = R.from_euler("ZYZ", [np.radians(roll), np.radians(pitch), np.radians(yaw)])
-        
         # Translation matrix
         translation_matrix = np.eye(4)
         translation_matrix[:3, 3] = [x, y, z]
@@ -39,14 +47,13 @@ class RobotArm(ABC):
         # r_z1 = R.from_euler("z", np.radians(roll))
         # r_y = R.from_euler("y", np.radians(pitch))
         # r_z2 = R.from_euler("z", np.radians(yaw))
-       
-        
-        # rotation_matrix = (r_x * r_y * r_z).as_matrix()        
+
+        # rotation_matrix = (r_x * r_y * r_z).as_matrix()
         # rotation_matrix = (r_z1 * r_y * r_z2).as_matrix()
 
         # Homogeneous transformation matrix
         T = np.eye(4)
-        T[:3, :3] = r.as_matrix() # rotation_matrix
+        T[:3, :3] = r.as_matrix()  # rotation_matrix
         T[:3, 3] = [x, y, z]
 
         # Alternatively, you can multiply the translation and rotation matrix.
@@ -170,7 +177,7 @@ class SmallRbtArm(RobotArm):
     def moveTo(self, end_effector_pose):
         # return super().moveTo(end_effector_pose)
         j = self.ik(end_effector_pose)
-        print('q:', j)
+        print("q:", j)
         cmd = {"header": "j", "joint_angle": j, "ack": True}
         self.conn.send2Arduino(cmd)
 
@@ -243,8 +250,14 @@ class SmallRbtArm(RobotArm):
                 (
                     r2**2
                     + (wrist_position[2] - d1) * (wrist_position[2] - d1)
-                    + (np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2) - r1)
-                    * (np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2) - r1)
+                    + (
+                        np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
+                        - r1
+                    )
+                    * (
+                        np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
+                        - r1
+                    )
                     - (r3**2 + d4**2)
                 )
                 / (
@@ -252,13 +265,24 @@ class SmallRbtArm(RobotArm):
                     * r2
                     * np.sqrt(
                         (wrist_position[2] - d1) * (wrist_position[2] - d1)
-                        + (np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2) - r1)
-                        * (np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2) - r1)
+                        + (
+                            np.sqrt(
+                                wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2
+                            )
+                            - r1
+                        )
+                        * (
+                            np.sqrt(
+                                wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2
+                            )
+                            - r1
+                        )
                     )
                 )
             )
             - np.arctan2(
-                (wrist_position[2] - d1), (np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2) - r1)
+                (wrist_position[2] - d1),
+                (np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2) - r1),
             )
         )
         # Jik(1) = pi/2-acos((r(2) ^ 2+(wrist_position(3)-d(1)) ^ 2+(sqrt(wrist_position(1) ^ 2+wrist_position(2) ^ 2-d(3) ^ 2)-r(1)) ^ 2-(r(3) ^ 2+d(4) ^ 2))/(2*r(2)*sqrt((wrist_position(3)-d(1)) ^ 2+(sqrt(wrist_position(1) ^ 2+wrist_position(2) ^ 2-d(3) ^ 2)-r(1)) ^ 2)))-atan((wrist_position(3)-d(1))/(sqrt(wrist_position(1) ^ 2+wrist_position(2) ^ 2-d(3) ^ 2)-r(1)))
@@ -272,8 +296,14 @@ class SmallRbtArm(RobotArm):
                     + r3**2
                     + d4**2
                     - (wrist_position[2] - d1) * (wrist_position[2] - d1)
-                    - (np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2) - r1)
-                    * (np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2) - r1)
+                    - (
+                        np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
+                        - r1
+                    )
+                    * (
+                        np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
+                        - r1
+                    )
                 )
                 / (2 * r2 * np.sqrt(r3**2 + d4**2))
             )

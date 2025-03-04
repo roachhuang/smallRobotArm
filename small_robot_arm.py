@@ -26,7 +26,7 @@ std_dh_table = [
     RevoluteDH(d=d6, a=0, alpha=0),  # joint 6
 ]
 
-# Create the robot object with the DH parameters
+# Create a custom robot object based on my DH parameters for std dh tbl.
 smRobot = DHRobot(std_dh_table)
 
 # {x, y, z, ZYZ Euler angles}
@@ -50,14 +50,13 @@ def main() -> None:
     )
     # create an instance of the robotarm.
     smallRobotArm = robot.SmallRbtArm(std_dh_params)
-    
-    # tool frame. this is for generating Tc6
+
+    # tool frame. this is for generating Tc6 (cup to {6})
     # Xtf = robot.Point(0.0, 0.0, 50.0, 180.0, -90.0, 0.0)
-    # tool frame transformation matrix
-    # tc6 = Xtf.pos2tran(), 50mm is the distance btw frame6 to end-effector
+    # 50mm is the distance btw frame6 to end-effector
     tc6 = smallRobotArm.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
 
-    # orientation for frame 6 is unchanged (x points up, z->front)
+    # orientation for frame 6 is unchanged (x points up, z points front)
     t60 = smallRobotArm.pose2T([164.5, 0.0, 241.0, 90.0, 180.0, -90])
     # t60 = robot.pose2T([164.5, 0.0, 241.0, 180.0, -90.0, 0])
     tc0 = t60 @ tc6
@@ -77,10 +76,10 @@ def main() -> None:
     initPose[0:3] = tc0[0:3, 3]
     initPose[3:6] = tZ1, tY, tZ2
     print(f"initial pose: {initPose}")
-   
+
     # Print the transformation matrix in SE(3) format
     # print(
-    #     "dhTbl =\n"
+    #     "std_dh_tbl =\n"
     #     + np.array2string(
     #         smallRobotArm.dhTbl, separator=", ", formatter={"float": "{: 0.2f}".format}
     #     )
@@ -93,7 +92,7 @@ def main() -> None:
     smallRobotArm.moveTo(initPose)
     # j = [0, 0, 0, 0, 90, 0]
     # conn.send2Arduino('j', j, bWaitAck=True)
-
+    input("Press Enter to continue...")
     sleep(2)
 
     """
@@ -110,7 +109,18 @@ def main() -> None:
     after fk for [0, 78.51, -73,9, 0, -1.14, 0], computed manually from arduino goHome code.
     home postion = [301.85, 0.0, 168.6, -180, -84.0, 0]
     """
-    # end-effector's position and orientation
+    # end-effector's position and orientation.
+    """ 
+    these end-effector posese are wrt frame{0}
+    initially, think of the orientation in rotation matrix is easier to understand:
+        suppose you wnat the end-effector's X-axis to point in the opposite direction of the base frame's X-axis,
+        and the Y and Z axes to be aligned. rotation_matrix = np.array([
+        [-1, 0, 0],
+        [0, 1, 0],
+        [0, 0, 1]
+        ])
+        then convert the R into degrees in 'ZYZ' sequence
+    """
     poses = np.array(
         [
             # current is(90,180,-90), after rotating the current orientation by 35 deg about z axis
@@ -123,8 +133,8 @@ def main() -> None:
         ],
         dtype=np.float64,
     )
-    
-    # give time col to joints
+
+    # this is only for giving time col to joints
     joints = poses.copy()
 
     if bTrajectory == False:
@@ -172,8 +182,8 @@ def main() -> None:
 
         start_time = curr_time = perf_counter()
         Xx = np.zeros([6], dtype=np.float64)
-        
-        '''
+
+        """
         # Create CubicSpline interpolators for each joint
         splines = [CubicSpline(ts, js[:, col]) for col in range(DOF - 1)]
 
@@ -188,8 +198,8 @@ def main() -> None:
             smallRobotArm.conn.send2Arduino(cmd)
             # must be a delay here. ack takes too long causing discontinued arm movement.
             sleep(1 / 100)
-        '''
-                
+        """
+
         # ts[-1] last one element
         while curr_time - start_time <= ts[-1]:
             dt = curr_time - start_time
@@ -219,7 +229,6 @@ def main() -> None:
             # must be a delay here. ack takes too long causing discontinued arm movement.
             sleep(1 / 100)
             curr_time = perf_counter()
-        
 
         # this is to set ji in arduino coz of from and to args for goStrightLine
         ji = smallRobotArm.ik([264.5 - 120, 70.0 + 100, 355.0, 0.0, -60.0, 0.0])
@@ -229,10 +238,10 @@ def main() -> None:
     # smallRobotArm.moveTo([47.96, 0.0, 268.02, 180, 94.61, 180.0])
     # initPose[0:3] = [11.31000000e02, 1.94968772e-31, 2.78500000e02]
     # initPose[3:6] = [10.00000000e00, 1.27222187e-14, 1.80000000e02]
-    smallRobotArm.moveTo(initPose)    
+    smallRobotArm.moveTo(initPose)
     sleep(2)
-   
-    smallRobotArm.moveTo(q)
+    smallRobotArm.moveTo([13.5, 0.0, 23.5, 0.0, 0.0, 0.0])
+    # smallRobotArm.moveTo(q)
     # smallRobotArm.disable()
     # a way to terminate thread
     smallRobotArm.conn.disconnect()
