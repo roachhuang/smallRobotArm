@@ -8,11 +8,12 @@ from scipy.spatial.transform import Rotation as R
 import serial_class as ser
 from abc import ABC, abstractmethod
 
+
 class RobotArm(ABC):
     def __init__(self, std_dh_tbl: np.array):
         self.dhTbl = std_dh_tbl
 
-    def T2Pose(self, T, seq="xyz", degrees=True)->list:
+    def T2Pose(self, T, seq="xyz", degrees=True) -> tuple:
         """
         Converts a 4x4 transformation matrix to a pose (position and orientation).
 
@@ -32,9 +33,9 @@ class RobotArm(ABC):
         rotation = R.from_matrix(rotation_matrix)
         euler_angles = rotation.as_euler(seq=seq, degrees=degrees)
 
-        return np.concatenate((position, euler_angles)).tolist()
+        return (rotation, euler_angles)
 
-    def pose2T(self, pose: list, seq="xyz") -> np.array:
+    def pose2T(self, pose: tuple, seq="xyz") -> np.array:
         """
         Args: position (x,y,z) + 3 rotation angles in ZYZ order
         Returns: transformation matrix from pose
@@ -52,7 +53,7 @@ class RobotArm(ABC):
         # Translation matrix
         translation_matrix = np.eye(4)
         translation_matrix[:3, 3] = [x, y, z]
-        
+
         # Homogeneous transformation matrix
         T = np.eye(4)
         T[:3, :3] = r.as_matrix()  # rotation_matrix
@@ -66,7 +67,7 @@ class RobotArm(ABC):
 
     def get_ti2i_1(self, i, theta=None) -> np.array:
         """
-        todo: examin intput theta's procision by checking its number of decimal points.
+        todo: when theta will be none? examin intput theta's procision by checking its number of decimal points.
         Creates a DH transformation matrix using NumPy.
 
         Args:
@@ -176,10 +177,9 @@ class SmallRbtArm(RobotArm):
     def disable(self):
         self.conn.ser.write(b"dis\n")
 
-    def move_to_pose(self, end_effector_pose: list):
-        pose_array = np.array(end_effector_pose, dtype=float)
+    def move_to_pose(self, T: np.array)->None:
         # return super().moveTo(end_effector_pose)
-        j = self.ik(end_effector_pose)
+        j = self.ik(T)
         print("q:", j)
         j_array = np.array(j)
         if np.isnan(j_array).any():
@@ -187,12 +187,177 @@ class SmallRbtArm(RobotArm):
         cmd = {"header": "j", "joint_angle": j, "ack": True}
         self.conn.send2Arduino(cmd)
 
-    def move_to_angles(self, j):
+    def move_to_angles(self, j: tuple) -> None:
         # return super().moveTo(end_effector_pose)
         cmd = {"header": "j", "joint_angle": j, "ack": True}
         self.conn.send2Arduino(cmd)
 
     @hlp.timer
+    def ik(self, T_06: np.array) -> list:
+        """
+        arg:
+            pose: end-effector pose in cartension space.
+            position is retrieve from T_06.
+            orientation(j4,5,6) are in deg
+        return:
+            2 decimaled joints angles in degrees.
+        """
+        (_, r1, d1) = self.dhTbl[0, :]
+        r2 = self.dhTbl[1, 1]
+        (_, r3, d3) = self.dhTbl[2, :]
+        d4 = self.dhTbl[3, 2]
+        d6 = self.dhTbl[5, 2]
+
+        Jik = np.zeros((6,), dtype=np.float64)
+        th_offset = np.array([0.0, np.pi / 2, 0.0, 0.0, 0.0, 0.0])
+
+        wrist_position = T_06[:3, 3] - d6 * T_06[:3, 2]
+
+        try:
+            Jik[0] = np.arctan2(wrist_position[1], wrist_position[0]) - np.arctan2(
+                d3, np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
+            )
+
+            arccos_input_2 = (
+                r2**2
+                + (wrist_position[2] - d1) * (wrist_position[2] - d1)
+                + (
+                    np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
+                    - r1
+                )
+                * (
+                    np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
+                    - r1
+                )
+                - (r3**2 + d4**2)
+            ) / (
+                2.0
+                * r2
+                * np.sqrt(
+                    (wrist_position[2] - d1) * (wrist_position[2] - d1)
+                    + (
+                        np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
+                        - r1
+                    )
+                    * (
+                        np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
+                        - r1
+                    )
+                )
+            )
+
+            arccos_input_2 = np.clip(arccos_input_2, -1.0, 1.0)
+
+            Jik[1] = (
+                np.pi / 2.0
+                - np.arccos(arccos_input_2)
+                - np.arctan2(
+                    (wrist_position[2] - d1),
+                    (
+                        np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
+                        - r1
+                    ),
+                )
+            )
+
+            arccos_input_3 = (
+                r2**2
+                + r3**2
+                + d4**2
+                - (wrist_position[2] - d1) * (wrist_position[2] - d1)
+                - (
+                    np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
+                    - r1
+                )
+                * (
+                    np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
+                    - r1
+                )
+            ) / (2 * r2 * np.sqrt(r3**2 + d4**2))
+
+            arccos_input_3 = np.clip(arccos_input_3, -1.0, 1.0)
+
+            Jik[2] = np.pi - np.arccos(arccos_input_3) - np.arctan2(d4, r3)
+
+            T01 = self.get_ti2i_1(1, Jik[0] + th_offset[0])
+            T12 = self.get_ti2i_1(2, Jik[1] + th_offset[1])
+            T23 = self.get_ti2i_1(3, Jik[2] + th_offset[2])
+
+            T03 = T01 @ T12 @ T23
+            inv_T03 = np.linalg.inv(T03)
+            T36 = inv_T03 @ T_06
+
+            Jik[3] = np.arctan2(-T36[1][2], -T36[0][2])
+            Jik[4] = np.arctan2(np.sqrt(T36[0][2] ** 2 + T36[1][2] ** 2), T36[2][2])
+            Jik[5] = np.arctan2(-T36[2][1], T36[2][0])
+
+            Jik = np.degrees(Jik)
+            Jik = np.round_(Jik, decimals=2)
+            return Jik
+
+        except ValueError:
+            print("Warning: arccos domain error in Joint calculations.")
+            return None
+
+    # todo: fk taks care of qs wrt t06 instead of t0-cup. don't do the transformation in fk.
+    @hlp.timer
+    def fk(self, Jfk) -> np.array:
+        """
+        Jfk(in deg) - joints value for the calculation of the forward kinematics
+        output: Xfk - pos value for the calculation of the forward kinematics
+        """
+        # Denavit-Hartenberg matrix
+        th_offset = np.array([0.0, -90.0, 0.0, 0.0, 0.0, 0.0])
+        theta = np.zeros((6,), dtype=np.float64)
+        # theta=[Jfk(1); -90+Jfk(2); Jfk(3); Jfk(4); Jfk(5); Jfk(6)];
+        theta = np.add(Jfk, th_offset)
+
+        # alfa = self.dhTbl[0:6, 0]
+        # from deg to rad
+        theta = np.deg2rad(theta)
+        # theta = np.deg2rad(Jfk)
+        # alfa = np.deg2rad(alfa)
+
+        # work frame
+        # Xwf = Point(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        # tool frame
+        # Xtf = Point(0.0, 0.0, 50.0, 180.0, -90.0, 0.0)
+        # work frame transformation matrix
+
+        # Twf = Xwf.pos2tran()  # Twf=pos2tran(Xwf);
+        # tool frame transformation matrix
+        # Tft = Xtf.pos2tran()  # Ttf=pos2tran(Xtf);
+
+        Twf = self.pose2T([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        # std_dh_tbl seems no need to give last link's offset for end-effector. todo:to be confirm.
+        # Tft = self.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
+        Tft = self.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
+
+        # DH homogeneous transformation matrix
+        # float T01[16], T12[16], T23[16], T34[16], T45[16], T56[16];
+        # T 1 到 0 (1在下, 0在上).
+        # #1, frame1 相對于frame0 的空間幾何關係; #2,frame1 下表達的vector可轉囘frame0下來表達.
+        # #3, 從 frame0 來看 frame1.
+        T_01 = self.get_ti2i_1(1, theta[0])
+        # T 2 到 1
+        T_12 = self.get_ti2i_1(2, theta[1])
+        T_23 = self.get_ti2i_1(3, theta[2])
+        T_34 = self.get_ti2i_1(4, theta[3])
+        T_45 = self.get_ti2i_1(5, theta[4])
+        T_56 = self.get_ti2i_1(6, theta[5])
+        T = Twf @ T_01 @ T_12 @ T_23 @ T_34 @ T_45 @ T_56 @ Tft
+        # print('t: ', np.around(T, 2))
+        Xfk = np.zeros((6,), dtype=np.float64)
+        # get position from transformation matrix
+        (Xfk[0], Xfk[1], Xfk[2]) = T[0:3, 3]
+
+        Xfk[4] = np.arctan2(np.sqrt(T[2, 0] ** 2 + T[2, 1] ** 2), T[2, 2])
+        Xfk[3] = np.arctan2(T[1, 2] / np.sin(Xfk[4]), T[0, 2] / np.sin(Xfk[4]))
+        Xfk[5] = np.arctan2(T[2, 1] / np.sin(Xfk[4]), -T[2, 0] / np.sin(Xfk[4]))
+        # convert to degree
+        Xfk[3:6] = np.degrees(Xfk[3:6])
+        return Xfk
+
     # def ik(self, pose: list) -> list:
     #     """
     #     arg:
@@ -352,173 +517,3 @@ class SmallRbtArm(RobotArm):
     #     Jik = np.degrees(Jik)
     #     Jik = np.round_(Jik, decimals=2)
     #     return Jik
-
-    def ik(self, pose: list) -> list:
-        """
-        arg:
-            pose: end-effector pose in cartension space.
-            position is retrieve from T_06.
-            orientation(j4,5,6) are in deg
-        return:
-            2 decimaled joints angles in degrees.
-        """
-        (_, r1, d1) = self.dhTbl[0, :]
-        r2 = self.dhTbl[1, 1]
-        (_, r3, d3) = self.dhTbl[2, :]
-        d4 = self.dhTbl[3, 2]
-        d6 = self.dhTbl[5, 2]
-
-        Jik = np.zeros((6,), dtype=np.float64)
-        th_offset = np.array([0.0, np.pi / 2, 0.0, 0.0, 0.0, 0.0])
-
-        Twf = self.pose2T([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-        Ttf = self.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
-
-        T06 = self.pose2T(pose)
-
-        wrist_position = T06[:3, 3] - d6 * T06[:3, 2]
-
-        try:
-            Jik[0] = np.arctan2(wrist_position[1], wrist_position[0]) - np.arctan2(
-                d3, np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
-            )
-
-            arccos_input_2 = (
-                r2**2
-                + (wrist_position[2] - d1) * (wrist_position[2] - d1)
-                + (
-                    np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
-                    - r1
-                )
-                * (
-                    np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
-                    - r1
-                )
-                - (r3**2 + d4**2)
-            ) / (
-                2.0
-                * r2
-                * np.sqrt(
-                    (wrist_position[2] - d1) * (wrist_position[2] - d1)
-                    + (
-                        np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
-                        - r1
-                    )
-                    * (
-                        np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
-                        - r1
-                    )
-                )
-            )
-
-            arccos_input_2 = np.clip(arccos_input_2, -1.0, 1.0)
-
-            Jik[1] = (
-                np.pi / 2.0
-                - np.arccos(arccos_input_2)
-                - np.arctan2(
-                    (wrist_position[2] - d1),
-                    (
-                        np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
-                        - r1
-                    ),
-                )
-            )
-
-            arccos_input_3 = (
-                r2**2
-                + r3**2
-                + d4**2
-                - (wrist_position[2] - d1) * (wrist_position[2] - d1)
-                - (
-                    np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
-                    - r1
-                )
-                * (
-                    np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
-                    - r1
-                )
-            ) / (2 * r2 * np.sqrt(r3**2 + d4**2))
-
-            arccos_input_3 = np.clip(arccos_input_3, -1.0, 1.0)
-
-            Jik[2] = np.pi - np.arccos(arccos_input_3) - np.arctan2(d4, r3)
-
-            T01 = self.get_ti2i_1(1, Jik[0] + th_offset[0])
-            T12 = self.get_ti2i_1(2, Jik[1] + th_offset[1])
-            T23 = self.get_ti2i_1(3, Jik[2] + th_offset[2])
-
-            T03 = T01 @ T12 @ T23
-            inv_T03 = np.linalg.inv(T03)
-            T36 = inv_T03 @ T06
-
-            Jik[3] = np.arctan2(-T36[1][2], -T36[0][2])
-            Jik[4] = np.arctan2(np.sqrt(T36[0][2] ** 2 + T36[1][2] ** 2), T36[2][2])
-            Jik[5] = np.arctan2(-T36[2][1], T36[2][0])
-
-            Jik = np.degrees(Jik)
-            Jik = np.round_(Jik, decimals=2)
-            return Jik
-
-        except ValueError:
-            print("Warning: arccos domain error in Joint calculations.")
-            return None
-        
-    # todo: fk taks care of qs wrt t06 instead of t0-cup. don't do the transformation in fk.
-    @hlp.timer
-    def fk(self, Jfk) -> np.array:
-        """
-        Jfk(in deg) - joints value for the calculation of the forward kinematics
-        output: Xfk - pos value for the calculation of the forward kinematics
-        """
-        # Denavit-Hartenberg matrix
-        th_offset = np.array([0.0, -90.0, 0.0, 0.0, 0.0, 0.0])
-        theta = np.zeros((6,), dtype=np.float64)
-        # theta=[Jfk(1); -90+Jfk(2); Jfk(3); Jfk(4); Jfk(5); Jfk(6)];
-        theta = np.add(Jfk, th_offset)
-
-        # alfa = self.dhTbl[0:6, 0]
-        # from deg to rad
-        theta = np.deg2rad(theta)
-        # theta = np.deg2rad(Jfk)
-        # alfa = np.deg2rad(alfa)
-
-        # work frame
-        # Xwf = Point(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-        # tool frame
-        # Xtf = Point(0.0, 0.0, 50.0, 180.0, -90.0, 0.0)
-        # work frame transformation matrix
-
-        # Twf = Xwf.pos2tran()  # Twf=pos2tran(Xwf);
-        # tool frame transformation matrix
-        # Tft = Xtf.pos2tran()  # Ttf=pos2tran(Xtf);
-
-        Twf = self.pose2T([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-        # std_dh_tbl seems no need to give last link's offset for end-effector. todo:to be confirm.
-        # Tft = self.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
-        Tft = self.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
-
-        # DH homogeneous transformation matrix
-        # float T01[16], T12[16], T23[16], T34[16], T45[16], T56[16];
-        # T 1 到 0 (1在下, 0在上).
-        # #1, frame1 相對于frame0 的空間幾何關係; #2,frame1 下表達的vector可轉囘frame0下來表達.
-        # #3, 從 frame0 來看 frame1.
-        T_01 = self.get_ti2i_1(1, theta[0])
-        # T 2 到 1
-        T_12 = self.get_ti2i_1(2, theta[1])
-        T_23 = self.get_ti2i_1(3, theta[2])
-        T_34 = self.get_ti2i_1(4, theta[3])
-        T_45 = self.get_ti2i_1(5, theta[4])
-        T_56 = self.get_ti2i_1(6, theta[5])
-        T = Twf @ T_01 @ T_12 @ T_23 @ T_34 @ T_45 @ T_56 @ Tft
-        # print('t: ', np.around(T, 2))
-        Xfk = np.zeros((6,), dtype=np.float64)
-        # get position from transformation matrix
-        (Xfk[0], Xfk[1], Xfk[2]) = T[0:3, 3]
-
-        Xfk[4] = np.arctan2(np.sqrt(T[2, 0] ** 2 + T[2, 1] ** 2), T[2, 2])
-        Xfk[3] = np.arctan2(T[1, 2] / np.sin(Xfk[4]), T[0, 2] / np.sin(Xfk[4]))
-        Xfk[5] = np.arctan2(T[2, 1] / np.sin(Xfk[4]), -T[2, 0] / np.sin(Xfk[4]))
-        # convert to degree
-        Xfk[3:6] = np.degrees(Xfk[3:6])
-        return Xfk
