@@ -35,8 +35,10 @@ smRobot = DHRobot(std_dh_table)
 
 def main() -> None:
     DOF = 6
-    bTrajectory = True
+    bTrajectory = False
+
     np.set_printoptions(precision=2, suppress=True)
+
     # r6=distance btw axis6 and end-effector
     std_dh_params = np.array(
         [
@@ -50,31 +52,41 @@ def main() -> None:
     )
     # create an instance of the robotarm.
     smallRobotArm = robot.SmallRbtArm(std_dh_params)
+    # these values derived from fig 10 of my smallrobotarm notebook
+    robot_rest_angles = [0.0, -80.0, 70.0, -0.4, -96, 0]
+    rest_pose = smallRobotArm.fk(robot_rest_angles)
 
     # tool frame. this is for generating Tc6 (cup to {6})
     # Xtf = robot.Point(0.0, 0.0, 50.0, 180.0, -90.0, 0.0)
     # 50mm is the distance btw frame6 to end-effector
-    tc6 = smallRobotArm.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
-
+    # tc6 = smallRobotArm.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
+    T_C6 = np.array([[0, 0, 1, 0], [0, -1, 0, 0], [1, 0, 0, 50], [0, 0, 0, 1]])
+    T_C6_inv = np.linalg.inv(T_C6)    
+    
+    # T_0C = smallRobotArm.pose2T([264.5 + 19, 70.0 + 20, 60, 0.0, 0.0, 35.0])
+    T_0C = smallRobotArm.pose2T([164.5, 0.0, 241.0, 0.0, 0.0, 35.0])
+    T_06 = T_0C @ T_C6_inv  
     # orientation for frame 6 is unchanged (x points up, z points front)
-    t60 = smallRobotArm.pose2T([164.5, 0.0, 241.0, 90.0, 180.0, -90])
-    # t60 = robot.pose2T([164.5, 0.0, 241.0, 180.0, -90.0, 0])
-    tc0 = t60 @ tc6
+    # t60 = smallRobotArm.pose2T([164.5, 0.0, 241.0, 90.0, 180.0, -90])
+    # tc0 = t60 @ tc6
 
     # create a roatation object from the rotation part of the tc0 matrix
-    r_tc0 = R.from_matrix(tc0[:3, :3])
+    # r_tc0 = R.from_matrix(tc0[:3, :3])
+    R_06 = R.from_matrix(T_06[:3, :3])
     # Extract Euler angles (ZYZ in degrees) from the rotation matrix.
-    # todo: figure out xyz or zyz???
-    tZ1, tY, tZ2 = r_tc0.as_euler(
-        "ZYZ", degrees=True
+    # we use ntu example: orientation with euler FIXED angles
+    tZ1, tY, tZ2 = R_06.as_euler(
+        "xyz", degrees=True
     )  # if your original data was xyz, then change to xyz
 
     # T_se3 = SE3(tc0)
     # tZ1, tY, tZ2 = T_se3.eul(unit="deg")
 
     initPose = np.zeros(6)
-    initPose[0:3] = tc0[0:3, 3]
+    initPose[0:3] = T_06[0:3, 3]
     initPose[3:6] = tZ1, tY, tZ2
+    initPose = [np.round(x) for x in initPose]
+    initPose=smallRobotArm.T2Pose(T_06)
     print(f"initial pose: {initPose}")
 
     # Print the transformation matrix in SE(3) format
@@ -88,15 +100,13 @@ def main() -> None:
     # there must be a delay here right after sieal is initialized
     sleep(1)
     smallRobotArm.enable()
-    # j = smallRobotArm.ik(initPose)
-    smallRobotArm.moveTo(initPose)
+    # smallRobotArm.move_to_pose(initPose)
     # j = [0, 0, 0, 0, 90, 0]
-    # conn.send2Arduino('j', j, bWaitAck=True)
-    input("Press Enter to continue...")
-    sleep(2)
+    # input("Press Enter to continue...")
+    # sleep(5)
 
     """
-    T = SE3(initPose[0],  initPose[1], initPose[2]) * \
+    T = SE3(initPose[0],  initPose[1], initPose[2]) * 
         SE3.Rz(np.radians(
             initPose[3])) * SE3.Ry(np.radians(initPose[4])) * SE3.Rz(np.radians(initPose[5]))
     j = smRobot.ikine_LM(T)
@@ -121,18 +131,29 @@ def main() -> None:
         ])
         then convert the R into degrees in 'ZYZ' sequence
     """
+    # end-effector pose = the position and orientation of the robot's last link (often frame 6) relative to the robot's base frame (frame 0).
+    # poses = np.array(
+    #     [
+    #         # current is(90,180,-90), after rotating the current orientation by 35 deg about z axis
+    #         # the new zyz is (35,180,-55)
+    #         [0,  284,     90,       60,  0.0,  0.0, 35.0],
+    #         [8,  284,     90,       100, 0.0,  0.0, 35.0],
+    #         [20, 284-160, 90.0+80,  350, 0.0, -60.0, 0.0],
+    #         [24, 284-160, 90.0+160, 350, 0.0, -60.0, 0.0],
+    #     ],
+    #     dtype=np.float64,
+    # )
     poses = np.array(
-        [
-            # current is(90,180,-90), after rotating the current orientation by 35 deg about z axis
-            # the new zyz is (35,180,-55)
-            # [2, 164.5+70,   0.0+25,    241.0-130,  145.0,   90.0, 180.0],
-            [0, 264.5 + 19, 70.0 + 20, 60, 0.0, 0.0, 35.0],
-            [8, 264.5 + 19, 70.0 + 20, 90, 0.0, 0.0, 35.0],
-            [20, 264.5 - 120, 70.0 + 60, 350.0, 0.0, -60.0, 0.0],
-            [24, 264.5 - 120, 70.0 + 100, 355.0, 0.0, -60.0, 0.0],
-        ],
-        dtype=np.float64,
-    )
+            [
+                # current is(90,180,-90), after rotating the current orientation by 35 deg about z axis
+                # the new zyz is (35,180,-55)
+                [0, 320, 162, 50, 0.0, 0.0, 35.0],
+                [8, 320, 162, 47.7, 0.0, 0.0, 35.0],
+                [20, 110, 223.2, 320, 0.0, -60.0, 0.0],
+                [24, 110, 323.2, 320, 0.0, -60.0, 0.0],
+            ],
+            dtype=np.float64,
+        )
 
     # this is only for giving time col to joints
     joints = poses.copy()
@@ -140,7 +161,10 @@ def main() -> None:
     if bTrajectory == False:
         for pose in poses:
             _, *p = pose
-            smallRobotArm.moveTo(p)
+            T_0C = smallRobotArm.pose2T(p)
+            T_06 = T_0C @ T_C6_inv
+            end_effector_pose=smallRobotArm.T2Pose(T_06)
+            smallRobotArm.move_to_pose(end_effector_pose)
             # col 0 are time data
         # this is home pos but axis 6 is not moved back to its origin pos. maybe tool frame isn't considered
         # smallRobotArm.moveTo([47.96, 0.0, 268.02, 180, 94.61, 180.0])
@@ -158,7 +182,7 @@ def main() -> None:
     ###################################################################
     else:
         # this line is required coz reach to this pose at 0 sec as the poses says.
-        smallRobotArm.moveTo([264.5 + 19, 70.0 + 20, 60, 0.0, 0.0, 35.0])
+        smallRobotArm.move_to_pose([264.5 + 19, 70.0 + 20, 60, 0.0, 0.0, 35.0])
 
         for i, pose in enumerate(poses, start=0):
             # col 0 are time data
@@ -238,11 +262,11 @@ def main() -> None:
     # smallRobotArm.moveTo([47.96, 0.0, 268.02, 180, 94.61, 180.0])
     # initPose[0:3] = [11.31000000e02, 1.94968772e-31, 2.78500000e02]
     # initPose[3:6] = [10.00000000e00, 1.27222187e-14, 1.80000000e02]
-    smallRobotArm.moveTo(initPose)
+    smallRobotArm.move_to_pose(initPose)
     sleep(2)
-    smallRobotArm.moveTo([13.5, 0.0, 23.5, 0.0, 0.0, 0.0])
-    # smallRobotArm.moveTo(q)
-    # smallRobotArm.disable()
+    smallRobotArm.move_to_angles([0.0, -80.0, 70.0, -0.41, -96, 0])
+    # smallRobotArm.move_to_pose(rest_pose)
+    smallRobotArm.disable()
     # a way to terminate thread
     smallRobotArm.conn.disconnect()
     print("THREAD TERMINATED!")
