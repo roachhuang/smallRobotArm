@@ -25,19 +25,43 @@ Uses the Euler angle sequence 'z-y-z'
 class RobotArm(ABC):
     def __init__(self, std_dh_tbl: np.array):
         self.dhTbl = std_dh_tbl
+        
+    def T2Pose(self, T, seq="xyz", degrees=True):
+        """
+        Converts a 4x4 transformation matrix to a pose (position and orientation).
 
-    def pose2T(self, pose: list) -> np.array:
+        Args:
+            T: 4x4 NumPy array representing the transformation matrix.
+            euler_seq: Euler angle sequence (e.g., "xyz", "zyz").
+            degrees: If True, returns Euler angles in degrees; otherwise, in radians.
+
+        Returns:
+            A tuple: (position, euler_angles)
+            position: a 3 element numpy array.
+            euler_angles: a 3 element numpy array.
+        """
+        position = T[:3, 3]  # Extract position (translation)
+        rotation_matrix = T[:3, :3]  # Extract rotation matrix
+
+        rotation = R.from_matrix(rotation_matrix)
+        euler_angles = rotation.as_euler(seq=seq, degrees=degrees)
+
+        return np.concatenate((position, euler_angles)).tolist()
+    
+    def pose2T(self, pose:list, seq='xyz') -> np.array:
         """
         Args: position (x,y,z) + 3 rotation angles in ZYZ order
         Returns: transformation matrix from pose
-                                             
+        
+        The three rotations can either be in a global frame of reference (extrinsic) or in a body centred frame of reference (intrinsic),
+        which is attached to, and moves with, the object under rotation [1].                                         
         Robots with spherical wrists (where the last three joint axes intersect at a point)
         a.k.a. a4=a5=a6=0 (std dh tbl) often use "zyz" to represent the orientation of the wrist.
         NOTE: uppercase 'ZYZ' for intrinsic rotation.        
         """
         # avoid roll, pitch and yaw with zyz coz of misleading
         x, y, z, psi, theta, phi = pose  
-        r = R.from_euler("ZYZ", [np.radians(psi), np.radians(theta), np.radians(phi)])
+        r = R.from_euler(seq=seq, angles=[psi, theta, phi], degrees=True)
 
         # Translation matrix
         translation_matrix = np.eye(4)
@@ -147,9 +171,9 @@ class RobotArm(ABC):
     def fk(self, Jfk):
         pass
 
-    @abstractmethod
-    def moveTo(self, end_effector_pose):
-        pass
+    # @abstractmethod
+    # def moveTo(self, end_effector_pose):
+    #     pass
 
 
 class SmallRbtArm(RobotArm):
@@ -174,18 +198,191 @@ class SmallRbtArm(RobotArm):
     def disable(self):
         self.conn.ser.write(b"dis\n")
 
-    def moveTo(self, end_effector_pose):
+    def move_to_pose(self, end_effector_pose:list):
+        pose_array = np.array(end_effector_pose, dtype=float)        
         # return super().moveTo(end_effector_pose)
         j = self.ik(end_effector_pose)
         print("q:", j)
+        j_array=np.array(j)
+        if np.isnan(j_array).any():
+            return
+        cmd = {"header": "j", "joint_angle": j, "ack": True}
+        self.conn.send2Arduino(cmd)
+        
+    def move_to_angles(self, j):
+        # return super().moveTo(end_effector_pose)
         cmd = {"header": "j", "joint_angle": j, "ack": True}
         self.conn.send2Arduino(cmd)
 
     @hlp.timer
+    # def ik(self, pose: list) -> list:
+    #     """
+    #     arg:
+    #         pose: end-effector pose in cartension space.
+    #         position is retrieve from T_06.
+    #         orientation(j4,5,6) are in deg
+    #     return:
+    #         2 decimaled joints angles in degrees.
+    #     """
+    #     (_, r1, d1) = self.dhTbl[0, :]
+    #     r2 = self.dhTbl[1, 1]
+    #     (_, r3, d3) = self.dhTbl[2, :]
+    #     d4 = self.dhTbl[3, 2]
+    #     d6 = self.dhTbl[5, 2]
+
+    #     Jik = np.zeros((6,), dtype=np.float64)
+    #     # DH table
+    #     # th_offset = np.array([0.0, np.radians(-90), 0.0, 0.0, 0.0, 0.0])
+    #     th_offset = np.array([0.0, np.pi / 2, 0.0, 0.0, 0.0, 0.0])
+
+    #     # work frame
+    #     # Xwf = Point([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    #     # work frame transformation matrix
+    #     # Twf = Xwf.pos2tran()
+    #     Twf = self.pose2T([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    #     # tool frame. end_effector is 50mm align with z6
+    #     # Xtf = Point([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
+    #     # tool frame transformation matrix (wrt last joint frame!)
+    #     # Ttf = Xtf.pos2tran()
+
+    #     Ttf = self.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
+
+    #     # endEffectorPose = Point([
+    #     #    Xik[0], Xik[1], Xik[2], Xik[3], Xik[4], Xik[5]])
+    #     # tc_0 transformation matrix
+    #     # Twt = endEffectorPose.pos2tran()  # Twt=pos2tran(Xik)
+    #     # Twt = T0c
+    #     # map tool frame to world frame
+    #     Twt = self.pose2T(pose)
+
+    #     # find T06
+    #     # inTwf[16], inTtf[16], Tw6[16], T06[16]
+    #     invTwf = np.linalg.inv(Twf)  # Tw0 is not take into account now...
+    #     invTtf = np.linalg.inv(Ttf)
+    #     # Tcw=T0w*T60*Tc6 => T60=invT0w*Tcw*invTc6
+    #     # Tw6 = Twt@invTtf
+    #     # T06 = invTwf @ Twt @ invTtf
+        
+    #     T06=self.pose2T(pose)
+
+    #     # print('T06: ', np.around(T06,2))
+
+    #     # positon of the spherical wrist, and use analytical IK formulas to calculate the first three joint angles based on wrist_position and std_dh params.
+    #     wrist_position = [0.0, 0.0, 0.0]
+    #     wrist_position = T06[:3, 3] - d6 * T06[:3, 2]
+    #     # wrist_position[0] = T06[0][3] - d6 * T06[0][2]
+    #     # wrist_position[1] = T06[1][3] - d6 * T06[1][2]
+    #     # wrist_position[2] = T06[2][3] - d6 * T06[2][2]
+
+    #     # joints variable
+    #     # Jik=zeros(6,1);
+    #     # first joint
+    #     Jik[0] = np.arctan2(wrist_position[1], wrist_position[0]) - np.arctan2(
+    #         d3, np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
+    #     )
+
+    #     # second joint
+    #     Jik[1] = (
+    #         np.pi / 2.0
+    #         - np.arccos(
+    #             (
+    #                 r2**2
+    #                 + (wrist_position[2] - d1) * (wrist_position[2] - d1)
+    #                 + (
+    #                     np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
+    #                     - r1
+    #                 )
+    #                 * (
+    #                     np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
+    #                     - r1
+    #                 )
+    #                 - (r3**2 + d4**2)
+    #             )
+    #             / (
+    #                 2.0
+    #                 * r2
+    #                 * np.sqrt(
+    #                     (wrist_position[2] - d1) * (wrist_position[2] - d1)
+    #                     + (
+    #                         np.sqrt(
+    #                             wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2
+    #                         )
+    #                         - r1
+    #                     )
+    #                     * (
+    #                         np.sqrt(
+    #                             wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2
+    #                         )
+    #                         - r1
+    #                     )
+    #                 )
+    #             )
+    #         )
+    #         - np.arctan2(
+    #             (wrist_position[2] - d1),
+    #             (np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2) - r1),
+    #         )
+    #     )
+    #     # Jik(1) = pi/2-acos((r(2) ^ 2+(wrist_position(3)-d(1)) ^ 2+(sqrt(wrist_position(1) ^ 2+wrist_position(2) ^ 2-d(3) ^ 2)-r(1)) ^ 2-(r(3) ^ 2+d(4) ^ 2))/(2*r(2)*sqrt((wrist_position(3)-d(1)) ^ 2+(sqrt(wrist_position(1) ^ 2+wrist_position(2) ^ 2-d(3) ^ 2)-r(1)) ^ 2)))-atan((wrist_position(3)-d(1))/(sqrt(wrist_position(1) ^ 2+wrist_position(2) ^ 2-d(3) ^ 2)-r(1)))
+
+    #     # third joint
+    #     Jik[2] = (
+    #         np.pi
+    #         - np.arccos(
+    #             (
+    #                 r2**2
+    #                 + r3**2
+    #                 + d4**2
+    #                 - (wrist_position[2] - d1) * (wrist_position[2] - d1)
+    #                 - (
+    #                     np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
+    #                     - r1
+    #                 )
+    #                 * (
+    #                     np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
+    #                     - r1
+    #                 )
+    #             )
+    #             / (2 * r2 * np.sqrt(r3**2 + d4**2))
+    #         )
+    #         - np.arctan2(d4, r3)
+    #     )
+    #     # Jik(2) = pi-acos((r(2) ^ 2+r(3) ^ 2+d(4) ^ 2-(wrist_position(3)-d(1)) ^ 2-(sqrt(wrist_position(1) ^ 2+wrist_position(2) ^ 2-d(3) ^ 2)-r(1)) ^ 2)/(2*r(2)*sqrt(r(3) ^ 2+d(4) ^ 2)))-atan(d(4)/r(3))
+
+    #     # last three joints
+    #     T01 = T12 = T23 = T03 = inv_T03 = T36 = np.zeros((4, 4), dtype=np.float64)
+
+    #     T01 = self.get_ti2i_1(1, Jik[0] + th_offset[0])
+    #     # todo: note here is a -90 coz of dh table. figure out why
+    #     T12 = self.get_ti2i_1(2, Jik[1] + th_offset[1])
+    #     T23 = self.get_ti2i_1(3, Jik[2] + th_offset[2])
+
+    #     T03 = T01 @ T12 @ T23
+    #     inv_T03 = np.linalg.inv(T03)
+    #     # pose of frame6 measured from frame3
+    #     T36 = inv_T03 @ T06
+    #     # use use trigonometric functions to extract the last three join angles from T36.
+    #     # forth joint
+    #     Jik[3] = np.arctan2(-T36[1][2], -T36[0][2])
+
+    #     # fifth joint
+    #     Jik[4] = np.arctan2(np.sqrt(T36[0][2] ** 2 + T36[1][2] ** 2), T36[2][2])
+
+    #     # sixth joints
+    #     Jik[5] = np.arctan2(-T36[2][1], T36[2][0])
+    #     # rad to deg
+    #     Jik = np.degrees(Jik)
+    #     Jik = np.round_(Jik, decimals=2)
+    #     return Jik
+
     def ik(self, pose: list) -> list:
         """
-        pose: end-effector pose in cartension space, orientation(j4,5,6) are in deg
-        return: 2 decimaled joints angles in degrees.
+        arg:
+            pose: end-effector pose in cartension space.
+            position is retrieve from T_06.
+            orientation(j4,5,6) are in deg
+        return:
+            2 decimaled joints angles in degrees.
         """
         (_, r1, d1) = self.dhTbl[0, :]
         r2 = self.dhTbl[1, 1]
@@ -194,148 +391,105 @@ class SmallRbtArm(RobotArm):
         d6 = self.dhTbl[5, 2]
 
         Jik = np.zeros((6,), dtype=np.float64)
-        # DH table
-        # th_offset = np.array([0.0, np.radians(-90), 0.0, 0.0, 0.0, 0.0])
         th_offset = np.array([0.0, np.pi / 2, 0.0, 0.0, 0.0, 0.0])
 
-        # work frame
-        # Xwf = Point([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-        # work frame transformation matrix
-        # Twf = Xwf.pos2tran()
         Twf = self.pose2T([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-        # tool frame. end_effector is 50mm align with z6
-        # Xtf = Point([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
-        # tool frame transformation matrix (wrt last joint frame!)
-        # Ttf = Xtf.pos2tran()
-
-        # Ttf = self.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
         Ttf = self.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
 
-        # endEffectorPose = Point([
-        #    Xik[0], Xik[1], Xik[2], Xik[3], Xik[4], Xik[5]])
-        # tc_0 transformation matrix
-        # Twt = endEffectorPose.pos2tran()  # Twt=pos2tran(Xik)
-        # Twt = T0c
-        # map tool frame to world frame
-        Twt = self.pose2T(pose)
+        T06 = self.pose2T(pose)
 
-        # find T06
-        # inTwf[16], inTtf[16], Tw6[16], T06[16]
-        invTwf = np.linalg.inv(Twf)  # Tw0 is not take into account now...
-        invTtf = np.linalg.inv(Ttf)
-        # Tcw=T0w*T60*Tc6 => T60=invT0w*Tcw*invTc6
-        # Tw6 = Twt@invTtf
-        T06 = invTwf @ Twt @ invTtf
-
-        # print('T06: ', np.around(T06,2))
-
-        # positon of the spherical wrist, and use analytical IK formulas to calculate the first three joint angles based on wrist_position and std_dh params.
-        wrist_position = [0.0, 0.0, 0.0]
         wrist_position = T06[:3, 3] - d6 * T06[:3, 2]
-        # wrist_position[0] = T06[0][3] - d6 * T06[0][2]
-        # wrist_position[1] = T06[1][3] - d6 * T06[1][2]
-        # wrist_position[2] = T06[2][3] - d6 * T06[2][2]
 
-        # joints variable
-        # Jik=zeros(6,1);
-        # first joint
-        Jik[0] = np.arctan2(wrist_position[1], wrist_position[0]) - np.arctan2(
-            d3, np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
-        )
+        try:
+            Jik[0] = np.arctan2(wrist_position[1], wrist_position[0]) - np.arctan2(
+                d3, np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
+            )
 
-        # second joint
-        Jik[1] = (
-            np.pi / 2.0
-            - np.arccos(
-                (
-                    r2**2
-                    + (wrist_position[2] - d1) * (wrist_position[2] - d1)
+            arccos_input_2 = (
+                r2**2
+                + (wrist_position[2] - d1) * (wrist_position[2] - d1)
+                + (
+                    np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
+                    - r1
+                )
+                * (
+                    np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
+                    - r1
+                )
+                - (r3**2 + d4**2)
+            ) / (
+                2.0
+                * r2
+                * np.sqrt(
+                    (wrist_position[2] - d1) * (wrist_position[2] - d1)
                     + (
-                        np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
+                        np.sqrt(
+                            wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2
+                        )
                         - r1
                     )
                     * (
-                        np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
-                        - r1
-                    )
-                    - (r3**2 + d4**2)
-                )
-                / (
-                    2.0
-                    * r2
-                    * np.sqrt(
-                        (wrist_position[2] - d1) * (wrist_position[2] - d1)
-                        + (
-                            np.sqrt(
-                                wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2
-                            )
-                            - r1
+                        np.sqrt(
+                            wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2
                         )
-                        * (
-                            np.sqrt(
-                                wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2
-                            )
-                            - r1
-                        )
-                    )
-                )
-            )
-            - np.arctan2(
-                (wrist_position[2] - d1),
-                (np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2) - r1),
-            )
-        )
-        # Jik(1) = pi/2-acos((r(2) ^ 2+(wrist_position(3)-d(1)) ^ 2+(sqrt(wrist_position(1) ^ 2+wrist_position(2) ^ 2-d(3) ^ 2)-r(1)) ^ 2-(r(3) ^ 2+d(4) ^ 2))/(2*r(2)*sqrt((wrist_position(3)-d(1)) ^ 2+(sqrt(wrist_position(1) ^ 2+wrist_position(2) ^ 2-d(3) ^ 2)-r(1)) ^ 2)))-atan((wrist_position(3)-d(1))/(sqrt(wrist_position(1) ^ 2+wrist_position(2) ^ 2-d(3) ^ 2)-r(1)))
-
-        # third joint
-        Jik[2] = (
-            np.pi
-            - np.arccos(
-                (
-                    r2**2
-                    + r3**2
-                    + d4**2
-                    - (wrist_position[2] - d1) * (wrist_position[2] - d1)
-                    - (
-                        np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
-                        - r1
-                    )
-                    * (
-                        np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
                         - r1
                     )
                 )
-                / (2 * r2 * np.sqrt(r3**2 + d4**2))
             )
-            - np.arctan2(d4, r3)
-        )
-        # Jik(2) = pi-acos((r(2) ^ 2+r(3) ^ 2+d(4) ^ 2-(wrist_position(3)-d(1)) ^ 2-(sqrt(wrist_position(1) ^ 2+wrist_position(2) ^ 2-d(3) ^ 2)-r(1)) ^ 2)/(2*r(2)*sqrt(r(3) ^ 2+d(4) ^ 2)))-atan(d(4)/r(3))
 
-        # last three joints
-        T01 = T12 = T23 = T03 = inv_T03 = T36 = np.zeros((4, 4), dtype=np.float64)
+            arccos_input_2 = np.clip(arccos_input_2, -1.0, 1.0)
 
-        T01 = self.get_ti2i_1(1, Jik[0] + th_offset[0])
-        # todo: note here is a -90 coz of dh table. figure out why
-        T12 = self.get_ti2i_1(2, Jik[1] + th_offset[1])
-        T23 = self.get_ti2i_1(3, Jik[2] + th_offset[2])
+            Jik[1] = (
+                np.pi / 2.0
+                - np.arccos(arccos_input_2)
+                - np.arctan2(
+                    (wrist_position[2] - d1),
+                    (np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2) - r1),
+                )
+            )
 
-        T03 = T01 @ T12 @ T23
-        inv_T03 = np.linalg.inv(T03)
-        # pose of frame6 measured from frame3
-        T36 = inv_T03 @ T06
-        # use use trigonometric functions to extract the last three join angles from T36.
-        # forth joint
-        Jik[3] = np.arctan2(-T36[1][2], -T36[0][2])
+            arccos_input_3 = (
+                r2**2
+                + r3**2
+                + d4**2
+                - (wrist_position[2] - d1) * (wrist_position[2] - d1)
+                - (
+                    np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
+                    - r1
+                )
+                * (
+                    np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
+                    - r1
+                )
+            ) / (2 * r2 * np.sqrt(r3**2 + d4**2))
 
-        # fifth joint
-        Jik[4] = np.arctan2(np.sqrt(T36[0][2] ** 2 + T36[1][2] ** 2), T36[2][2])
+            arccos_input_3 = np.clip(arccos_input_3, -1.0, 1.0)
 
-        # sixth joints
-        Jik[5] = np.arctan2(-T36[2][1], T36[2][0])
-        # rad to deg
-        Jik = np.degrees(Jik)
-        Jik = np.round_(Jik, decimals=2)
-        return Jik
+            Jik[2] = (
+                np.pi
+                - np.arccos(arccos_input_3)
+                - np.arctan2(d4, r3)
+            )
+
+            T01 = self.get_ti2i_1(1, Jik[0] + th_offset[0])
+            T12 = self.get_ti2i_1(2, Jik[1] + th_offset[1])
+            T23 = self.get_ti2i_1(3, Jik[2] + th_offset[2])
+
+            T03 = T01 @ T12 @ T23
+            inv_T03 = np.linalg.inv(T03)
+            T36 = inv_T03 @ T06
+
+            Jik[3] = np.arctan2(-T36[1][2], -T36[0][2])
+            Jik[4] = np.arctan2(np.sqrt(T36[0][2] ** 2 + T36[1][2] ** 2), T36[2][2])
+            Jik[5] = np.arctan2(-T36[2][1], T36[2][0])
+
+            Jik = np.degrees(Jik)
+            Jik = np.round_(Jik, decimals=2)
+            return Jik
+
+        except ValueError:
+            print("Warning: arccos domain error in Joint calculations.")
+            return None
 
     @hlp.timer
     def fk(self, Jfk) -> np.array:
