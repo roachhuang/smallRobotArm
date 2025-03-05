@@ -8,25 +8,11 @@ from scipy.spatial.transform import Rotation as R
 import serial_class as ser
 from abc import ABC, abstractmethod
 
-"""
-This notation can sometimes be used to emphasize that the rotations are happening in a specific order, and can be used to describe either intrinsic or extrinsic rotations,
-but often when people write Z-Y-Z they are talking about extrinsic rotations.
-Extrinsic rotations mean.
-
-    Rotate around the initial Z-axis.
-    Rotate around the initial Y-axis.
-    Rotate around the initial Z-axis.
-
-So the rotations are all happening around the same global axis.
-Uses the Euler angle sequence 'z-y-z'
-"""
-
-
 class RobotArm(ABC):
     def __init__(self, std_dh_tbl: np.array):
         self.dhTbl = std_dh_tbl
-        
-    def T2Pose(self, T, seq="xyz", degrees=True):
+
+    def T2Pose(self, T, seq="xyz", degrees=True)->list:
         """
         Converts a 4x4 transformation matrix to a pose (position and orientation).
 
@@ -47,34 +33,26 @@ class RobotArm(ABC):
         euler_angles = rotation.as_euler(seq=seq, degrees=degrees)
 
         return np.concatenate((position, euler_angles)).tolist()
-    
-    def pose2T(self, pose:list, seq='xyz') -> np.array:
+
+    def pose2T(self, pose: list, seq="xyz") -> np.array:
         """
         Args: position (x,y,z) + 3 rotation angles in ZYZ order
         Returns: transformation matrix from pose
-        
+
         The three rotations can either be in a global frame of reference (extrinsic) or in a body centred frame of reference (intrinsic),
-        which is attached to, and moves with, the object under rotation [1].                                         
+        which is attached to, and moves with, the object under rotation [1].
         Robots with spherical wrists (where the last three joint axes intersect at a point)
         a.k.a. a4=a5=a6=0 (std dh tbl) often use "zyz" to represent the orientation of the wrist.
-        NOTE: uppercase 'ZYZ' for intrinsic rotation.        
+        NOTE: uppercase 'ZYZ' for intrinsic rotation; lowercase->fixed angles sequence
         """
         # avoid roll, pitch and yaw with zyz coz of misleading
-        x, y, z, psi, theta, phi = pose  
+        x, y, z, psi, theta, phi = pose
         r = R.from_euler(seq=seq, angles=[psi, theta, phi], degrees=True)
 
         # Translation matrix
         translation_matrix = np.eye(4)
         translation_matrix[:3, 3] = [x, y, z]
-
-        # # Rotation matrices
-        # r_z1 = R.from_euler("z", np.radians(roll))
-        # r_y = R.from_euler("y", np.radians(pitch))
-        # r_z2 = R.from_euler("z", np.radians(yaw))
-
-        # rotation_matrix = (r_x * r_y * r_z).as_matrix()
-        # rotation_matrix = (r_z1 * r_y * r_z2).as_matrix()
-
+        
         # Homogeneous transformation matrix
         T = np.eye(4)
         T[:3, :3] = r.as_matrix()  # rotation_matrix
@@ -88,7 +66,7 @@ class RobotArm(ABC):
 
     def get_ti2i_1(self, i, theta=None) -> np.array:
         """
-        todo: examin intpu theta's procision by checking its number of decimal points.
+        todo: examin intput theta's procision by checking its number of decimal points.
         Creates a DH transformation matrix using NumPy.
 
         Args:
@@ -198,17 +176,17 @@ class SmallRbtArm(RobotArm):
     def disable(self):
         self.conn.ser.write(b"dis\n")
 
-    def move_to_pose(self, end_effector_pose:list):
-        pose_array = np.array(end_effector_pose, dtype=float)        
+    def move_to_pose(self, end_effector_pose: list):
+        pose_array = np.array(end_effector_pose, dtype=float)
         # return super().moveTo(end_effector_pose)
         j = self.ik(end_effector_pose)
         print("q:", j)
-        j_array=np.array(j)
+        j_array = np.array(j)
         if np.isnan(j_array).any():
             return
         cmd = {"header": "j", "joint_angle": j, "ack": True}
         self.conn.send2Arduino(cmd)
-        
+
     def move_to_angles(self, j):
         # return super().moveTo(end_effector_pose)
         cmd = {"header": "j", "joint_angle": j, "ack": True}
@@ -262,7 +240,7 @@ class SmallRbtArm(RobotArm):
     #     # Tcw=T0w*T60*Tc6 => T60=invT0w*Tcw*invTc6
     #     # Tw6 = Twt@invTtf
     #     # T06 = invTwf @ Twt @ invTtf
-        
+
     #     T06=self.pose2T(pose)
 
     #     # print('T06: ', np.around(T06,2))
@@ -423,15 +401,11 @@ class SmallRbtArm(RobotArm):
                 * np.sqrt(
                     (wrist_position[2] - d1) * (wrist_position[2] - d1)
                     + (
-                        np.sqrt(
-                            wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2
-                        )
+                        np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
                         - r1
                     )
                     * (
-                        np.sqrt(
-                            wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2
-                        )
+                        np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
                         - r1
                     )
                 )
@@ -444,7 +418,10 @@ class SmallRbtArm(RobotArm):
                 - np.arccos(arccos_input_2)
                 - np.arctan2(
                     (wrist_position[2] - d1),
-                    (np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2) - r1),
+                    (
+                        np.sqrt(wrist_position[0] ** 2 + wrist_position[1] ** 2 - d3**2)
+                        - r1
+                    ),
                 )
             )
 
@@ -465,11 +442,7 @@ class SmallRbtArm(RobotArm):
 
             arccos_input_3 = np.clip(arccos_input_3, -1.0, 1.0)
 
-            Jik[2] = (
-                np.pi
-                - np.arccos(arccos_input_3)
-                - np.arctan2(d4, r3)
-            )
+            Jik[2] = np.pi - np.arccos(arccos_input_3) - np.arctan2(d4, r3)
 
             T01 = self.get_ti2i_1(1, Jik[0] + th_offset[0])
             T12 = self.get_ti2i_1(2, Jik[1] + th_offset[1])
@@ -490,7 +463,8 @@ class SmallRbtArm(RobotArm):
         except ValueError:
             print("Warning: arccos domain error in Joint calculations.")
             return None
-
+        
+    # todo: fk taks care of qs wrt t06 instead of t0-cup. don't do the transformation in fk.
     @hlp.timer
     def fk(self, Jfk) -> np.array:
         """

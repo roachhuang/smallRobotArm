@@ -32,7 +32,6 @@ smRobot = DHRobot(std_dh_table)
 # {x, y, z, ZYZ Euler angles}
 # Xhome = [164.5, 0.0, 241.0, 90.0, 180.0, -90.0]
 
-
 def main() -> None:
     DOF = 6
     bTrajectory = False
@@ -67,25 +66,8 @@ def main() -> None:
     T_0C = smallRobotArm.pose2T([164.5, 0.0, 241.0, 0.0, 0.0, 35.0])
     T_06 = T_0C @ T_C6_inv  
     # orientation for frame 6 is unchanged (x points up, z points front)
-    # t60 = smallRobotArm.pose2T([164.5, 0.0, 241.0, 90.0, 180.0, -90])
-    # tc0 = t60 @ tc6
-
-    # create a roatation object from the rotation part of the tc0 matrix
-    # r_tc0 = R.from_matrix(tc0[:3, :3])
-    R_06 = R.from_matrix(T_06[:3, :3])
-    # Extract Euler angles (ZYZ in degrees) from the rotation matrix.
-    # we use ntu example: orientation with euler FIXED angles
-    tZ1, tY, tZ2 = R_06.as_euler(
-        "xyz", degrees=True
-    )  # if your original data was xyz, then change to xyz
-
-    # T_se3 = SE3(tc0)
-    # tZ1, tY, tZ2 = T_se3.eul(unit="deg")
-
-    initPose = np.zeros(6)
-    initPose[0:3] = T_06[0:3, 3]
-    initPose[3:6] = tZ1, tY, tZ2
-    initPose = [np.round(x) for x in initPose]
+    # t60 = smallRobotArm.pose2T([164.5, 0.0, 241.0, 90.0, 180.0, -90])   
+    
     initPose=smallRobotArm.T2Pose(T_06)
     print(f"initial pose: {initPose}")
 
@@ -105,21 +87,12 @@ def main() -> None:
     # input("Press Enter to continue...")
     # sleep(5)
 
-    """
-    T = SE3(initPose[0],  initPose[1], initPose[2]) * 
-        SE3.Rz(np.radians(
-            initPose[3])) * SE3.Ry(np.radians(initPose[4])) * SE3.Rz(np.radians(initPose[5]))
-    j = smRobot.ikine_LM(T)
-    q = np.degrees(j.q)
-    # send2Arduino(ser, 'j', q.round(2), bWaitAck=True)
-    """
-
+ 
     """
     for curPos are all zero
     after fk for [0, 78.51, -73,9, 0, -1.14, 0], computed manually from arduino goHome code.
     home postion = [301.85, 0.0, 168.6, -180, -84.0, 0]
     """
-    # end-effector's position and orientation.
     """ 
     these end-effector posese are wrt frame{0}
     initially, think of the orientation in rotation matrix is easier to understand:
@@ -143,6 +116,7 @@ def main() -> None:
     #     ],
     #     dtype=np.float64,
     # )
+    # we use ntu example: orientation with euler FIXED angles 
     poses = np.array(
             [
                 # current is(90,180,-90), after rotating the current orientation by 35 deg about z axis
@@ -165,10 +139,7 @@ def main() -> None:
             T_06 = T_0C @ T_C6_inv
             end_effector_pose=smallRobotArm.T2Pose(T_06)
             smallRobotArm.move_to_pose(end_effector_pose)
-            # col 0 are time data
-        # this is home pos but axis 6 is not moved back to its origin pos. maybe tool frame isn't considered
-        # smallRobotArm.moveTo([47.96, 0.0, 268.02, 180, 94.61, 180.0])
-        # cut the power of motors
+        # col 0 are time data
 
         """
         T = SE3(pose[1],  pose[2], pose[3]) * \
