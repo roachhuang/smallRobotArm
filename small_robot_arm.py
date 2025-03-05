@@ -32,9 +32,10 @@ smRobot = DHRobot(std_dh_table)
 # {x, y, z, ZYZ Euler angles}
 # Xhome = [164.5, 0.0, 241.0, 90.0, 180.0, -90.0]
 
+
 def main() -> None:
     DOF = 6
-    bTrajectory = True
+    bTrajectory = False
 
     np.set_printoptions(precision=2, suppress=True)
 
@@ -60,14 +61,17 @@ def main() -> None:
     # 50mm is the distance btw frame6 to end-effector
     # tc6 = smallRobotArm.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
     T_C6 = np.array([[0, 0, 1, 0], [0, -1, 0, 0], [1, 0, 0, 50], [0, 0, 0, 1]])
-    T_C6_inv = np.linalg.inv(T_C6)    
-    
+    T_C6_inv = np.linalg.inv(T_C6)
+
     # T_0C = smallRobotArm.pose2T([264.5 + 19, 70.0 + 20, 60, 0.0, 0.0, 35.0])
-    T_0C = smallRobotArm.pose2T((320, 162, 50, 0.0, 0.0, 0.0))
-    T_init = T_0C @ T_C6_inv  
-    # orientation for frame 6 is unchanged (x points up, z points forward)
-    # t60 = smallRobotArm.pose2T([164.5, 0.0, 241.0, 90.0, 180.0, -90])   
+    T_0C = smallRobotArm.pose2T([164.5, 0.0, 241.0, 180.0, -90.0, 0.0])
     
+    # T_0C = smallRobotArm.pose2T((320, 162, 50, 0.0, 0.0, 0.0))
+    
+    T_init = T_0C @ T_C6_inv
+    # orientation for frame 6 is unchanged (x points up, z points forward)
+    # t60 = smallRobotArm.pose2T([164.5, 0.0, 241.0, 90.0, 180.0, -90])
+
     # Print the transformation matrix in SE(3) format
     # print(
     #     "std_dh_tbl =\n"
@@ -79,12 +83,11 @@ def main() -> None:
     # there must be a delay here right after sieal is initialized
     sleep(1)
     smallRobotArm.enable()
-    # smallRobotArm.move_to_pose(initPose)
+    smallRobotArm.move_to_pose(T_init)
     # j = [0, 0, 0, 0, 90, 0]
     # input("Press Enter to continue...")
-    # sleep(5)
+    sleep(5)
 
- 
     """
     for curPos are all zero
     after fk for [0, 78.51, -73,9, 0, -1.14, 0], computed manually from arduino goHome code.
@@ -113,18 +116,18 @@ def main() -> None:
     #     ],
     #     dtype=np.float64,
     # )
-    # we use ntu example: orientation with euler FIXED angles 
+    # we use ntu example: orientation with euler FIXED angles
     poses = np.array(
-            [
-                # current is(90,180,-90), after rotating the current orientation by 35 deg about z axis
-                # the new zyz is (35,180,-55)
-                (0, 320, 162, 50, 0.0, 0.0, 35.0),
-                (8, 320, 162, 47.7, 0.0, 0.0, 35.0),
-                (20, 110, 223.2, 320, 0.0, -60.0, 0.0),
-                (24, 110, 323.2, 320, 0.0, -60.0, 0.0),
-            ],
-            dtype=np.float64,
-        )
+        [
+            # current is(90,180,-90), after rotating the current orientation by 35 deg about z axis
+            # the new zyz is (35,180,-55)
+            (0, 264.5 + 19, 70.0 + 20, 60, 0, 0.0, 35.0),
+            (8, 264.5 + 19, 70.0 + 20, 90, 0, 0.0, 35.0),
+            (20, 264.5 - 120, 70.0 + 60, 350.0, 180, -90-60.0, 0.0),
+            (24, 264.5 - 120, 70.0 + 100, 355.0, 180, -90-60.0, 0.0),
+        ],
+        dtype=np.float64,
+    )
 
     # this is only for giving time col to joints
     joints = poses.copy()
@@ -149,7 +152,9 @@ def main() -> None:
     ###################################################################
     else:
         # this line is required coz reach to this pose at 0 sec as the poses says.
-        smallRobotArm.move_to_pose(T_init)
+        T_0C_at_0s = smallRobotArm.pose2T((264.5 + 19, 70.0 + 20, 60, 0.0, 0.0, 35.0))
+        T_06_at_0s = T_0C_at_0s @ T_C6_inv        
+        smallRobotArm.move_to_pose(T_06_at_0s)
 
         for i, pose in enumerate(poses, start=0):
             # col 0 are time data
@@ -224,9 +229,10 @@ def main() -> None:
             curr_time = perf_counter()
 
         # this is to set ji in arduino coz of from and to args for goStrightLine
-        T_0C = smallRobotArm.pose2T((110, 323.2, 320, 0.0, -60.0, 0.0))
+        T_0C = smallRobotArm.pose2T((47.96, 0.0, 268.02, 180, 94.61, 180.0))
+        # T_0C = smallRobotArm.pose2T((110, 323.2, 320, 0.0, -60.0, 0.0))
         T_06 = T_0C @ T_C6_inv
-        ji=smallRobotArm.ik(T_06) 
+        ji = smallRobotArm.ik(T_06)
         # ji = smallRobotArm.ik((264.5 - 120, 70.0 + 100, 355.0, 0.0, -60.0, 0.0))
         cmd = {"header": "c", "joint_angle": ji, "ack": False}
         smallRobotArm.conn.send2Arduino(cmd)
@@ -234,8 +240,9 @@ def main() -> None:
     # smallRobotArm.moveTo([47.96, 0.0, 268.02, 180, 94.61, 180.0])
     # initPose[0:3] = [11.31000000e02, 1.94968772e-31, 2.78500000e02]
     # initPose[3:6] = [10.00000000e00, 1.27222187e-14, 1.80000000e02]
-    smallRobotArm.move_to_pose(T_init)
-    sleep(2)
+    # smallRobotArm.move_to_pose(T_init)
+    sleep(5)
+    # rest pose
     smallRobotArm.move_to_angles((0.0, -80.0, 70.0, -0.41, -96, 0))
     # smallRobotArm.move_to_pose(rest_pose)
     smallRobotArm.disable()
