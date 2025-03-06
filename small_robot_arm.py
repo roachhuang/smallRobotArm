@@ -29,8 +29,8 @@ std_dh_table = [
 # Create a custom robot object based on my DH parameters for std dh tbl.
 smRobot = DHRobot(std_dh_table)
 
-# {x, y, z, ZYZ Euler angles}
-# Xhome = [164.5, 0.0, 241.0, 90.0, 180.0, -90.0]
+#   x, y, z, ZYZ Euler angles}
+# Xhome = [(164.5, 0.0, 241.0, 90.0, 180.0, -90.0]
 
 
 def main() -> None:
@@ -53,40 +53,40 @@ def main() -> None:
     # create an instance of the robotarm.
     smallRobotArm = robot.SmallRbtArm(std_dh_params)
     # these values derived from fig 10 of my smallrobotarm notebook
-    robot_rest_angles = [0.0, -80.0, 70.0, -0.4, -96, 0]
+    robot_rest_angles = (0.0, -80.0, 70.0, -0.4, -96, 0)    
     # rest_pose = smallRobotArm.fk(robot_rest_angles)
+   
 
-    # tool frame. this is for generating Tc6 (cup to {6})
-    # Xtf = robot.Point(0.0, 0.0, 50.0, 180.0, -90.0, 0.0)
+    # tool frame. this is for generating Tc6 (cup to    6})
     # 50mm is the distance btw frame6 to end-effector
     # tc6 = smallRobotArm.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
+    # hand made T_C6: gripper's len + x:180,y:-90, z:0. see their coordiation system.
     T_C6 = np.array([[0, 0, 1, 0], [0, -1, 0, 0], [1, 0, 0, 50], [0, 0, 0, 1]])
     T_C6_inv = np.linalg.inv(T_C6)
 
     # T_0C = smallRobotArm.pose2T([264.5 + 19, 70.0 + 20, 60, 0.0, 0.0, 35.0])
     T_0C = smallRobotArm.pose2T([164.5, 0.0, 241.0, 180.0, -90.0, 0.0])
-    
+
     # T_0C = smallRobotArm.pose2T((320, 162, 50, 0.0, 0.0, 0.0))
-    
+
     T_init = T_0C @ T_C6_inv
     # orientation for frame 6 is unchanged (x points up, z points forward)
-    # t60 = smallRobotArm.pose2T([164.5, 0.0, 241.0, 90.0, 180.0, -90])
 
-    # Print the transformation matrix in SE(3) format
     # print(
     #     "std_dh_tbl =\n"
     #     + np.array2string(
-    #         smallRobotArm.dhTbl, separator=", ", formatter={"float": "{: 0.2f}".format}
+    #         smallRobotArm.dhTbl, separator=", ", formatter={".2f}".format}
     #     )
     # )
 
     # there must be a delay here right after sieal is initialized
     sleep(1)
     smallRobotArm.enable()
-    smallRobotArm.move_to_pose(T_init)
+    smallRobotArm.move_to_angles(robot_rest_angles)
+    # smallRobotArm.move_to_pose(T_init)
     # j = [0, 0, 0, 0, 90, 0]
     # input("Press Enter to continue...")
-    sleep(5)
+    sleep(1)
 
     """
     for curPos are all zero
@@ -104,6 +104,24 @@ def main() -> None:
         ])
         then convert the R into degrees in 'ZYZ' sequence
     """
+    poses0 = np.array(
+        [
+            (164.5, 0.0, 241.0, 90.0, 180.0, -90.0),  # {x,) y, z, ZYZ Euler angles}
+            (164.5, 0.0, 141.0, 90.0, 180.0, -90.0),
+            (164.5 + 14.7, 35.4, 141.0, 90.0, 180.0, -90.0),
+            (164.5 + 50.0, 50.0, 141.0, 90.0, 180.0, -90.0),
+            (164.5 + 85.3, 35.4, 141.0, 90.0, 180.0, -90.0),
+            (164.5 + 100.0, 0.0, 141.0, 90.0, 180.0, -90.0),
+            (164.5 + 85.3, -35.4, 141.0, 90.0, 180.0, -90.0),
+            (164.5 + 50.0, -50.0, 141.0, 90.0, 180.0, -90.0),
+            (164.5 + 14.7, -35.4, 141.0, 90.0, 180.0, -90.0),
+            (164.5 + 50.0, 0.0, 141.0, 90.0, 180.0, -90.0),
+            (264.5, 0.0, 141.0, 0.0, 90.0, 0.0),
+            (164.5, 100.0, 141.0, 90.0, 90.0, 0.0),
+            (164.5, -100.0, 141.0, 90.0, -90.0, 0.0),
+        ]
+    )
+
     # end-effector pose = the position and orientation of the robot's last link (often frame 6) relative to the robot's base frame (frame 0).
     # poses = np.array(
     #     [
@@ -116,6 +134,7 @@ def main() -> None:
     #     ],
     #     dtype=np.float64,
     # )
+
     # we use ntu example: orientation with euler FIXED angles
     poses = np.array(
         [
@@ -123,8 +142,8 @@ def main() -> None:
             # the new zyz is (35,180,-55)
             (0, 264.5 + 19, 70.0 + 20, 60, 0, 0.0, 35.0),
             (8, 264.5 + 19, 70.0 + 20, 90, 0, 0.0, 35.0),
-            (20, 264.5 - 120, 70.0 + 60, 350.0, 180, -90-60.0, 0.0),
-            (24, 264.5 - 120, 70.0 + 100, 355.0, 180, -90-60.0, 0.0),
+            (20, 264.5 - 120, 70.0 + 60, 350.0, 180, -90 - 60.0, 0.0),
+            (24, 264.5 - 120, 70.0 + 100, 355.0, 180, -90 - 60.0, 0.0),
         ],
         dtype=np.float64,
     )
@@ -133,9 +152,9 @@ def main() -> None:
     joints = poses.copy()
 
     if bTrajectory == False:
-        for pose in poses:
-            _, *p = pose
-            T_0C = smallRobotArm.pose2T(p)
+        for pose in poses0:
+            p = pose
+            T_0C = smallRobotArm.pose2T(p, seq='ZYZ')
             T_06 = T_0C @ T_C6_inv
             smallRobotArm.move_to_pose(T_06)
         # col 0 are time data
@@ -153,7 +172,7 @@ def main() -> None:
     else:
         # this line is required coz reach to this pose at 0 sec as the poses says.
         T_0C_at_0s = smallRobotArm.pose2T((264.5 + 19, 70.0 + 20, 60, 0.0, 0.0, 35.0))
-        T_06_at_0s = T_0C_at_0s @ T_C6_inv        
+        T_06_at_0s = T_0C_at_0s @ T_C6_inv
         smallRobotArm.move_to_pose(T_06_at_0s)
 
         for i, pose in enumerate(poses, start=0):
@@ -169,6 +188,7 @@ def main() -> None:
 
         print("--- Start trajectory planning ---")
         (v, a) = pt.planTraj(joints)
+
         (totalPoints, _) = np.shape(joints)
         logging.info(v)
         logging.info(a)
@@ -192,7 +212,7 @@ def main() -> None:
             for col in range(DOF - 1):
                 Xx[col] = splines[col](dt)
             # ask arduino to run goTractory(Xx)
-            cmd = {"header": "m", "joint_angle": Xx, "ack": False}
+            cmd =   "header": "m", "joint_angle": Xx, "ack": False}
             smallRobotArm.conn.send2Arduino(cmd)
             # must be a delay here. ack takes too long causing discontinued arm movement.
             sleep(1 / 100)
@@ -243,7 +263,7 @@ def main() -> None:
     # smallRobotArm.move_to_pose(T_init)
     sleep(5)
     # rest pose
-    smallRobotArm.move_to_angles((0.0, -80.0, 70.0, -0.41, -96, 0))
+    smallRobotArm.move_to_angles(robot_rest_angles)
     # smallRobotArm.move_to_pose(rest_pose)
     smallRobotArm.disable()
     # a way to terminate thread
