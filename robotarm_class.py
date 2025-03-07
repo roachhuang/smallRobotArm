@@ -46,7 +46,7 @@ class RobotArm(ABC):
         a.k.a. a4=a5=a6=0 (std dh tbl) often use "zyz" to represent the orientation of the wrist.
         NOTE: uppercase 'ZYZ' for intrinsic rotation; lowercase->fixed angles sequence
         """
-        # avoid roll, pitch and yaw with zyz coz of misleading
+        # avoid naming roll, pitch and yaw with zyz coz of misleading
         x, y, z, psi, theta, phi = pose
         r = R.from_euler(seq=seq, angles=[psi, theta, phi], degrees=True)
 
@@ -157,10 +157,18 @@ class RobotArm(ABC):
 
 class SmallRbtArm(RobotArm):
     def __init__(self, std_dh_tbl: np.array):
+        self.max_limits = ()
+        self.min_limits = ()
         super().__init__(std_dh_tbl)
         self.conn = ser.SerialPort()
         self.conn.connect()
-
+        
+    def limit_joint_angles(self, angles):
+        """Limits joint angles to specified max/min values."""
+        if len(angles) != len(self.max_limits) or len(angles) != len(self.min_limits):
+            raise ValueError("Angle and limit lists must have the same length.")
+        return [max(min(a, max_val), min_val) for a, max_val, min_val in zip(angles, max_limits, min_limits)]
+            
     def grab(self):
         self.conn.ser.write(b"eOn\n")
 
