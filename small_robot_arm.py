@@ -32,6 +32,15 @@ smRobot = DHRobot(std_dh_table)
 #   x, y, z, ZYZ Euler angles}
 # Xhome = [(164.5, 0.0, 241.0, 90.0, 180.0, -90.0]
 
+"""
+todo:
+    1. Gimbal Lock: A potential issue with Euler angles is "gimbal lock," where you lose a degree of freedom. This can happen when the second rotation (around the Y-axis in Z-Y-Z) is 90 degrees.
+        convert t to quaternion and convert it back then pass it to ik.    
+    2. ik needs to take offset into account since dh alreay has offset?
+    3. sigularities, numberical instability.
+    
+"""
+
 
 def main() -> None:
     DOF = 6
@@ -53,9 +62,9 @@ def main() -> None:
     # create an instance of the robotarm.
     smallRobotArm = robot.SmallRbtArm(std_dh_params)
     # these values derived from fig 10 of my smallrobotarm notebook
-    robot_rest_angles = (0.0, -80.0, 70.0, -0.4, -96, 0)    
+    robot_rest_angles = (0.0, -78.5, 73.9, -0.4, -90, 0)
+    # robot_rest_angles = (0.0, -78.5, 73.9, 0, -90, 0)
     # rest_pose = smallRobotArm.fk(robot_rest_angles)
-   
 
     # tool frame. this is for generating Tc6 (cup to    6})
     # 50mm is the distance btw frame6 to end-effector
@@ -83,9 +92,11 @@ def main() -> None:
     sleep(1)
     smallRobotArm.enable()
     smallRobotArm.move_to_angles(robot_rest_angles)
+    sleep(1)
     # smallRobotArm.move_to_pose(T_init)
-    # j = [0, 0, 0, 0, 90, 0]
-    # input("Press Enter to continue...")
+    j = [0, 0, 0, 0, 0, 0]  
+    smallRobotArm.move_to_angles(j)  
+    input("Press Enter to continue...")    
     sleep(1)
 
     """
@@ -122,7 +133,7 @@ def main() -> None:
         ]
     )
 
-    # end-effector pose = the position and orientation of the robot's last link (often frame 6) relative to the robot's base frame (frame 0).
+    # end-effec or pose = the position and orientation of the robot's last link (often frame 6) relative to the robot's base frame (frame 0).
     # poses = np.array(
     #     [
     #         # current is(90,180,-90), after rotating the current orientation by 35 deg about z axis
@@ -138,12 +149,11 @@ def main() -> None:
     # we use ntu example: orientation with euler FIXED angles
     poses = np.array(
         [
-            # current is(90,180,-90), after rotating the current orientation by 35 deg about z axis
-            # the new zyz is (35,180,-55)
             (0, 264.5 + 19, 70.0 + 20, 60, 0, 0.0, 35.0),
             (8, 264.5 + 19, 70.0 + 20, 90, 0, 0.0, 35.0),
-            (20, 264.5 - 120, 70.0 + 60, 350.0, 180, -90 - 60.0, 0.0),
-            (24, 264.5 - 120, 70.0 + 100, 355.0, 180, -90 - 60.0, 0.0),
+            # rotate cup 60 degrees around y axis wrt the world frame.
+            (20, 264.5 - 120, 70.0 + 60, 350.0, 0, 60.0, 0.0),
+            (24, 264.5 - 120, 70.0 + 100, 355.0, 0, 60.0, 0.0),
         ],
         dtype=np.float64,
     )
@@ -154,7 +164,8 @@ def main() -> None:
     if bTrajectory == False:
         for pose in poses0:
             p = pose
-            T_0C = smallRobotArm.pose2T(p, seq='ZYZ')
+            # euler angles ZYZ according to smallrobot arm's demo
+            T_0C = smallRobotArm.pose2T(p, seq="ZYZ")
             T_06 = T_0C @ T_C6_inv
             smallRobotArm.move_to_pose(T_06)
         # col 0 are time data
@@ -174,11 +185,16 @@ def main() -> None:
         T_0C_at_0s = smallRobotArm.pose2T((264.5 + 19, 70.0 + 20, 60, 0.0, 0.0, 35.0))
         T_06_at_0s = T_0C_at_0s @ T_C6_inv
         smallRobotArm.move_to_pose(T_06_at_0s)
-
+        # traj planning in joint-space.
+        """
+        there is another method: in cartesian-space. if it needs 100 operating point in 1s (100hz) for period of 9s,
+        in this caseg we need to do 100x9=900 times of ik.
+        """
         for i, pose in enumerate(poses, start=0):
             # col 0 are time data
             _, *p = pose
-            T_0C = smallRobotArm.pose2T(p)
+            # fixed angles according to NTU course
+            T_0C = smallRobotArm.pose2T(p, seq="XYZ")
             T_06 = T_0C @ T_C6_inv
             joints[i, 1:7] = smallRobotArm.ik(T_06)
 
