@@ -12,7 +12,9 @@ from abc import ABC, abstractmethod
 class RobotArm(ABC):
     def __init__(self, std_dh_tbl: np.array):
         self.dhTbl = std_dh_tbl
-
+        self.max_limits = (130,180,180,25,280,180) # 70,)
+        self.min_limits = (-125, -180, -180, -25, -60, -180)
+        
     def T2Pose(self, T, seq="xyz", degrees=True) -> tuple:
         """
         Converts a 4x4 transformation matrix to a pose (position and orientation).
@@ -33,7 +35,7 @@ class RobotArm(ABC):
         rotation = R.from_matrix(rotation_matrix)
         euler_angles = rotation.as_euler(seq=seq, degrees=degrees)
 
-        return (rotation, euler_angles)
+        return (position, euler_angles)
 
     def pose2T(self, pose: tuple, seq="xyz") -> np.array:
         """
@@ -156,9 +158,7 @@ class RobotArm(ABC):
 
 
 class SmallRbtArm(RobotArm):
-    def __init__(self, std_dh_tbl: np.array):
-        self.max_limits = ()
-        self.min_limits = ()
+    def __init__(self, std_dh_tbl: np.array):        
         super().__init__(std_dh_tbl)
         self.conn = ser.SerialPort()
         self.conn.connect()
@@ -167,7 +167,7 @@ class SmallRbtArm(RobotArm):
         """Limits joint angles to specified max/min values."""
         if len(angles) != len(self.max_limits) or len(angles) != len(self.min_limits):
             raise ValueError("Angle and limit lists must have the same length.")
-        return [max(min(a, max_val), min_val) for a, max_val, min_val in zip(angles, max_limits, min_limits)]
+        return [max(min(a, max_val), min_val) for a, max_val, min_val in zip(angles, self.max_limits, self.min_limits)]
             
     def grab(self):
         self.conn.ser.write(b"eOn\n")
@@ -192,7 +192,8 @@ class SmallRbtArm(RobotArm):
         j_array = np.array(j)
         if np.isnan(j_array).any():
             return
-        cmd = {"header": "j", "joint_angle": j, "ack": True}
+        limit_j=self.limit_joint_angles(j)
+        cmd = {"header": "j", "joint_angle": limit_j, "ack": True}
         self.conn.send2Arduino(cmd)
 
     def move_to_angles(self, j: tuple) -> None:
