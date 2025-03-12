@@ -39,7 +39,7 @@ class RobotArm(ABC):
 
     def pose2T(self, pose: tuple, seq="xyz") -> np.array:
         """
-        Args: position (x,y,z) + 3 rotation angles in ZYZ order
+        Args: position (x,y,z) + 3 rotation angles in ZYZ order in degree
         Returns: transformation matrix from pose
 
         The three rotations can either be in a global frame of reference (extrinsic) or in a body centred frame of reference (intrinsic),
@@ -106,6 +106,7 @@ class RobotArm(ABC):
 
         """ standard DH table's T_i_to_i-1 coz smallrobotarm is uing std DH tbl.
             the m matrix will be difference if using craig dh table. see ntu 3-3
+            Tzi-1(th_i)@Tzr(di)@Txq(ai)@Txp(alpha_i)
         """
         m = np.array(
             [
@@ -218,7 +219,8 @@ class SmallRbtArm(RobotArm):
         d6 = self.dhTbl[5, 2]
 
         Jik = np.zeros((6,), dtype=np.float64)
-        th_offset = np.array([0.0, np.pi / 2, 0.0, 0.0, 0.0, 0.0])
+        # th_offset = np.array([0.0, -np.pi / 2, 0.0, 0.0, 0.0, 0.0])
+        th_offset = (0.0, -90.0, 0.0, 0.0, 0.0, 0.0)
 
         wrist_position = T_06[:3, 3] - d6 * T_06[:3, 2]
 
@@ -301,7 +303,8 @@ class SmallRbtArm(RobotArm):
             Jik[5] = np.arctan2(-T36[2][1], T36[2][0])
 
             Jik = np.degrees(Jik)
-            Jik = np.round_(Jik, decimals=2)
+            Jik = np.round_(Jik, decimals=4)
+            
             return Jik
 
         except ValueError:
