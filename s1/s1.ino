@@ -56,6 +56,12 @@ boolean PULstat5 = 0;
 boolean PULstat6 = 0;
 
 //robot geometry
+/*
+360.0 / 200.0 / 32.0 calculates the degrees per microstep of the motor itself.
+4.8: The division by 4.8 indicates that the motor's output is being further reduced by a gear system.
+This means that for every 4.8 rotations of the motor, the output shaft of the gear system rotates once.
+So, the 4.8 is a ratio. in essence, it calculates the degrees of rotation of the final output shaft per microstep, considering the gear reduction.
+*/
 // the motors are 200 steps /rev (50 teeth*4phase), microstepping=32
 const double dl1 = 360.0 / 200.0 / 32.0 / 4.8;  // 4.8 is gear ratio
 const double dl2 = 360.0 / 200.0 / 32.0 / 4.0;

@@ -8,13 +8,13 @@ from scipy.spatial.transform import Rotation as R
 import serial_class as ser
 from abc import ABC, abstractmethod
 
-
+# robot arm independent
 class RobotArm(ABC):
     def __init__(self, std_dh_tbl: np.array):
         self.dhTbl = std_dh_tbl
-        self.max_limits = (130,180,180,25,280,180) # 70,)
-        self.min_limits = (-125, -180, -180, -25, -60, -180)
-        
+        self.max_limits = (130, 150, 85, 25, 120, 180)  # 70,)
+        self.min_limits = (-125, -78.5, -160, -180, -120, -180)
+
     def T2Pose(self, T, seq="xyz", degrees=True) -> tuple:
         """
         Converts a 4x4 transformation matrix to a pose (position and orientation).
@@ -45,7 +45,7 @@ class RobotArm(ABC):
         The three rotations can either be in a global frame of reference (extrinsic) or in a body centred frame of reference (intrinsic),
         which is attached to, and moves with, the object under rotation [1].
         Robots with spherical wrists (where the last three joint axes intersect at a point)
-        a.k.a. a4=a5=a6=0 (std dh tbl) often use "zyz" to represent the orientation of the wrist.
+        a.k.a. a4=a5=a6=0 (std dh tbl) often use "ZYZ" to represent the orientation of the wrist.
         NOTE: uppercase 'ZYZ' for intrinsic rotation; lowercase->fixed angles sequence
         """
         # avoid naming roll, pitch and yaw with zyz coz of misleading
@@ -73,7 +73,7 @@ class RobotArm(ABC):
         Creates a DH transformation matrix using NumPy.
 
         Args:
-            th: Theta (joint angle or variable).
+            th: Theta (joint angle or variable). muse be in rad coz np.sin/cos... take rad.
             alfa: Alpha (twist angle).
             ai: ai (link length).
             di: di (link offset).
@@ -158,18 +158,23 @@ class RobotArm(ABC):
     #     pass
 
 
+# robot arm dependent
 class SmallRbtArm(RobotArm):
-    def __init__(self, std_dh_tbl: np.array):        
+    def __init__(self, std_dh_tbl: np.array):
         super().__init__(std_dh_tbl)
+        self.th_offset = (0.0, -np.pi / 2, 0.0, 0.0, 0.0, 0.0)
         self.conn = ser.SerialPort()
         self.conn.connect()
-        
+
     def limit_joint_angles(self, angles):
         """Limits joint angles to specified max/min values."""
         if len(angles) != len(self.max_limits) or len(angles) != len(self.min_limits):
             raise ValueError("Angle and limit lists must have the same length.")
-        return [max(min(a, max_val), min_val) for a, max_val, min_val in zip(angles, self.max_limits, self.min_limits)]
-            
+        return [
+            max(min(a, max_val), min_val)
+            for a, max_val, min_val in zip(angles, self.max_limits, self.min_limits)
+        ]
+
     def grab(self):
         self.conn.ser.write(b"eOn\n")
 
@@ -180,37 +185,27 @@ class SmallRbtArm(RobotArm):
         # motors are disabled in arduino's setup()
         self.conn.ser.write(b"en\n")
         # sleep(.5)
-        self.conn.ser.write(b"rst\n")
+        # self.conn.ser.write(b"rst\n")
         # sleep(.5)
 
     def disable(self):
         self.conn.ser.write(b"dis\n")
 
-    def move_to_pose(self, T: np.array)->None:
-        # return super().moveTo(end_effector_pose)
-        j = self.ik(T)
-        print("q:", j)
-        j_array = np.array(j)
-        if np.isnan(j_array).any():
-            return
-        limit_j=self.limit_joint_angles(j)
-        cmd = {"header": "j", "joint_angle": limit_j, "ack": True}
-        self.conn.send2Arduino(cmd)
-
     def move_to_angles(self, j: tuple) -> None:
         # return super().moveTo(end_effector_pose)
-        cmd = {"header": "j", "joint_angle": j, "ack": True}
+        limited_j = self.limit_joint_angles(j)
+        cmd = {"header": "j", "joint_angle": limited_j, "ack": True}
         self.conn.send2Arduino(cmd)
 
     @hlp.timer
-    def ik(self, T_06: np.array) -> list:
+    def ik(self, T_06: np.array) -> tuple | None:
         """
         arg:
             pose: end-effector pose in cartension space.
             position is retrieve from T_06.
             orientation(j4,5,6) are in deg
         return:
-            2 decimaled joints angles in degrees.
+            4 decimaled joints angles in degrees.
         """
         (_, r1, d1) = self.dhTbl[0, :]
         r2 = self.dhTbl[1, 1]
@@ -219,9 +214,6 @@ class SmallRbtArm(RobotArm):
         d6 = self.dhTbl[5, 2]
 
         Jik = np.zeros((6,), dtype=np.float64)
-        # th_offset = np.array([0.0, -np.pi / 2, 0.0, 0.0, 0.0, 0.0])
-        th_offset = (0.0, -90.0, 0.0, 0.0, 0.0, 0.0)
-
         wrist_position = T_06[:3, 3] - d6 * T_06[:3, 2]
 
         try:
@@ -290,9 +282,9 @@ class SmallRbtArm(RobotArm):
 
             Jik[2] = np.pi - np.arccos(arccos_input_3) - np.arctan2(d4, r3)
 
-            T01 = self.get_ti2i_1(1, Jik[0] + th_offset[0])
-            T12 = self.get_ti2i_1(2, Jik[1] + th_offset[1])
-            T23 = self.get_ti2i_1(3, Jik[2] + th_offset[2])
+            T01 = self.get_ti2i_1(1, Jik[0] + self.th_offset[0])
+            T12 = self.get_ti2i_1(2, Jik[1] + self.th_offset[1])
+            T23 = self.get_ti2i_1(3, Jik[2] + self.th_offset[2])
 
             T03 = T01 @ T12 @ T23
             inv_T03 = np.linalg.inv(T03)
@@ -304,8 +296,8 @@ class SmallRbtArm(RobotArm):
 
             Jik = np.degrees(Jik)
             Jik = np.round_(Jik, decimals=4)
-            
-            return Jik
+
+            return tuple(Jik)
 
         except ValueError:
             print("Warning: arccos domain error in Joint calculations.")
@@ -313,37 +305,29 @@ class SmallRbtArm(RobotArm):
 
     # todo: fk taks care of qs wrt t06 instead of t0-cup. don't do the transformation in fk.
     @hlp.timer
-    def fk(self, Jfk) -> np.array:
+    def fk(self, Jfk:tuple) -> tuple:
         """
-        Jfk(in deg) - joints value for the calculation of the forward kinematics
-        output: Xfk - pos value for the calculation of the forward kinematics
+        arg:
+            Jfk(in deg) - joints value for the calculation of the forward kinematics
+        return:
+            Xfk - pos value for the calculation of the forward kinematics
         """
         # Denavit-Hartenberg matrix
-        th_offset = np.array([0.0, -90.0, 0.0, 0.0, 0.0, 0.0])
-        theta = np.zeros((6,), dtype=np.float64)
+        # theta = np.zeros((6,), dtype=np.float64)
         # theta=[Jfk(1); -90+Jfk(2); Jfk(3); Jfk(4); Jfk(5); Jfk(6)];
-        theta = np.add(Jfk, th_offset)
+        theta = Jfk + np.degrees(self.th_offset)
 
         # alfa = self.dhTbl[0:6, 0]
-        # from deg to rad
         theta = np.deg2rad(theta)
         # theta = np.deg2rad(Jfk)
         # alfa = np.deg2rad(alfa)
 
         # work frame
-        # Xwf = Point(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-        # tool frame
-        # Xtf = Point(0.0, 0.0, 50.0, 180.0, -90.0, 0.0)
-        # work frame transformation matrix
-
-        # Twf = Xwf.pos2tran()  # Twf=pos2tran(Xwf);
-        # tool frame transformation matrix
-        # Tft = Xtf.pos2tran()  # Ttf=pos2tran(Xtf);
-
         Twf = self.pose2T([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
         # std_dh_tbl seems no need to give last link's offset for end-effector. todo:to be confirm.
-        # Tft = self.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
         Tft = self.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
+        # tool frame
+        # Tft = self.pose2T([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
         # DH homogeneous transformation matrix
         # float T01[16], T12[16], T23[16], T34[16], T45[16], T56[16];
@@ -361,14 +345,14 @@ class SmallRbtArm(RobotArm):
         # print('t: ', np.around(T, 2))
         Xfk = np.zeros((6,), dtype=np.float64)
         # get position from transformation matrix
-        (Xfk[0], Xfk[1], Xfk[2]) = T[0:3, 3]
+        position = T[0:3, 3]
 
         Xfk[4] = np.arctan2(np.sqrt(T[2, 0] ** 2 + T[2, 1] ** 2), T[2, 2])
         Xfk[3] = np.arctan2(T[1, 2] / np.sin(Xfk[4]), T[0, 2] / np.sin(Xfk[4]))
         Xfk[5] = np.arctan2(T[2, 1] / np.sin(Xfk[4]), -T[2, 0] / np.sin(Xfk[4]))
         # convert to degree
-        Xfk[3:6] = np.degrees(Xfk[3:6])
-        return Xfk
+        orientation = np.degrees(Xfk[3:6])
+        return (position, orientation)
 
     # def ik(self, pose: list) -> list:
     #     """

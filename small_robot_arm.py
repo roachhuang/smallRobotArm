@@ -38,9 +38,18 @@ todo:
         convert t to quaternion and convert it back then pass it to ik.    
     2. ik needs to take offset into account since dh alreay has offset?
     3. sigularities, numberical instability.
+    4. precision test for position
+    5. add ai onto it.
+    6. ros2
+    7. ar4 or ar4-mk3   
+    8. reachable workspace
+    9. from a point to b point, may have mutilple soultions from ik. choose minimum thetas
+         
     
 """
-
+'''
+    always use np.array coz it can represent any number of dimensions (vectors, matrices, tensors, etc.). 
+'''
 
 def main() -> None:
     DOF = 6
@@ -94,10 +103,12 @@ def main() -> None:
     smallRobotArm.move_to_angles(robot_rest_angles)
     sleep(1)
     # smallRobotArm.move_to_pose(T_init)
-    j = [0, 0, 0, 0, 0, 0]  
-    smallRobotArm.move_to_angles(j)  
-    input("Press Enter to continue...")    
-    sleep(1)
+    
+    # zero positon (see fig1)
+    # j = (0, 0, 0, 0, 0, 0)
+    # smallRobotArm.move_to_angles(j)  
+    # input("Press Enter to continue...")    
+    # sleep(1)
 
     """
     for curPos are all zero
@@ -117,7 +128,8 @@ def main() -> None:
     """
     poses0 = np.array(
         [
-            (164.5, 0.0, 241.0, 90.0, 180.0, -90.0),  # {x,) y, z, ZYZ Euler angles}
+            # todo: fk j = (0, 0, 0, 0, 0, 0) to see if it is home  
+            (164.5, 0.0, 241.0, 90.0, 180.0, -90.0),  # Home (x, y, z, ZYZ Euler angles)
             (164.5, 0.0, 141.0, 90.0, 180.0, -90.0),
             (164.5 + 14.7, 35.4, 141.0, 90.0, 180.0, -90.0),
             (164.5 + 50.0, 50.0, 141.0, 90.0, 180.0, -90.0),
@@ -163,12 +175,12 @@ def main() -> None:
 
     if bTrajectory == False:
         for pose in poses0:
-            p = pose
             # euler angles ZYZ according to smallrobot arm's demo
-            T_0C = smallRobotArm.pose2T(p, seq="ZYZ")
+            T_0C = smallRobotArm.pose2T(pose, seq="ZYZ")
             T_06 = T_0C @ T_C6_inv
             smallRobotArm.move_to_pose(T_06)
-        # col 0 are time data
+            input("Press Enter to continue...")   
+
 
         """
         T = SE3(pose[1],  pose[2], pose[3]) * \
