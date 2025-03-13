@@ -16,7 +16,12 @@ from scipy.interpolate import CubicSpline
 # 50 is distance btw 6th axis and the extended end-effector
 a1, a2, a3 = 47.0, 110.0, 26.0
 d1, d4, d6 = 133.0, 117.50, 28.0
-
+"""
+d: link offset 
+a: link length
+alpha: link twist
+offset: kinematic-joint variable offset
+"""
 std_dh_table = [
     RevoluteDH(d=d1, a=a1, alpha=-np.pi / 2),  # joint 1
     RevoluteDH(d=0, a=a2, alpha=0, offset=-np.pi / 2),  # joint 2
@@ -44,16 +49,18 @@ todo:
     7. ar4 or ar4-mk3   
     8. reachable workspace
     9. from a point to b point, may have mutilple soultions from ik. choose minimum thetas
-         
+    10. research spatialmath
+      
     
 """
-'''
+"""
     always use np.array coz it can represent any number of dimensions (vectors, matrices, tensors, etc.). 
-'''
+"""
+
 
 def main() -> None:
     DOF = 6
-    bTrajectory = False
+    bTrajectory = True
 
     np.set_printoptions(precision=2, suppress=True)
 
@@ -71,9 +78,10 @@ def main() -> None:
     # create an instance of the robotarm.
     smallRobotArm = robot.SmallRbtArm(std_dh_params)
     # these values derived from fig 10 of my smallrobotarm notebook
-    robot_rest_angles = (0.0, -78.5, 73.9, -0.4, -90, 0)
-    # robot_rest_angles = (0.0, -78.5, 73.9, 0, -90, 0)
-    # rest_pose = smallRobotArm.fk(robot_rest_angles)
+    robot_rest_angles = (0.0, -78.5, 73.9, 0.0, -90.0, 0.0)
+    # robot_rest_angles = (0.0, -78.5, 73.9, -0.4, -90, 0)
+    rest_pose = smallRobotArm.fk(robot_rest_angles)
+    print(f"rest pose: {rest_pose}")
 
     # tool frame. this is for generating Tc6 (cup to    6})
     # 50mm is the distance btw frame6 to end-effector
@@ -100,14 +108,15 @@ def main() -> None:
     # there must be a delay here right after sieal is initialized
     sleep(1)
     smallRobotArm.enable()
+    sleep(3)
     smallRobotArm.move_to_angles(robot_rest_angles)
-    sleep(1)
+    sleep(2)
     # smallRobotArm.move_to_pose(T_init)
-    
+
     # zero positon (see fig1)
     # j = (0, 0, 0, 0, 0, 0)
-    # smallRobotArm.move_to_angles(j)  
-    # input("Press Enter to continue...")    
+    # smallRobotArm.move_to_angles(j)
+    # input("Press Enter to continue...")
     # sleep(1)
 
     """
@@ -128,20 +137,27 @@ def main() -> None:
     """
     poses0 = np.array(
         [
-            # todo: fk j = (0, 0, 0, 0, 0, 0) to see if it is home  
+            # todo: fk j = (0, 0, 0, 0, 0, 0) to see if it is home
             (164.5, 0.0, 241.0, 90.0, 180.0, -90.0),  # Home (x, y, z, ZYZ Euler angles)
-            (164.5, 0.0, 141.0, 90.0, 180.0, -90.0),
-            (164.5 + 14.7, 35.4, 141.0, 90.0, 180.0, -90.0),
-            (164.5 + 50.0, 50.0, 141.0, 90.0, 180.0, -90.0),
-            (164.5 + 85.3, 35.4, 141.0, 90.0, 180.0, -90.0),
-            (164.5 + 100.0, 0.0, 141.0, 90.0, 180.0, -90.0),
-            (164.5 + 85.3, -35.4, 141.0, 90.0, 180.0, -90.0),
-            (164.5 + 50.0, -50.0, 141.0, 90.0, 180.0, -90.0),
-            (164.5 + 14.7, -35.4, 141.0, 90.0, 180.0, -90.0),
-            (164.5 + 50.0, 0.0, 141.0, 90.0, 180.0, -90.0),
-            (264.5, 0.0, 141.0, 0.0, 90.0, 0.0),
-            (164.5, 100.0, 141.0, 90.0, 90.0, 0.0),
-            (164.5, -100.0, 141.0, 90.0, -90.0, 0.0),
+            (164.5, 0.0, 141.0, 90.0, 180.0, -90.0),  # j1
+            (164.5 + 14.7, 35.4, 141.0, 90.0, 180.0, -90.0),  # j11
+            (164.5 + 50.0, 50.0, 141.0, 90.0, 180.0, -90.0),  # j12
+            (164.5 + 85.3, 35.4, 141.0, 90.0, 180.0, -90.0),  # j13
+            (164.5 + 100.0, 0.0, 141.0, 90.0, 180.0, -90.0),  # j14
+            (164.5 + 85.3, -35.4, 141.0, 90.0, 180.0, -90.0),  # j15
+            (164.5 + 50.0, -50.0, 141.0, 90.0, 180.0, -90.0),  # j16
+            (164.5 + 14.7, -35.4, 141.0, 90.0, 180.0, -90.0),  # j17
+            (164.5, 0.0, 141.0, 90.0, 180.0, -90.0),  # j1
+            (164.5 + 50.0, 0.0, 141.0, 90.0, 180.0, -90.0),  # j18
+            (164.5 + 100.0, 0.0, 141.0, 90.0, 180.0, -90.0),  # j14
+            (164.5, 0.0, 141.0, 90.0, 180.0, -90.0),  # j1
+            (264.5, 0.0, 141.0, 0.0, 90.0, 0.0),  # j2
+            (164.5, 0.0, 141.0, 90.0, 180.0, -90.0),  # j1
+            (164.5, 100.0, 141.0, 90.0, 90.0, 0.0),  # j3
+            (164.5, 0.0, 141.0, 90.0, 180.0, -90.0),  # j1
+            (164.5, -100.0, 141.0, 90.0, -90.0, 0.0),  # j4
+            (164.5, 0.0, 141.0, 90.0, 180.0, -90.0),  # j1
+            (164.5, 0.0, 241.0, 90.0, 180.0, -90.0),  # Home (x, y, z, ZYZ Euler angles)
         ]
     )
 
@@ -177,26 +193,28 @@ def main() -> None:
         for pose in poses0:
             # euler angles ZYZ according to smallrobot arm's demo
             T_0C = smallRobotArm.pose2T(pose, seq="ZYZ")
+            # T_0C = smallRobotArm.pose2T(pose[1:7], seq="xyz")
             T_06 = T_0C @ T_C6_inv
-            smallRobotArm.move_to_pose(T_06)
-            input("Press Enter to continue...")   
+            j = smallRobotArm.ik(T_06)
+            print("my q:", j)
+            (position, euler_zyz) = smallRobotArm.fk(j)
+            print(f"my fk, p:{position}, o:{euler_zyz}")
+            # print('rbtool fk', smRobot.fkine(j).t)
+            # validate my ik
+            # iks = smRobot.ikine_LM(T_06)
+            # q = np.degrees(iks.q)
+            # print(f'rbtool q: {q.round(4)}')
 
-
-        """
-        T = SE3(pose[1],  pose[2], pose[3]) * \
-            SE3.Rz(np.radians(
-                pose[4])) * SE3.Ry(np.radians(pose[5])) * SE3.Rz(np.radians(pose[6]))
-        iks = smRobot.ikine_LM(T)
-        q = np.degrees(iks.q)
-        # joints[i, 1:7] = q.round(2)
-        """
+            smallRobotArm.move_to_angles(j)
+            # input("Press Enter to continue...")
 
     ###################################################################
     else:
-        # this line is required coz reach to this pose at 0 sec as the poses says.
-        T_0C_at_0s = smallRobotArm.pose2T((264.5 + 19, 70.0 + 20, 60, 0.0, 0.0, 35.0))
+        # this line is required coz reach to this pose at 0 sec as the poses says. ntu: fixed euler anglers
+        T_0C_at_0s = smallRobotArm.pose2T(poses[0, 1:7], seq="xyz")
         T_06_at_0s = T_0C_at_0s @ T_C6_inv
-        smallRobotArm.move_to_pose(T_06_at_0s)
+        j = smallRobotArm.ik(T_06_at_0s)
+        smallRobotArm.move_to_angles(j)
         # traj planning in joint-space.
         """
         there is another method: in cartesian-space. if it needs 100 operating point in 1s (100hz) for period of 9s,
@@ -206,13 +224,13 @@ def main() -> None:
             # col 0 are time data
             _, *p = pose
             # fixed angles according to NTU course
-            T_0C = smallRobotArm.pose2T(p, seq="XYZ")
+            T_0C = smallRobotArm.pose2T(p, seq="xyz")
             T_06 = T_0C @ T_C6_inv
             joints[i, 1:7] = smallRobotArm.ik(T_06)
 
         # display easily readable ik resutls on the screen
         J = pd.DataFrame(joints, columns=["ti", "q1", "q2", "q3", "q4", "q5", "q6"])
-        print(J.round(2))
+        print(J.round(4))
 
         print("--- Start trajectory planning ---")
         (v, a) = pt.planTraj(joints)
@@ -271,6 +289,7 @@ def main() -> None:
 
             # ask arduino to run goTractory(Xx)
             cmd = {"header": "m", "joint_angle": Xx, "ack": False}
+            print(f"Xx: {Xx}")
             smallRobotArm.conn.send2Arduino(cmd)
             # must be a delay here. ack takes too long causing discontinued arm movement.
             sleep(1 / 100)
@@ -288,11 +307,9 @@ def main() -> None:
     # smallRobotArm.moveTo([47.96, 0.0, 268.02, 180, 94.61, 180.0])
     # initPose[0:3] = [11.31000000e02, 1.94968772e-31, 2.78500000e02]
     # initPose[3:6] = [10.00000000e00, 1.27222187e-14, 1.80000000e02]
-    # smallRobotArm.move_to_pose(T_init)
     sleep(5)
     # rest pose
     smallRobotArm.move_to_angles(robot_rest_angles)
-    # smallRobotArm.move_to_pose(rest_pose)
     smallRobotArm.disable()
     # a way to terminate thread
     smallRobotArm.conn.disconnect()
