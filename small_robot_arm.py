@@ -83,20 +83,12 @@ def main() -> None:
     rest_pose = smallRobotArm.fk(robot_rest_angles)
     print(f"rest pose: {rest_pose}")
 
-    # tool frame. this is for generating Tc6 (cup to    6})
+    # tool frame. this is for generating Tc6 (cup to {6})
     # 50mm is the distance btw frame6 to end-effector
     # tc6 = smallRobotArm.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
     # hand made T_C6: gripper's len + x:180,y:-90, z:0. see their coordiation system.
     T_C6 = np.array([[0, 0, 1, 0], [0, -1, 0, 0], [1, 0, 0, 50], [0, 0, 0, 1]])
     T_C6_inv = np.linalg.inv(T_C6)
-
-    # T_0C = smallRobotArm.pose2T([264.5 + 19, 70.0 + 20, 60, 0.0, 0.0, 35.0])
-    T_0C = smallRobotArm.pose2T([164.5, 0.0, 241.0, 180.0, -90.0, 0.0])
-
-    # T_0C = smallRobotArm.pose2T((320, 162, 50, 0.0, 0.0, 0.0))
-
-    T_init = T_0C @ T_C6_inv
-    # orientation for frame 6 is unchanged (x points up, z points forward)
 
     # print(
     #     "std_dh_tbl =\n"
@@ -106,17 +98,14 @@ def main() -> None:
     # )
 
     # there must be a delay here right after sieal is initialized
-    sleep(1)
     smallRobotArm.enable()
-    sleep(3)
+    sleep(1)
     smallRobotArm.move_to_angles(robot_rest_angles)
-    sleep(2)
-    # smallRobotArm.move_to_pose(T_init)
-
+    sleep(1)
     # zero positon (see fig1)
-    # j = (0, 0, 0, 0, 0, 0)
-    # smallRobotArm.move_to_angles(j)
-    # input("Press Enter to continue...")
+    j = (0, 0, 0, 0, 0, 0)
+    smallRobotArm.move_to_angles(j)
+    input("Press Enter to continue...")
     # sleep(1)
 
     """
@@ -180,8 +169,8 @@ def main() -> None:
             (0, 264.5 + 19, 70.0 + 20, 60, 0, 0.0, 35.0),
             (8, 264.5 + 19, 70.0 + 20, 90, 0, 0.0, 35.0),
             # rotate cup 60 degrees around y axis wrt the world frame.
-            (20, 264.5 - 120, 70.0 + 60, 350.0, 0, 60.0, 0.0),
-            (24, 264.5 - 120, 70.0 + 100, 355.0, 0, 60.0, 0.0),
+            (20, 264.5 - 120, 70.0 + 60, 350.0, 0, -60.0, 0.0),
+            (24, 264.5 - 120, 70.0 + 100, 355.0, 0, -60.0, 0.0),
         ],
         dtype=np.float64,
     )
