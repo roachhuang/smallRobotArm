@@ -7,7 +7,8 @@
 
 # Distribution / packaging
 .Python
-__pycache__/*.pyc
+*.pyc
+__pycache__/
 build/
 develop-eggs/
 dist/
@@ -25,7 +26,6 @@ share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-*.pyc
 MANIFEST
 
 # PyInstaller
