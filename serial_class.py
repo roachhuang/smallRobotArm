@@ -2,7 +2,8 @@
 import serial.tools.list_ports
 
 import serial
-import platform
+# import platform
+import logging
 from threading import Thread, Event
 
 class SerialPort():
@@ -65,8 +66,8 @@ class SerialPort():
         if cmd['ack'] is True:
             # wait till the event is set in rcvThread.
             self._event_ok2send.wait()            
-        # while event_ack.is_set() and bWaitAck is True:
-        #    pass
+        # while self._event_ack.is_set() and bWaitAck is True:
+            # pass
 
     def _ReceiveThread(self):
         """
@@ -83,6 +84,7 @@ class SerialPort():
                 # print(string)
                 if string == 'ack':
                     # receive ack frm arduion meaning it is free now
+                    logging.debug("Received ack, setting event.")
                     self._event_ok2send.set()
 
 '''

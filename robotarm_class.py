@@ -144,9 +144,9 @@ class RobotArm(ABC):
             # Matrix objects have a numpy method that returns a numpy.ndarray
             # float32 maintains only approximately 7 decimal digits fo precision internally.
             return m.astype(np.float64)
-
+    # interface
     @abstractmethod
-    def ik(self):
+    def ik(self, T_06:np.ndarray)->tuple:
         pass
 
     @abstractmethod
@@ -295,7 +295,7 @@ class SmallRbtArm(RobotArm):
             Jik[5] = np.arctan2(-T36[2][1], T36[2][0])
 
             Jik = np.degrees(Jik)
-            Jik = np.round_(Jik, decimals=4)
+            Jik = np.round(Jik, decimals=4)
 
             return tuple(Jik)
 
@@ -324,7 +324,7 @@ class SmallRbtArm(RobotArm):
 
         # work frame
         Twf = self.pose2T([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-        # std_dh_tbl seems no need to give last link's offset for end-effector. todo:to be confirm.
+        # even with std_dh_tbl, we still need to give last link's offset for end-effector.
         Tft = self.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
         # tool frame
         # Tft = self.pose2T([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])

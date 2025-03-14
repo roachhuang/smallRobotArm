@@ -6,7 +6,7 @@ import numpy as np
 import equations as eq
 import robotarm_class as robot
 import plan_traj as pt
-from roboticstoolbox import DHRobot, RevoluteDH
+# from roboticstoolbox import DHRobot, RevoluteDH
 
 # from spatialmath import SE3
 from scipy.spatial.transform import Rotation as R
@@ -22,17 +22,17 @@ a: link length
 alpha: link twist
 offset: kinematic-joint variable offset
 """
-std_dh_table = [
-    RevoluteDH(d=d1, a=a1, alpha=-np.pi / 2),  # joint 1
-    RevoluteDH(d=0, a=a2, alpha=0, offset=-np.pi / 2),  # joint 2
-    RevoluteDH(d=0, a=a3, alpha=-np.pi / 2),  # joint 3
-    RevoluteDH(d=d4, a=0, alpha=np.pi / 2),  # joint 4
-    RevoluteDH(d=0, a=0, alpha=-np.pi / 2),  # joint 5
-    RevoluteDH(d=d6, a=0, alpha=0),  # joint 6
-]
+# std_dh_table = [
+#     RevoluteDH(d=d1, a=a1, alpha=-np.pi / 2),  # joint 1
+#     RevoluteDH(d=0, a=a2, alpha=0, offset=-np.pi / 2),  # joint 2
+#     RevoluteDH(d=0, a=a3, alpha=-np.pi / 2),  # joint 3
+#     RevoluteDH(d=d4, a=0, alpha=np.pi / 2),  # joint 4
+#     RevoluteDH(d=0, a=0, alpha=-np.pi / 2),  # joint 5
+#     RevoluteDH(d=d6, a=0, alpha=0),  # joint 6
+# ]
 
 # Create a custom robot object based on my DH parameters for std dh tbl.
-smRobot = DHRobot(std_dh_table)
+# smRobot = DHRobot(std_dh_table)
 
 #   x, y, z, ZYZ Euler angles}
 # Xhome = [(164.5, 0.0, 241.0, 90.0, 180.0, -90.0]
@@ -59,8 +59,10 @@ todo:
 
 
 def main() -> None:
+    logging.basicConfig()
     DOF = 6
     bTrajectory = True
+    # bTrajectory = False
 
     np.set_printoptions(precision=2, suppress=True)
 
@@ -98,8 +100,10 @@ def main() -> None:
     # )
 
     # there must be a delay here right after sieal is initialized
+    sleep(1)    # don't remove this line!!!
+    
     smallRobotArm.enable()
-    sleep(1)
+    sleep(2)
     smallRobotArm.move_to_angles(robot_rest_angles)
     sleep(1)
     # zero positon (see fig1)
@@ -278,12 +282,14 @@ def main() -> None:
 
             # ask arduino to run goTractory(Xx)
             cmd = {"header": "m", "joint_angle": Xx, "ack": False}
-            print(f"Xx: {Xx}")
+            # print(f"Xx: {Xx}")
             smallRobotArm.conn.send2Arduino(cmd)
             # must be a delay here. ack takes too long causing discontinued arm movement.
-            sleep(1 / 100)
+            sleep(1 / 5)
             curr_time = perf_counter()
-
+            
+        input("Press Enter to continue...")
+        
         # this is to set ji in arduino coz of from and to args for goStrightLine
         T_0C = smallRobotArm.pose2T((47.96, 0.0, 268.02, 180, 94.61, 180.0))
         # T_0C = smallRobotArm.pose2T((110, 323.2, 320, 0.0, -60.0, 0.0))
