@@ -147,7 +147,7 @@ class RobotArm(ABC):
     # interface
     @abstractmethod
     def ik(self, T_06:np.ndarray)->tuple:
-        pass
+        raise NotImplementedError("Subclasses must implement ik()")
 
     @abstractmethod
     def fk(self, Jfk):
@@ -194,7 +194,7 @@ class SmallRbtArm(RobotArm):
     def move_to_angles(self, j: tuple) -> None:
         # return super().moveTo(end_effector_pose)
         limited_j = self.limit_joint_angles(j)
-        cmd = {"header": "j", "joint_angle": limited_j, "ack": True}
+        cmd = {"header": "g", "joint_angle": limited_j, "ack": True}
         self.conn.send2Arduino(cmd)
 
     @hlp.timer
