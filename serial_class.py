@@ -2,36 +2,69 @@
 import serial.tools.list_ports
 
 import serial
+
 # import platform
 import logging
 from threading import Thread, Event
+# import time
 
-class SerialPort():
-    def __init__(self):                
-       self.ser = None
-       self._event_run = Event()
-       self._event_ok2send = Event()
-       
-    def connect(self):
+class SerialPort:
+    def __init__(self):
+        self.ser = None
+        self._event_run = Event()
+        self._event_ok2send = Event()
+        self.t = None  # Ensure thread is tracked properly
+        logging.basicConfig(
+            level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s"
+        )
+
+    def connect(self) -> bool:
+        """Connects to the first available serial port that matches expected descriptions."""
         port = self._get_serial_port()
         if port:
-            self.ser = serial.Serial(port, baudrate=115200, timeout=1)
-            print(f"Connected to serial port {self.ser.name}")            
-            self._event_ok2send.set()            
-            self._event_run.set()
-            self.t = Thread(target=self._ReceiveThread, args=[])
-            self.t.start()            
+            try:
+                self.ser = serial.Serial(port, baudrate=115200, timeout=1)
+                print(f"[INFO] Connected to serial port {self.ser.name}")
+                self._event_ok2send.set()
+                self._event_run.set()
+                # Ensure a new thread is created only if one is not running
+                if not self.t or not self.t.is_alive():
+                    self.t = Thread(target=self._ReceiveThread, daemon=True)
+                    self.t.start()
+                return True
+            except serial.SerialException as e:
+                logging.error(f"Serial connection error: {e}")
+                return False  # Connection failed
+            except OSError as e:
+                logging.error(f"OS error during serial connection: {e}")
+                return False  # Connection failed
         else:
-            print("Could not find a suitable serial port.")
+            print("[Error] Could not find a suitable serial port.")
+            return False
 
     def disconnect(self):
-        self.event_run = False
-        self.t.join()
-        self.ser.close()
+        """Safely closes the serial connection and stops the receiving thread."""
+        self._event_run.clear()
+        # check if thread is running before joining.
+        if self.ser and self.t and self.t.is_alive():
+            self.t.join(timeout=2)  # ensure thread stops within 2 sec.
+            self.t = None
+        # check if serial port is open before closing.
+        if self.ser and self.ser.is_open:
+            try:
+                self.ser.close()
+                print("[INFO] Serial port closed successfully.")
+            except serial.SerialException as e:
+                logging.error(f"Error closing serial port: {e}")
+
+        self.t = None  # Reset thread reference
+        # self.event_run = False
+        # self.t.join()
+        # self.ser.close()
 
     @property
     def event_run(self):
-        return self._event_run.is_set()    
+        return self._event_run.is_set()
 
     @event_run.setter
     def event_run(self, state):
@@ -41,133 +74,80 @@ class SerialPort():
             self._event_run.clear()
 
     def _get_serial_port(self):
-        """Automatically detects and returns the serial port."""
-        ports = list(serial.tools.list_ports.comports())
-        for port in ports:
-            if 'USB' in port.description:
-                return port.device
+        """Automatically detects and returns the 1st available serial port."""
+        try:
+            ports = list(serial.tools.list_ports.comports())
+            for port in ports:
+                if "USB" in port.description or "COM" in port.device:
+                    return port.device
+        except Exception as e:
+            logging.error(f"Error getting serial ports: {e}")
         return None
 
     def send2Arduino(self, cmd: dict) -> None:
-    # def send2Arduino(self, header: str, j, bWaitAck: bool):
-        """send robot cmd to arduino
-
+        """
+        send robot cmd to arduino
         Args:
             ser (_type_): _description_
             header (str): cmd type
             j (float): theta in deg for 6 axes
             bWaitAck (bool): wait for ack from arduino or not
         """
-        # msg = '{}{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}\n'.format(cmd['header'], *j)
-        msg = '{}{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}\n'.format(cmd['header'], *cmd['joint_angle'])
-        self.ser.write(msg.encode('utf-8'))
-        self._event_ok2send.clear()
-        # print(msg)
-        if cmd['ack'] is True:
+        if self.ser and self.ser.is_open:
+            # msg = '{}{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}\n'.format(cmd['header'], *j)
+            msg = "{}{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}\n".format(
+                cmd["header"], *cmd["joint_angle"]
+            )
+            try:
+                self.ser.write(msg.encode("utf-8"))
+                print(f"[INFO] Sent: {msg.strip()}")
+                # logging.debug(f"Sent command: {msg.strip()}")
+                self._event_ok2send.clear()
+                if cmd["ack"]:
+                    self._event_ok2send.clear()
+                    print("[DEBUG] Waiting for ack...")
+                    # timeout must be >= 15
+                    if not self._event_ok2send.wait(timeout=15):  # timeout added.
+                        logging.error("Timeout waiting for Arduino acknowledgement.")
+                    else:
+                        print("[DEBUG] Ack received.")    
+            except serial.SerialTimeoutException:
+                logging.error("Serial write timeout.")
+            except serial.SerialException as e:
+                logging.error(f"Serial write error: {e}")
+        else:
+            logging.error("Serial port not connected. Can't send cmd")
             # wait till the event is set in rcvThread.
-            self._event_ok2send.wait()            
-        # while self._event_ack.is_set() and bWaitAck is True:
-            # pass
+            # self._event_ok2send.wait()
+        # while event_ack.is_set() and bWaitAck is True:
+        #    pass
 
     def _ReceiveThread(self):
         """
+        Listens for responses from Arduino and sets acknowledgment event if needed.
         input string is retrieved as a byte string, which works
         differently than a standard string. The decode() method is to convert
         the string from a byte string to a standard string.
         """
-        while self.event_run == True:            
-            line = self.ser.readline().decode('utf-8')
-            if len(line) > 0:
-                # get rid of the end of characters /n/r
-                string = line.rstrip()
-                # logging.warning(string)
-                # print(string)
-                if string == 'ack':
-                    # receive ack frm arduion meaning it is free now
-                    logging.debug("Received ack, setting event.")
-                    self._event_ok2send.set()
-
-'''
-import serial.tools.list_ports
-import serial
-from threading import Thread, Event
-
-class SerialPortConnection:
-    def __init__(self, port_name):
-        self.ser = None
-        self.port_name = port_name
-        
-    def connect(self):
-        self.ser = serial.Serial(self.port_name, baudrate=115200, timeout=1)
-        print(f"Connected to serial port {self.ser.name}")
-        
-    def disconnect(self):
-        self.ser.close()
-
-class SerialPortSender:
-    def __init__(self, ser):
-        self.ser = ser
-        self._event_ok2send = Event()
-        
-    def send(self, cmd: dict) -> None:
-        msg = '{}{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}\n'.format(cmd['header'], *cmd['joint_angle'])
-        self.ser.write(msg.encode('utf-8'))
-        print(msg)
-        if cmd['ack'] is True:
-            self._event_ok2send.wait()
-        
-class SerialPortReceiver:
-    def __init__(self, ser):
-        self.ser = ser
-        self._event_ok2send = None
-        
-    def receive(self):
-        line = self.ser.readline().decode('utf-8')
-        if len(line) > 0:
-            string = line.rstrip()
-            if string == 'ack':
-                self._event_ok2send.set()
-
-class ArduinoController:
-    def __init__(self):
-        self._event_run = Event()
-        self._event_ok2send = Event()
-        
-    def connect(self):
-        port_name = self._get_serial_port()
-        if port_name:
-            connection = SerialPortConnection(port_name)
-            connection.connect()
-            self._event_ok2send.set()
-            self._event_run.set()
-            sender = SerialPortSender(connection.ser)
-            receiver = SerialPortReceiver(connection.ser)
-            receiver._event_ok2send = self._event_ok2send
-            self.t = Thread(target=self._receive_thread, args=[receiver])
-            self.t.start()
-            return sender
-        else:
-            print("Could not find a suitable serial port.")
-            return None
-        
-    def disconnect(self):
-        self._event_run.clear()
-        self.t.join()
-        self.connection.disconnect()
-        
-    @property
-    def event_run(self):
-        return self._event_run.is_set()
-    
-    @event_run.setter
-    def event_run(self, state):
-        if state == True:
-            self._event_run.set()
-        else:
-            self._event_run.clear()
-            
-    def _get_serial_port(self):
-        """Automatically detects and returns the serial port."""
-        ports = list(serial.tools.list_ports.comports
-
-'''
+        while self.event_run:
+            if self.ser and self.ser.is_open:
+                try:
+                    line = self.ser.readline().decode("utf-8").rstrip()
+                    if line:
+                        print(f"[DEBUG] received: {line}")
+                        if line.lower() == "ack":
+                            self._event_ok2send.set()
+                        # else:
+                        #     logging.debug(
+                        #         f"Received from Arduino: {line}"
+                        #     )  # add debug line.
+                except serial.SerialTimeoutException:
+                    pass  # timeout is normal.
+                except serial.SerialException as e:
+                    logging.error(f"Serial read error: {e}")
+                    break  # exit thread on error.
+                except UnicodeDecodeError:
+                    logging.error("Unicode decoding error from serial data.")
+                    break  # exit thread on error.
+            else:
+                break  # exit thread if serial port is closed.
