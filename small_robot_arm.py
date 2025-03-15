@@ -6,11 +6,12 @@ import numpy as np
 import equations as eq
 import robotarm_class as robot
 import plan_traj as pt
+
 # from roboticstoolbox import DHRobot, RevoluteDH
 
 # from spatialmath import SE3
-from scipy.spatial.transform import Rotation as R
-from scipy.interpolate import CubicSpline
+# from scipy.spatial.transform import Rotation as R
+# from scipy.interpolate import CubicSpline
 
 # Define your DH table parameters
 # 50 is distance btw 6th axis and the extended end-effector
@@ -50,7 +51,8 @@ todo:
     8. reachable workspace
     9. from a point to b point, may have mutilple soultions from ik. choose minimum thetas
     10. research spatialmath
-      
+    11. refact s1.ino
+    12. use 'g' command, like 3-d printer. 
     
 """
 """
@@ -100,16 +102,20 @@ def main() -> None:
     # )
 
     # there must be a delay here right after sieal is initialized
-    sleep(1)    # don't remove this line!!!
-    
+    sleep(1)  # don't remove this line!!!
     smallRobotArm.enable()
-    sleep(2)
-    smallRobotArm.move_to_angles(robot_rest_angles)
-    sleep(1)
+
+    # sleep(1)
+    """this won't work coz 1. the motors don't have encoder. 2. If your robot uses incremental encoders, it loses its position when power is cycled or the program is restarted.
+    Solution: Implement homing at startup using absolute encoders or external reference sensors.e motors have no encoder to record previous angles.
+    """
+    # smallRobotArm.move_to_angles(robot_rest_angles)
+    # sleep(1)
+
     # zero positon (see fig1)
-    j = (0, 0, 0, 0, 0, 0)
-    smallRobotArm.move_to_angles(j)
-    input("Press Enter to continue...")
+    # j = (0, 0, 0, 0, 0, 0)
+    # smallRobotArm.move_to_angles(j)
+    # input("Press Enter to continue...")
     # sleep(1)
 
     """
@@ -281,28 +287,28 @@ def main() -> None:
                     )
 
             # ask arduino to run goTractory(Xx)
-            cmd = {"header": "m", "joint_angle": Xx, "ack": False}
+            cmd = {"header": "m", "joint_angle": Xx, "ack": True}
             # print(f"Xx: {Xx}")
             smallRobotArm.conn.send2Arduino(cmd)
             # must be a delay here. ack takes too long causing discontinued arm movement.
-            sleep(1 / 5)
+            # sleep(0.3)
             curr_time = perf_counter()
-            
+
         input("Press Enter to continue...")
-        
+
         # this is to set ji in arduino coz of from and to args for goStrightLine
-        T_0C = smallRobotArm.pose2T((47.96, 0.0, 268.02, 180, 94.61, 180.0))
-        # T_0C = smallRobotArm.pose2T((110, 323.2, 320, 0.0, -60.0, 0.0))
-        T_06 = T_0C @ T_C6_inv
-        ji = smallRobotArm.ik(T_06)
-        # ji = smallRobotArm.ik((264.5 - 120, 70.0 + 100, 355.0, 0.0, -60.0, 0.0))
-        cmd = {"header": "c", "joint_angle": ji, "ack": False}
-        smallRobotArm.conn.send2Arduino(cmd)
+        # T_0C = smallRobotArm.pose2T(rest_pose)
+        # # T_0C = smallRobotArm.pose2T((110, 323.2, 320, 0.0, -60.0, 0.0))
+        # T_06 = T_0C @ T_C6_inv
+        # ji = smallRobotArm.ik(T_06)
+        # # ji = smallRobotArm.ik((264.5 - 120, 70.0 + 100, 355.0, 0.0, -60.0, 0.0))
+        # cmd = {"header": "c", "joint_angle": ji, "ack": False}
+        # smallRobotArm.conn.send2Arduino(cmd)
 
     # smallRobotArm.moveTo([47.96, 0.0, 268.02, 180, 94.61, 180.0])
     # initPose[0:3] = [11.31000000e02, 1.94968772e-31, 2.78500000e02]
     # initPose[3:6] = [10.00000000e00, 1.27222187e-14, 1.80000000e02]
-    sleep(5)
+    sleep(2)
     # rest pose
     smallRobotArm.move_to_angles(robot_rest_angles)
     smallRobotArm.disable()
