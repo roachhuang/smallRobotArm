@@ -53,9 +53,9 @@ todo:
     10. research spatialmath
     11. refact s1.ino
     12. use 'g' command, like 3-d printer. 
-    
-"""
-"""
+    13. ik takes desired pose of end-effector frame relative to the world frame.
+    14. ik and fk must take world frame and end-effector frame into consideration.
+    what about cup frame? ask gpt.
     always use np.array coz it can represent any number of dimensions (vectors, matrices, tensors, etc.). 
 """
 
@@ -87,12 +87,7 @@ def main() -> None:
     rest_pose = smallRobotArm.fk(robot_rest_angles)
     print(f"rest pose: {rest_pose}")
 
-    # tool frame. this is for generating Tc6 (cup to {6})
-    # 50mm is the distance btw frame6 to end-effector
-    # tc6 = smallRobotArm.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
-    # hand made T_C6: gripper's len + x:180,y:-90, z:0. see their coordiation system.
-    T_C6 = np.array([[0, 0, 1, 0], [0, -1, 0, 0], [1, 0, 0, 50], [0, 0, 0, 1]])
-    T_C6_inv = np.linalg.inv(T_C6)
+    
 
     # print(
     #     "std_dh_tbl =\n"
@@ -134,6 +129,7 @@ def main() -> None:
         ])
         then convert the R into degrees in 'ZYZ' sequence
     """
+    # end-effector pose = the position and orientation of the robot's last link (often frame 6) relative to the robot's base frame (frame 0).
     poses0 = np.array(
         [
             # todo: fk j = (0, 0, 0, 0, 0, 0) to see if it is home
@@ -174,6 +170,7 @@ def main() -> None:
     # )
 
     # we use ntu example: orientation with euler FIXED angles
+    # Cup poses wrt world frame {0}.
     poses = np.array(
         [
             (0, 264.5 + 19, 70.0 + 20, 60, 0, 0.0, 35.0),
@@ -190,11 +187,10 @@ def main() -> None:
 
     if bTrajectory == False:
         for pose in poses0:
+            # poses' coordiation system is end-effector's wrt world frame.
+            T_0E = smallRobotArm.pose2T(pose, seq="ZYZ")            
             # euler angles ZYZ according to smallrobot arm's demo
-            T_0C = smallRobotArm.pose2T(pose, seq="ZYZ")
-            # T_0C = smallRobotArm.pose2T(pose[1:7], seq="xyz")
-            T_06 = T_0C @ T_C6_inv
-            j = smallRobotArm.ik(T_06)
+            j = smallRobotArm.ik(T_0E)
             print("my q:", j)
             (position, euler_zyz) = smallRobotArm.fk(j)
             print(f"my fk, p:{position}, o:{euler_zyz}")
@@ -211,8 +207,8 @@ def main() -> None:
     else:
         # this line is required coz reach to this pose at 0 sec as the poses says. ntu: fixed euler anglers
         T_0C_at_0s = smallRobotArm.pose2T(poses[0, 1:7], seq="xyz")
-        T_06_at_0s = T_0C_at_0s @ T_C6_inv
-        j = smallRobotArm.ik(T_06_at_0s)
+        T_0E_at_0s = T_0C_at_0s @ smallRobotArm.T_EC_inv
+        j = smallRobotArm.ik(T_0E_at_0s)
         smallRobotArm.move_to_angles(j)
         # traj planning in joint-space.
         """
@@ -223,9 +219,9 @@ def main() -> None:
             # col 0 are time data
             _, *p = pose
             # fixed angles according to NTU course
-            T_0C = smallRobotArm.pose2T(p, seq="xyz")
-            T_06 = T_0C @ T_C6_inv
-            joints[i, 1:7] = smallRobotArm.ik(T_06)
+            T_0C = smallRobotArm.pose2T(p, seq="xyz")            
+            T_0E = T_0C @ smallRobotArm.T_EC_inv
+            joints[i, 1:7] = smallRobotArm.ik(T_0E)
 
         # display easily readable ik resutls on the screen
         J = pd.DataFrame(joints, columns=["ti", "q1", "q2", "q3", "q4", "q5", "q6"])

@@ -165,7 +165,17 @@ class SmallRbtArm(RobotArm):
         self.th_offset = (0.0, -np.pi / 2, 0.0, 0.0, 0.0, 0.0)
         self.conn = ser.SerialPort()
         self.conn.connect()
-
+        self.cup_height = 50
+        # 4x4 transformation matrix from end-effector frame to cup frame
+        self.T_EC=np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 50/2], [0, 0, 0, 1]])
+        self.T_EC_inv=np.linalg.inv(self.T_EC)
+        # tool frame. this is for generating T_6E (end-effector/gripper to {6})
+        # 50mm is the distance btw frame6 to end-effector
+        # t_6E = smallRobotArm.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
+        # hand made T_6E: gripper's len + x:180,y:-90, z:0. see their coordiation system.
+        self.T_6E = np.array([[0, 0, 1, 0], [0, -1, 0, 0], [1, 0, 0, 50], [0, 0, 0, 1]])
+        self.T_6E_inv = np.linalg.inv(self.T_6E)
+        
     def limit_joint_angles(self, angles):
         """Limits joint angles to specified max/min values."""
         if len(angles) != len(self.max_limits) or len(angles) != len(self.min_limits):
@@ -198,8 +208,10 @@ class SmallRbtArm(RobotArm):
         self.conn.send2Arduino(cmd)
 
     @hlp.timer
-    def ik(self, T_06: np.array) -> tuple | None:
+    def ik(self, T_0E: np.array) -> tuple | None:
         """
+        in general, the T taken in is the desired pose of the end-effector frame relative to the world frame)
+        
         arg:
             pose: end-effector pose in cartension space.
             position is retrieve from T_06.
@@ -214,6 +226,7 @@ class SmallRbtArm(RobotArm):
         d6 = self.dhTbl[5, 2]
 
         Jik = np.zeros((6,), dtype=np.float64)
+        T_06 = T_0E @ self.T_6E_inv
         wrist_position = T_06[:3, 3] - d6 * T_06[:3, 2]
 
         try:
@@ -322,10 +335,10 @@ class SmallRbtArm(RobotArm):
         # theta = np.deg2rad(Jfk)
         # alfa = np.deg2rad(alfa)
 
-        # work frame
-        Twf = self.pose2T([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        # world frame, there is a 25mm offset in z direction btw world frame and frame0
+        Twf = self.pose2T([0.0, 0.0, 0.0, 0.0, 0.0, 0.0], seq='ZYZ')
         # even with std_dh_tbl, we still need to give last link's offset for end-effector.
-        Tft = self.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
+        Tft = self.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0], seq='ZYZ')
         # tool frame
         # Tft = self.pose2T([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
