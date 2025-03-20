@@ -1,11 +1,6 @@
 // 0.00  0.01  0.46  3.14  2.04 -1.57
 
-// #include <math.h>
 //#include <SoftwareSerial.h>
-
-//#define PI 3.1415926535897932384626433832795
-
-// kk-p20/15
 #define END_EFFECTOR_PIN 16
 //driver for the axis 1
 #define PUL1_PIN 39
@@ -41,12 +36,21 @@ float curPos5 = -90.0;
 float curPos6 = 0.0;
 // float Ji[6] = { curPos1, curPos2, curPos3, curPos4, curPos5, curPos6 };  //{x, y, z, ZYZ Euler angles} home position
 
-boolean PULstat1 = 0;
-boolean PULstat2 = 0;
-boolean PULstat3 = 0;
-boolean PULstat4 = 0;
-boolean PULstat5 = 0;
-boolean PULstat6 = 0;
+// Motor step direction flags
+volatile bool dir1 = false;
+volatile bool dir2 = false;
+volatile bool dir3 = false;
+volatile bool dir4 = false;
+volatile bool dir5 = false;
+volatile bool dir6 = false;
+
+// Motor pulsing flags
+volatile bool PULstat1 = false;
+volatile bool PULstat2 = false;
+volatile bool PULstat3 = false;
+volatile bool PULstat4 = false;
+volatile bool PULstat5 = false;
+volatile bool PULstat6 = false;
 
 //robot geometry
 /*
@@ -56,14 +60,23 @@ This means that for every 4.8 rotations of the motor, the output shaft of the ge
 So, the 4.8 is a ratio. in essence, it calculates the degrees of rotation of the final output shaft per microstep, considering the gear reduction.
 */
 // the motors are 200 steps /rev (50 teeth*4phase), microstepping=32
-// step per degree = 200*32/360
 const double dl1 = 360.0 / 200.0 / 32.0 / 4.8;  // 4.8 is gear ratio
 const double dl2 = 360.0 / 200.0 / 32.0 / 4.0;
 const double dl3 = 360.0 / 200.0 / 32.0 / 5.0;
 const double dl4 = 360.0 / 200.0 / 32.0 / 2.8;
 const double dl5 = 360.0 / 200.0 / 32.0 / 2.1;
 const double dl6 = 360.0 / 200.0 / 32.0 / 1.0;
+// Target joint positions
+volatile float targetPos1 = 0.0;
+volatile float targetPos2 = 0.0;
+volatile float targetPos3 = 0.0;
+volatile float targetPos4 = 0.0;
+volatile float targetPos5 = 0.0;
+volatile float targetPos6 = 0.0;
 
+// Stepping enable flag
+volatile bool stepping = false;
+volatile bool lastSteppingState = false;
 // String dataIn = ""; //variable to store the bluetooth command
 // int index = 0; //index corresonding to the robot position
 // float Joint1[50], Joint2[50], Joint3[50], Joint4[50], Joint5[50], Joint6[50], MaxSpeed[50], InSpeed[50], FinSpeed[50];
@@ -71,17 +84,9 @@ const uint8_t ledPin = 13;  // the LED is connected to digital pin 13
 
 float X[6] = { 0.00, 0.00, 0.00, 0.00, 0.00, 0.00 };
 float velG = 0;
-/*
-  int i = 0;
-  int j = 0;
-  int k = 0;
-  float J[4][7];  // col 0: timing
-  float V[5][6];  // plus head and tail
-  float A[5][6];  // plus head and tail
-*/
 
 // float* splitStringToFloatArray(char* str);
-const int MAX_INPUT_SIZE = 100;  // Adjust as needed
+const int MAX_INPUT_SIZE = 256;  // Adjust as needed
 char inputBuffer[MAX_INPUT_SIZE];
 int inputIndex = 0;
 
@@ -99,23 +104,8 @@ float* splitStringToFloatArray(char* str) {
   while (count < 6) {
     arr[count++] = 0.0;
   }
-
   return arr;
 }
-
-#include <TimerOne.h>
-volatile int motor1StepsRemaining = 0;
-volatile int motor2StepsRemaining = 0;
-volatile unsigned long lastStepTime = 0;  // Last time step was made
-// if we want a joint rotate 60 degrees per sec, 60 * 60/360 = 10rpm.
-unsigned int pulse_freq = 1 / (10 * dl1 / 60) * 1000;                               // rpm * steps per degree/60=hz, 1/hz*1000=ms
-const unsigned long stepInterval = pulse_freq / 100;                                // ISR timer interrupt freq to be at least 100 time higher than the pulse rate.
-const int stepsPerRevolution = 200;                                                 // Number of steps per motor revolution
-const int microsteps = 16;                                                          // Number of microsteps per full step
-const float gearRatio = 4.8;                                                        // Gear ratio
-const double stepsPerDegree = 360.0 / stepsPerRevolution / microsteps / gearRatio;  // Steps per degree
-unsigned long currentMillis = 0;                                                    // To store current time for non-blocking logic
-
 
 void setup() {
   pinMode(ledPin, OUTPUT);
@@ -166,19 +156,37 @@ void setup() {
   digitalWrite(EN5_PIN, HIGH);
   digitalWrite(EN6_PIN, HIGH);
 
-  // Set up Timer1 to trigger an interrupt every xxx microseconds
-  Timer1.initialize(stepInterval * 1000);  // 100 times higher than the pulse rate.
-  Timer1.attachInterrupt(stepMotorsISR);
- 
   Serial.begin(115200);
+  /*
+  The Arduino Mega 2560 typically uses a 16 MHz clock.
+  We need to determine the prescaler and OCR1A value that will give us a 15-microsecond interrupt period.
+  Formula: Interrupt Period = (OCR1A + 1) * Prescaler / Clock Frequency
+  Rearranging: OCR1A = (Interrupt Period * Clock Frequency / Prescaler) - 1
+  Let's try a prescaler of 8.
+
+    OCR1A = (30 * 10^-6 * 16 * 10^6 / 8) - 1
+    OCR1A = (480 / 8) - 1
+    OCR1A = 59.
+  This result in an interrupt period that is very close to 15 micro seconds.
+  */
+  // Disable interrupts during setup
+  cli();
+  // Set CTC mode
+  TCCR1B = (1 << WGM12);
+  // Set prescaler to 8
+  TCCR1B |= (1 << CS11);
+  // Set OCR1A value
+  OCR1A = 300;  // 150 us
+  // Enable compare match interrupt
+  TIMSK1 |= (1 << OCIE1A);
+  // Enable interrupts
+  sei();
 }
 
 void loop() {
   // float velG = 0.25e-4;
-
   if (Serial.available() > 0) {
     char c = Serial.read();
-
     if (c == '\n') {
       inputBuffer[inputIndex] = '\0';
       inputIndex = 0;
@@ -190,21 +198,14 @@ void loop() {
       if (strncmp(inputBuffer, "m", 1) == 0) {
         float* j_over_time = splitStringToFloatArray(val);
         goTrajectory(j_over_time);
-        Serial.println("ack");
       } else if (strncmp(inputBuffer, "g", 1) == 0) {
         // The 'g' command is designed for incremental movements. Instead of specifying absolute joint angles, you specify how much each joint should move relative to its current position.
         float* targetAngles = splitStringToFloatArray(val);
         float from[6] = { curPos1, curPos2, curPos3, curPos4, curPos5, curPos6 };
         goStrightLine(from, targetAngles, 0.25e-4, 0.75e-10, 0.0, 0.0);
-       
-        curPos1 = targetAngles[0];
-        curPos2 = targetAngles[1];
-        curPos3 = targetAngles[2];
-        curPos4 = targetAngles[3];
-        curPos5 = targetAngles[4];
-        curPos6 = targetAngles[5];
-        // velG = 0.25e-4;
-        Serial.println("ack");
+        // Serial.println("ack");
+
+        velG = 0.25e-4;
       } else if (strcmp(inputBuffer, "eOn") == 0) {
         digitalWrite(END_EFFECTOR_PIN, HIGH);
       } else if (strcmp(inputBuffer, "eOff") == 0) {
@@ -226,7 +227,23 @@ void loop() {
       inputBuffer[inputIndex++] = c;
     }
   }
-  // delay(10);
+
+  cli();
+  bool isSteppingDone = (!stepping && lastSteppingState);
+  lastSteppingState = stepping; 
+  sei();
+  if (isSteppingDone) {
+    // curPos1 = targetAngles[0];
+    // curPos2 = targetAngles[1];
+    // curPos3 = targetAngles[2];
+    // curPos4 = targetAngles[3];
+    // curPos5 = targetAngles[4];
+    // curPos6 = targetAngles[5];
+    Serial.println("ack");
+  }
+
+  // Small delay to prevent serial communication interference
+  delayMicroseconds(20);  // Adjust to a suitable value (e.g., 50 or 100)
 }
 
 void goStrightLine(float* xfi, float* xff, float vel0, float acc0, float velini, float velfin) {
@@ -275,216 +292,113 @@ void goStrightLine(float* xfi, float* xff, float vel0, float acc0, float velini,
   }
 }
 
-// low level control: this function takes care of gear ratios, we just give degrees for the joints to move from their current positions to the target positions.
 void goTrajectory(float Jf[]) {
-  const int delF = 2;
+  targetPos1 = Jf[0];
+  targetPos2 = Jf[1];
+  targetPos3 = Jf[2];
+  targetPos4 = Jf[3];
+  targetPos5 = Jf[4];
+  targetPos6 = Jf[5];
 
-  //execution
-  // joint #1
-  if (Jf[0] - curPos1 > 0.0) {
-    // positive direction of rotation - CCW
-    digitalWrite(DIR1_PIN, HIGH);
-    // why dl /2? coz each puls takes one microstep. there are +/- puls 
-    while (Jf[0] - curPos1 > dl1 / 2.0) {
-      if (PULstat1 == 0) {
-        digitalWrite(PUL1_PIN, HIGH);
-        PULstat1 = 1;
-      } else {
-        digitalWrite(PUL1_PIN, LOW);
-        PULstat1 = 0;
-      }
-      //curPos1 = Jf[0];
-      curPos1 = curPos1 + dl1 / 2.0;
-      if (Jf[0] - curPos1 > dl1 / 2.0) {
-        delayMicroseconds(delF);
-      }
-    }
-  } else {
-    // neg direction roatiaon - CW rotation.
-    digitalWrite(DIR1_PIN, LOW);
-    while (-Jf[0] + curPos1 > dl1 / 2.0) {
-      if (PULstat1 == 0) {
-        digitalWrite(PUL1_PIN, HIGH);
-        PULstat1 = 1;
-      } else {
-        digitalWrite(PUL1_PIN, LOW);
-        PULstat1 = 0;
-      }
-      //curPos1 = Jf[0];
-      curPos1 = curPos1 - dl1 / 2.0;
-      if (-Jf[0] + curPos1 > dl1 / 2.0) {
-        delayMicroseconds(delF);
-      }
-    }
-  }
-  // joint #2
-  if (Jf[1] - curPos2 > 0.0) {  // positive direction of rotation
-    digitalWrite(DIR2_PIN, HIGH);
-    while (Jf[1] - curPos2 > dl2 / 2.0) {
-      if (PULstat2 == 0) {
-        digitalWrite(PUL2_PIN, HIGH);
-        PULstat2 = 1;
-      } else {
-        digitalWrite(PUL2_PIN, LOW);
-        PULstat2 = 0;
-      }
-      //curPos2 = Jf[1];
-      curPos2 = curPos2 + dl2 / 2.0;
-      if (Jf[1] - curPos2 > dl2 / 2.0) {
-        delayMicroseconds(delF);
-      }
-    }
-  } else {
-    digitalWrite(DIR2_PIN, LOW);
-    while (-Jf[1] + curPos2 > dl2 / 2.0) {
-      if (PULstat2 == 0) {
-        digitalWrite(PUL2_PIN, HIGH);
-        PULstat2 = 1;
-      } else {
-        digitalWrite(PUL2_PIN, LOW);
-        PULstat2 = 0;
-      }
-      //curPos2 = Jf[1];
-      curPos2 = curPos2 - dl2 / 2.0;
-      if (-Jf[1] + curPos2 > dl2 / 2.0) {
-        delayMicroseconds(delF);
-      }
-    }
-  }
-  // joint #3
-  if (Jf[2] - curPos3 > 0.0) {  // positive direction of rotation
-    digitalWrite(DIR3_PIN, LOW);
-    while (Jf[2] - curPos3 > dl3 / 2.0) {
-      if (PULstat3 == 0) {
-        digitalWrite(PUL3_PIN, HIGH);
-        PULstat3 = 1;
-      } else {
-        digitalWrite(PUL3_PIN, LOW);
-        PULstat3 = 0;
-      }
-      //curPos3 = Jf[2];
-      curPos3 = curPos3 + dl3 / 2.0;
-      if (Jf[2] - curPos3 > dl3 / 2.0) {
-        delayMicroseconds(delF);
-      }
-    }
-  } else {
-    digitalWrite(DIR3_PIN, HIGH);
-    while (-Jf[2] + curPos3 > dl3 / 2.0) {
-      if (PULstat3 == 0) {
-        digitalWrite(PUL3_PIN, HIGH);
-        PULstat3 = 1;
-      } else {
-        digitalWrite(PUL3_PIN, LOW);
-        PULstat3 = 0;
-      }
-      //curPos3 = Jf[2];
-      curPos3 = curPos3 - dl3 / 2.0;
-      if (-Jf[2] + curPos3 > dl3 / 2.0) {
-        delayMicroseconds(delF);
-      }
-    }
-  }
-  // joint #4
-  if (Jf[3] - curPos4 > 0.0) {  // positive direction of rotation
-    digitalWrite(DIR4_PIN, HIGH);
-    while (Jf[3] - curPos4 > dl4 / 2.0) {
-      if (PULstat4 == 0) {
-        digitalWrite(PUL4_PIN, HIGH);
-        PULstat4 = 1;
-      } else {
-        digitalWrite(PUL4_PIN, LOW);
-        PULstat4 = 0;
-      }
-      //curPos4 = Jf[3];
-      curPos4 = curPos4 + dl4 / 2.0;
-      if (Jf[3] - curPos4 > dl4 / 2.0) {
-        delayMicroseconds(delF);
-      }
-    }
-  } else {
-    digitalWrite(DIR4_PIN, LOW);
-    while (-Jf[3] + curPos4 > dl4 / 2.0) {
-      if (PULstat4 == 0) {
-        digitalWrite(PUL4_PIN, HIGH);
-        PULstat4 = 1;
-      } else {
-        digitalWrite(PUL4_PIN, LOW);
-        PULstat4 = 0;
-      }
-      //curPos4 = Jf[3];
-      curPos4 = curPos4 - dl4 / 2.0;
-      if (-Jf[3] + curPos4 > dl4 / 2.0) {
-        delayMicroseconds(delF);
-      }
-    }
-  }
-  // joint #5
-  if (Jf[4] - curPos5 > 0.0) {  // positive direction of rotation
-    digitalWrite(DIR5_PIN, HIGH);
-    while (Jf[4] - curPos5 > dl5 / 2.0) {
-      if (PULstat5 == 0) {
-        digitalWrite(PUL5_PIN, HIGH);
-        PULstat5 = 1;
-      } else {
-        digitalWrite(PUL5_PIN, LOW);
-        PULstat5 = 0;
-      }
-      //curPos5 = Jf[4];
-      curPos5 = curPos5 + dl5 / 2.0;
-      if (Jf[4] - curPos5 > dl5 / 2.0) {
-        delayMicroseconds(delF);
-      }
-    }
-  } else {
-    digitalWrite(DIR5_PIN, LOW);
-    while (-Jf[4] + curPos5 > dl5 / 2.0) {
-      if (PULstat5 == 0) {
-        digitalWrite(PUL5_PIN, HIGH);
-        PULstat5 = 1;
-      } else {
-        digitalWrite(PUL5_PIN, LOW);
-        PULstat5 = 0;
-      }
-      //curPos5 = Jf[4];
-      curPos5 = curPos5 - dl5 / 2.0;
-      if (-Jf[4] + curPos5 > dl5 / 2.0) {
-        delayMicroseconds(delF);
-      }
-    }
-  }
-  // joint #6
-  if (Jf[5] - curPos6 > 0.0) {  // positive direction of rotation
-    digitalWrite(DIR6_PIN, HIGH);
-    while (Jf[5] - curPos6 > dl6 / 2.0) {
-      if (PULstat6 == 0) {
-        digitalWrite(PUL6_PIN, HIGH);
-        PULstat6 = 1;
-      } else {
-        digitalWrite(PUL6_PIN, LOW);
-        PULstat6 = 0;
-      }
-      //curPos6 = Jf[5];
-      curPos6 = curPos6 + dl6 / 2.0;
-      if (Jf[5] - curPos6 > dl6 / 2.0) {
-        delayMicroseconds(delF);
-      }
-    }
-  } else {
-    digitalWrite(DIR6_PIN, LOW);
-    while (-Jf[5] + curPos6 > dl6 / 2.0) {
-      if (PULstat6 == 0) {
-        digitalWrite(PUL6_PIN, HIGH);
-        PULstat6 = 1;
-      } else {
-        digitalWrite(PUL6_PIN, LOW);
-        PULstat6 = 0;
-      }
-      //curPos6 = Jf[5];
-      curPos6 = curPos6 - dl6 / 2.0;
-      if (-Jf[5] + curPos6 > dl6 / 2.0) {
-        delayMicroseconds(delF);
-      }
-    }
+  dir1 = (targetPos1 > curPos1);
+  dir2 = (targetPos2 > curPos2);
+  dir3 = (targetPos3 > curPos3);
+  dir4 = (targetPos4 > curPos4);
+  dir5 = (targetPos5 > curPos5);
+  dir6 = (targetPos6 > curPos6);
+  // noInterrupts();  // Disable interrupts; no shared var are being modified inside the ISR during this fn.
+  stepping = true;
+  // interrupts();  // Re-enable interrupts
+}
+
+ISR(TIMER1_COMPA_vect) {
+  if (stepping) {
+    stepMotors();
   }
 }
+
+void stepMotors() {
+  bool allMotorsStopped = true;
+
+  // Joint 1
+  if (abs(targetPos1 - curPos1) > dl1 / 2.0) {
+    digitalWrite(DIR1_PIN, dir1 ? HIGH : LOW);
+    digitalWrite(PUL1_PIN, PULstat1 ? LOW : HIGH);
+    PULstat1 = !PULstat1;
+    curPos1 += dir1 ? dl1 / 2.0 : -dl1 / 2.0;
+    allMotorsStopped = false;
+  }
+
+  // Joint 2
+  if (abs(targetPos2 - curPos2) > dl2 / 2.0) {
+    digitalWrite(DIR2_PIN, dir2 ? HIGH : LOW);
+    digitalWrite(PUL2_PIN, PULstat2 ? LOW : HIGH);
+    PULstat2 = !PULstat2;
+    curPos2 += dir2 ? dl2 / 2.0 : -dl2 / 2.0;
+    allMotorsStopped = false;
+  }
+
+  // Joint 3
+  if (abs(targetPos3 - curPos3) > dl3 / 2.0) {
+    digitalWrite(DIR3_PIN, dir3 ? LOW : HIGH);  // Reversed direction
+    digitalWrite(PUL3_PIN, PULstat3 ? LOW : HIGH);
+    PULstat3 = !PULstat3;
+    curPos3 += dir3 ? dl3 / 2.0 : -dl3 / 2.0;
+    allMotorsStopped = false;
+  }
+
+  // Joint 4
+  if (abs(targetPos4 - curPos4) > dl4 / 2.0) {
+    digitalWrite(DIR4_PIN, dir4 ? HIGH : LOW);
+    digitalWrite(PUL4_PIN, PULstat4 ? LOW : HIGH);
+    PULstat4 = !PULstat4;
+    curPos4 += dir4 ? dl4 / 2.0 : -dl4 / 2.0;
+    allMotorsStopped = false;
+  }
+
+  // Joint 5
+  if (abs(targetPos5 - curPos5) > dl5 / 2.0) {
+    digitalWrite(DIR5_PIN, dir5 ? HIGH : LOW);
+    digitalWrite(PUL5_PIN, PULstat5 ? LOW : HIGH);
+    PULstat5 = !PULstat5;
+    curPos5 += dir5 ? dl5 / 2.0 : -dl5 / 2.0;
+    allMotorsStopped = false;
+  }
+
+  // Joint 6
+  if (abs(targetPos6 - curPos6) > dl6 / 2.0) {
+    digitalWrite(DIR6_PIN, dir6 ? HIGH : LOW);
+    digitalWrite(PUL6_PIN, PULstat6 ? LOW : HIGH);
+    PULstat6 = !PULstat6;
+    curPos6 += dir6 ? dl6 / 2.0 : -dl6 / 2.0;
+    allMotorsStopped = false;
+  }
+
+  if (allMotorsStopped) {
+    stepping = false;
+  }
+
+  // OCR1A = 300; // micro second
+}
+
+/*
+void stepMotors() {
+  unsigned long currentTime = micros();
+  if (currentTime >= nextStepTime) {
+    bool allMotorsStopped = true;
+    for (int i = 0; i < 6; i++) {
+      if (motors[i].stepsRemaining > 0) {
+        digitalWrite(motors[i].pulPin, HIGH);
+        digitalWrite(motors[i].pulPin, LOW);
+        motors[i].stepsRemaining--;
+        motors[i].curPos += (digitalRead(motors[i].dirPin) == HIGH) ? motors[i].dl / 2.0 : -motors[i].dl / 2.0;
+        allMotorsStopped = false;
+      }
+    }
+    if (allMotorsStopped) {
+      stepping = false;
+    }
+    nextStepTime = currentTime + 1000;  // Adjust for desired step frequency
+  }
+}
+*/
