@@ -107,6 +107,7 @@ float* splitStringToFloatArray(char* str) {
   return arr;
 }
 
+#include <TimerOne.h>
 void setup() {
   pinMode(ledPin, OUTPUT);
   digitalWrite(ledPin, HIGH);
@@ -157,30 +158,10 @@ void setup() {
   digitalWrite(EN6_PIN, HIGH);
 
   Serial.begin(115200);
-  /*
-  The Arduino Mega 2560 typically uses a 16 MHz clock.
-  We need to determine the prescaler and OCR1A value that will give us a 15-microsecond interrupt period.
-  Formula: Interrupt Period = (OCR1A + 1) * Prescaler / Clock Frequency
-  Rearranging: OCR1A = (Interrupt Period * Clock Frequency / Prescaler) - 1
-  Let's try a prescaler of 8.
-
-    OCR1A = (30 * 10^-6 * 16 * 10^6 / 8) - 1
-    OCR1A = (480 / 8) - 1
-    OCR1A = 59.
-  This result in an interrupt period that is very close to 15 micro seconds.
-  */
-  // Disable interrupts during setup
-  cli();
-  // Set CTC mode
-  TCCR1B = (1 << WGM12);
-  // Set prescaler to 8
-  TCCR1B |= (1 << CS11);
-  // Set OCR1A value
-  OCR1A = 300;  // 150 us
-  // Enable compare match interrupt
-  TIMSK1 |= (1 << OCIE1A);
-  // Enable interrupts
-  sei();
+  //The Arduino Mega 2560 typically uses a 16 MHz clock.
+  Timer1.initialize(150);  // 3 times higher than the pulse rate.
+  Timer1.start();
+  Timer1.attachInterrupt(ISR_routine);  
 }
 
 void loop() {
@@ -243,7 +224,7 @@ void loop() {
   }
 
   // Small delay to prevent serial communication interference
-  delayMicroseconds(20);  // Adjust to a suitable value (e.g., 50 or 100)
+  delayMicroseconds(50);  // Adjust to a suitable value (e.g., 50 or 100)
 }
 
 void goStrightLine(float* xfi, float* xff, float vel0, float acc0, float velini, float velfin) {
@@ -311,7 +292,7 @@ void goTrajectory(float Jf[]) {
   // interrupts();  // Re-enable interrupts
 }
 
-ISR(TIMER1_COMPA_vect) {
+void ISR_routine() {
   if (stepping) {
     stepMotors();
   }
