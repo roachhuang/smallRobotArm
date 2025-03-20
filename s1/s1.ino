@@ -56,6 +56,7 @@ This means that for every 4.8 rotations of the motor, the output shaft of the ge
 So, the 4.8 is a ratio. in essence, it calculates the degrees of rotation of the final output shaft per microstep, considering the gear reduction.
 */
 // the motors are 200 steps /rev (50 teeth*4phase), microstepping=32
+// step per degree = 200*32/360
 const double dl1 = 360.0 / 200.0 / 32.0 / 4.8;  // 4.8 is gear ratio
 const double dl2 = 360.0 / 200.0 / 32.0 / 4.0;
 const double dl3 = 360.0 / 200.0 / 32.0 / 5.0;
@@ -85,7 +86,7 @@ char inputBuffer[MAX_INPUT_SIZE];
 int inputIndex = 0;
 
 float* splitStringToFloatArray(char* str) {
-  float* arr = new float[6];
+  static float arr[6];
   int count = 0;
   char* token = strtok(str, ",");
 
@@ -101,6 +102,20 @@ float* splitStringToFloatArray(char* str) {
 
   return arr;
 }
+
+#include <TimerOne.h>
+volatile int motor1StepsRemaining = 0;
+volatile int motor2StepsRemaining = 0;
+volatile unsigned long lastStepTime = 0;  // Last time step was made
+// if we want a joint rotate 60 degrees per sec, 60 * 60/360 = 10rpm.
+unsigned int pulse_freq = 1 / (10 * dl1 / 60) * 1000;                               // rpm * steps per degree/60=hz, 1/hz*1000=ms
+const unsigned long stepInterval = pulse_freq / 100;                                // ISR timer interrupt freq to be at least 100 time higher than the pulse rate.
+const int stepsPerRevolution = 200;                                                 // Number of steps per motor revolution
+const int microsteps = 16;                                                          // Number of microsteps per full step
+const float gearRatio = 4.8;                                                        // Gear ratio
+const double stepsPerDegree = 360.0 / stepsPerRevolution / microsteps / gearRatio;  // Steps per degree
+unsigned long currentMillis = 0;                                                    // To store current time for non-blocking logic
+
 
 void setup() {
   pinMode(ledPin, OUTPUT);
@@ -151,6 +166,10 @@ void setup() {
   digitalWrite(EN5_PIN, HIGH);
   digitalWrite(EN6_PIN, HIGH);
 
+  // Set up Timer1 to trigger an interrupt every xxx microseconds
+  Timer1.initialize(stepInterval * 1000);  // 100 times higher than the pulse rate.
+  Timer1.attachInterrupt(stepMotorsISR);
+ 
   Serial.begin(115200);
 }
 
@@ -172,22 +191,20 @@ void loop() {
         float* j_over_time = splitStringToFloatArray(val);
         goTrajectory(j_over_time);
         Serial.println("ack");
-        delete[] j_over_time;
-        // Serial.println("ack m");
       } else if (strncmp(inputBuffer, "g", 1) == 0) {
         // The 'g' command is designed for incremental movements. Instead of specifying absolute joint angles, you specify how much each joint should move relative to its current position.
         float* targetAngles = splitStringToFloatArray(val);
         float from[6] = { curPos1, curPos2, curPos3, curPos4, curPos5, curPos6 };
         goStrightLine(from, targetAngles, 0.25e-4, 0.75e-10, 0.0, 0.0);
-        Serial.println("ack");
+       
         curPos1 = targetAngles[0];
         curPos2 = targetAngles[1];
         curPos3 = targetAngles[2];
         curPos4 = targetAngles[3];
         curPos5 = targetAngles[4];
         curPos6 = targetAngles[5];
-        delete[] targetAngles;
-        velG = 0.25e-4;
+        // velG = 0.25e-4;
+        Serial.println("ack");
       } else if (strcmp(inputBuffer, "eOn") == 0) {
         digitalWrite(END_EFFECTOR_PIN, HIGH);
       } else if (strcmp(inputBuffer, "eOff") == 0) {
@@ -267,6 +284,7 @@ void goTrajectory(float Jf[]) {
   if (Jf[0] - curPos1 > 0.0) {
     // positive direction of rotation - CCW
     digitalWrite(DIR1_PIN, HIGH);
+    // why dl /2? coz each puls takes one microstep. there are +/- puls 
     while (Jf[0] - curPos1 > dl1 / 2.0) {
       if (PULstat1 == 0) {
         digitalWrite(PUL1_PIN, HIGH);
