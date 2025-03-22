@@ -2,7 +2,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
-from roboticstoolbox import DHRobot, RevoluteDH
+# from roboticstoolbox import DHRobot, RevoluteDH
 from spatialmath import SE3
 # from roboticstoolbox.backends.PyPlot import PyPlot
 import robotarm_class as smRbt
@@ -82,9 +82,9 @@ class Application(tk.Frame):
         # j = sm_rbt_arm.ik(pose)
         T = SE3(pose[0],  pose[1], pose[2]) * SE3.Rz(np.radians(pose[3])
                                                      ) * SE3.Ry(np.radians(pose[4])) * SE3.Rz(np.radians(pose[5]))
-        j = robot.ikine_LM(T)
-        q = np.degrees(j.q)
-
+        # j = robot.ikine_LM(T)
+        # q = np.degrees(j.q)
+        q= smRbt.ik(T)
         for i in range(6):
             self.sliders[i].set(q[i])
         self.send_command()
@@ -93,7 +93,7 @@ class Application(tk.Frame):
         # example of joint angle update
         # q = frame / 100 * np.array([np.pi/2, np.pi/4, np.pi/2, 0, 0, 0])
         q = np.radians(self.__from_deg + self.__d_deg/frame)
-        robot.plot(q, fig=fig, block=False)  # , fig=fig, backend="pyplot")
+        # robot.plot(q, fig=fig, block=False)  # , fig=fig, backend="pyplot")
 
         # animate is async, so we need to do this at here
         if frame == 1:
@@ -146,13 +146,13 @@ class Application(tk.Frame):
         plt.show()
 
         command = "g{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}\n".format(
-            *self.__d_deg)
+            *self.__to_deg)
         print(command)
         # send the command to the Arduino  
-        cmd = {'header': 'g', 'joint_angle': self.__d_deg, 'ack': False}
+        cmd = {'header': 'g', 'joint_angle': self.__to_deg, 'ack': True}
         smallRobotArm.conn.send2Arduino(cmd)
-        self.send_button.configure(state='disabled')
-        self.reset_button.configure(state='disabled')
+        # self.send_button.configure(state='disabled')
+        # self.reset_button.configure(state='disabled')
 
     def on_checkbox_click(self):
         if self.chkbox_state.get() == False:
@@ -225,31 +225,44 @@ if __name__ == "__main__":
     #a1, a2, a3 = 47.0, 110.0, 26.0
     #d1, d4, d6 = 133.0, 117.50, 28.0
 
-    dh_params = [
-        RevoluteDH(d=d1, a=a1, alpha=-np.pi/2),    # joint 1
-        RevoluteDH(d=0, a=a2, alpha=0, offset=-np.pi/2),             # joint 2
-        RevoluteDH(d=0, a=a3, alpha=-np.pi/2),      # joint 3
-        RevoluteDH(d=d4, a=0, alpha=np.pi/2),       # joint 4
-        RevoluteDH(d=0, a=0, alpha=-np.pi/2),       # joint 5
-        RevoluteDH(d=d6, a=0, alpha=0),              # joint 6
-    ]
+    # dh_params = [
+    #     RevoluteDH(d=d1, a=a1, alpha=-np.pi/2),    # joint 1
+    #     RevoluteDH(d=0, a=a2, alpha=0, offset=-np.pi/2),             # joint 2
+    #     RevoluteDH(d=0, a=a3, alpha=-np.pi/2),      # joint 3
+    #     RevoluteDH(d=d4, a=0, alpha=np.pi/2),       # joint 4
+    #     RevoluteDH(d=0, a=0, alpha=-np.pi/2),       # joint 5
+    #     RevoluteDH(d=d6, a=0, alpha=0),              # joint 6
+    # ]
+
+    std_dh_params = np.array(
+            [
+                [np.radians(-90), a1, d1],
+                [0, a2, 0],
+                [np.radians(-90), a3, 0],
+                [np.radians(90), 0, d4],
+                [np.radians(-90), 0, 0],
+                [0, 0, d6],
+            ]
+        )
 
     frames = [
         SE3.Tx(0)*SE3.Ty(0)*SE3.Tz(20),
         SE3.Rz(np.pi)*SE3.Ry(-np.pi/2)*SE3.Rz(0)
     ]
     # sm_rbt_arm = smRbt.RobotArm(dh_params)
-    smallRobotArm = smRbt.SmallRbtArm(dh_params)
+    smallRobotArm = smRbt.SmallRbtArm(std_dh_params)
     sleep(1)
     smallRobotArm.enable()
 
 
     # , base=frames[0],tool=frames[-1])
-    robot = DHRobot(dh_params, name='SmallRobotArm')
+    # robot = DHRobot(dh_params, name='SmallRobotArm')
     # fig, ax = plt.subplots()
-    print(robot.dhunique)
-    robot.isspherical()
-    print(robot.d)
+    
+    # print(robot.dhunique)
+    # robot.isspherical()
+    # print(robot.d)
+    
     # Generate some random data
     x = np.random.rand(100)
     y = np.random.rand(100)
@@ -262,8 +275,9 @@ if __name__ == "__main__":
     #ax.set_ylim(-200, 200)
     #ax.set_zlim(0, 350)
     #plt.show()
-    robot.plot([0, np.radians(-78.51), np.radians(73.9),
-               0, -np.pi/2, 0], fig=fig, backend="pyplot", block=False)
+    
+    # robot.plot([0, np.radians(-78.51), np.radians(73.9),
+            #    0, -np.pi/2, 0], fig=fig, backend="pyplot", block=False)
     root = tk.Tk()
 
     # root.resizable(True, True)
