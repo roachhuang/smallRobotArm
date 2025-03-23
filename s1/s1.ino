@@ -213,8 +213,8 @@ void loop() {
   bool isSteppingDone = (!stepping && lastSteppingState);
   lastSteppingState = stepping; 
   sei();
-  if (isSteppingDone) {
-    // curPos1 = targetAngles[0];
+  if (isSteppingDone) {    
+    // curPos1 = targetAngles[0]; // updated in isr
     // curPos2 = targetAngles[1];
     // curPos3 = targetAngles[2];
     // curPos4 = targetAngles[3];
@@ -298,61 +298,76 @@ void ISR_routine() {
   }
 }
 
+
+volatile unsigned long lastStepTime[6] = {0, 0, 0, 0, 0, 0}; // Track last step time for each joint
+const unsigned long stepDelay[6] = {0, 50, 100, 150, 200, 250}; // Staggered delays in microseconds
+
+//Pulse Interval (µs) = (60 * 1,000,000) / (200 * microstep * RMP * gear_ratio)
 void stepMotors() {
   bool allMotorsStopped = true;
-
+  unsigned long currentMicros = micros();
   // Joint 1
-  if (abs(targetPos1 - curPos1) > dl1 / 2.0) {
+  if (abs(targetPos1 - curPos1) > dl1 / 2.0 && currentMicros - lastStepTime[0] >= stepDelay[0]) {
     digitalWrite(DIR1_PIN, dir1 ? HIGH : LOW);
     digitalWrite(PUL1_PIN, PULstat1 ? LOW : HIGH);
     PULstat1 = !PULstat1;
     curPos1 += dir1 ? dl1 / 2.0 : -dl1 / 2.0;
-    allMotorsStopped = false;
+    lastStepTime[0] = currentMicros;
+    allMotorsStopped=false  
   }
 
   // Joint 2
-  if (abs(targetPos2 - curPos2) > dl2 / 2.0) {
+  if (abs(targetPos2 - curPos2) > dl2 / 2.0 && currentMicros - lastStepTime[1] >= stepDelay[1]) {
     digitalWrite(DIR2_PIN, dir2 ? HIGH : LOW);
     digitalWrite(PUL2_PIN, PULstat2 ? LOW : HIGH);
     PULstat2 = !PULstat2;
     curPos2 += dir2 ? dl2 / 2.0 : -dl2 / 2.0;
-    allMotorsStopped = false;
+    lastStepTime[1] = currentMicros;
+    allMotorsStopped=false
+  
   }
 
-  // Joint 3
-  if (abs(targetPos3 - curPos3) > dl3 / 2.0) {
-    digitalWrite(DIR3_PIN, dir3 ? LOW : HIGH);  // Reversed direction
+   // Joint 3
+   if (abs(targetPos3 - curPos3) > dl3 / 2.0 && currentMicros - lastStepTime[2] >= stepDelay[2]) {
+    digitalWrite(DIR3_PIN, dir3 ? LOW : HIGH);
     digitalWrite(PUL3_PIN, PULstat3 ? LOW : HIGH);
     PULstat3 = !PULstat3;
     curPos3 += dir3 ? dl3 / 2.0 : -dl3 / 2.0;
-    allMotorsStopped = false;
+    lastStepTime[2] = currentMicros;
+    allMotorsStopped=false
   }
+  
 
-  // Joint 4
-  if (abs(targetPos4 - curPos4) > dl4 / 2.0) {
+   // Joint 4
+   if (abs(targetPos4 - curPos4) > dl4 / 2.0 && currentMicros - lastStepTime[3] >= stepDelay[3]) {
     digitalWrite(DIR4_PIN, dir4 ? HIGH : LOW);
     digitalWrite(PUL4_PIN, PULstat4 ? LOW : HIGH);
     PULstat4 = !PULstat4;
     curPos4 += dir4 ? dl4 / 2.0 : -dl4 / 2.0;
-    allMotorsStopped = false;
+    lastStepTime[3] = currentMicros;
+    allMotorsStopped=false
   }
+  
 
   // Joint 5
-  if (abs(targetPos5 - curPos5) > dl5 / 2.0) {
+  if (abs(targetPos5 - curPos5) > dl5 / 2.0 && currentMicros - lastStepTime[4] >= stepDelay[4]) {
     digitalWrite(DIR5_PIN, dir5 ? HIGH : LOW);
     digitalWrite(PUL5_PIN, PULstat5 ? LOW : HIGH);
     PULstat5 = !PULstat5;
     curPos5 += dir5 ? dl5 / 2.0 : -dl5 / 2.0;
-    allMotorsStopped = false;
+    lastStepTime[4] = currentMicros;
+    allMotorsStopped=false
   }
+  
 
   // Joint 6
-  if (abs(targetPos6 - curPos6) > dl6 / 2.0) {
+  if (abs(targetPos6 - curPos6) > dl6 / 2.0 && currentMicros - lastStepTime[5] >= stepDelay[5]) {
     digitalWrite(DIR6_PIN, dir6 ? HIGH : LOW);
     digitalWrite(PUL6_PIN, PULstat6 ? LOW : HIGH);
     PULstat6 = !PULstat6;
     curPos6 += dir6 ? dl6 / 2.0 : -dl6 / 2.0;
-    allMotorsStopped = false;
+    lastStepTime[5] = currentMicros;
+    allMotorsStopped=false
   }
 
   if (allMotorsStopped) {
