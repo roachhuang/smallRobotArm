@@ -3,6 +3,7 @@ scipy >= 1.6
 pyserial >= 3.5
 spatialmath-python >= 1.1.14
 roboticstoolbox-python >= 1.1.1
-
+pandas >= 1.2.4
+matplotlib >= 3.3.4
 
 # pip3 install -r requirements.txt
