@@ -175,6 +175,8 @@ class SmallRbtArm(RobotArm):
         # hand made T_6E: gripper's len + x:180,y:-90, z:0. see their coordiation system.
         self.T_6E = np.array([[0, 0, 1, 0], [0, -1, 0, 0], [1, 0, 0, 50], [0, 0, 0, 1]])
         self.T_6E_inv = np.linalg.inv(self.T_6E)
+        self.T_6C = np.array([[0, 0, 1, 0], [0, -1, 0, 0], [1, 0, 0, -50/2], [0, 0, 0, 1]])
+        self.T_6C_inv = np.linalg.inv(self.T_6C)
         
     def limit_joint_angles(self, angles):
         """Limits joint angles to specified max/min values."""
@@ -208,7 +210,7 @@ class SmallRbtArm(RobotArm):
         self.conn.send2Arduino(cmd)
 
     @hlp.timer
-    def ik(self, T_0E: np.array) -> tuple | None:
+    def ik(self, T_06: np.array) -> tuple | None:
         """
         in general, the T taken in is the desired pose of the end-effector frame relative to the world frame)
         
@@ -226,7 +228,7 @@ class SmallRbtArm(RobotArm):
         d6 = self.dhTbl[5, 2]
 
         Jik = np.zeros((6,), dtype=np.float64)
-        T_06 = T_0E @ self.T_6E_inv
+        # T_06 = T_0E @ self.T_6E_inv
         wrist_position = T_06[:3, 3] - d6 * T_06[:3, 2]
 
         try:
@@ -354,7 +356,8 @@ class SmallRbtArm(RobotArm):
         T_34 = self.get_ti2i_1(4, theta[3])
         T_45 = self.get_ti2i_1(5, theta[4])
         T_56 = self.get_ti2i_1(6, theta[5])
-        T = Twf @ T_01 @ T_12 @ T_23 @ T_34 @ T_45 @ T_56 @ Tft
+        # T = Twf @ T_01 @ T_12 @ T_23 @ T_34 @ T_45 @ T_56 @ Tft
+        T = T_01 @ T_12 @ T_23 @ T_34 @ T_45 @ T_56 
         # print('t: ', np.around(T, 2))
         Xfk = np.zeros((6,), dtype=np.float64)
         # get position from transformation matrix
@@ -362,7 +365,8 @@ class SmallRbtArm(RobotArm):
 
         Xfk[4] = np.arctan2(np.sqrt(T[2, 0] ** 2 + T[2, 1] ** 2), T[2, 2])
         Xfk[3] = np.arctan2(T[1, 2] / np.sin(Xfk[4]), T[0, 2] / np.sin(Xfk[4]))
-        Xfk[5] = np.arctan2(T[2, 1] / np.sin(Xfk[4]), -T[2, 0] / np.sin(Xfk[4]))
+        Xfk[5] = np.arctan2(T[2, 1] / np.sin(Xfk[4]), -T[2, 0] / np.sin(Xfk[4]))                     
+                
         # convert to degree
         orientation = np.degrees(Xfk[3:6])
         return (position, orientation)

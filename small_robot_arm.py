@@ -63,8 +63,8 @@ todo:
 def main() -> None:
     logging.basicConfig()
     DOF = 6
-    bTrajectory = True
-    # bTrajectory = False
+    # bTrajectory = True
+    bTrajectory = False
 
     np.set_printoptions(precision=2, suppress=True)
 
@@ -170,7 +170,7 @@ def main() -> None:
     # )
 
     # we use ntu example: orientation with euler FIXED angles
-    # Cup poses wrt world frame {0}.
+    # Cup poses wrt frame {0}.
     poses = np.array(
         [
             (0, 264.5 + 19, 70.0 + 20, 60, 0, 0.0, 35.0),
@@ -188,9 +188,9 @@ def main() -> None:
     if bTrajectory == False:
         for pose in poses0:
             # poses' coordiation system is end-effector's wrt world frame.
-            T_0E = smallRobotArm.pose2T(pose, seq="ZYZ")            
+            T_06 = smallRobotArm.pose2T(pose, seq="ZYZ")            
             # euler angles ZYZ according to smallrobot arm's demo
-            j = smallRobotArm.ik(T_0E)
+            j = smallRobotArm.ik(T_06)
             print("my q:", j)
             (position, euler_zyz) = smallRobotArm.fk(j)
             print(f"my fk, p:{position}, o:{euler_zyz}")
@@ -207,8 +207,8 @@ def main() -> None:
     else:
         # this line is required coz reach to this pose at 0 sec as the poses says. ntu: fixed euler anglers
         T_0C_at_0s = smallRobotArm.pose2T(poses[0, 1:7], seq="xyz")
-        T_0E_at_0s = T_0C_at_0s @ smallRobotArm.T_EC_inv
-        j = smallRobotArm.ik(T_0E_at_0s)
+        T_06_at_0s = T_0C_at_0s @ smallRobotArm.T_6C_inv
+        j = smallRobotArm.ik(T_06_at_0s)
         smallRobotArm.move_to_angles(j)
         # traj planning in joint-space.
         """
@@ -220,8 +220,8 @@ def main() -> None:
             _, *p = pose
             # fixed angles according to NTU course
             T_0C = smallRobotArm.pose2T(p, seq="xyz")            
-            T_0E = T_0C @ smallRobotArm.T_EC_inv
-            joints[i, 1:7] = smallRobotArm.ik(T_0E)
+            T_06 = T_0C @ smallRobotArm.T_6C_inv
+            joints[i, 1:7] = smallRobotArm.ik(T_06)
 
         # display easily readable ik resutls on the screen
         J = pd.DataFrame(joints, columns=["ti", "q1", "q2", "q3", "q4", "q5", "q6"])
