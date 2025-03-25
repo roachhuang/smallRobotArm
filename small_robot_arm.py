@@ -2,14 +2,17 @@ from time import sleep, perf_counter
 import logging
 import pandas as pd
 import numpy as np
-
+import matplotlib.pyplot as plt
+import pyvista
 import equations as eq
 import robotarm_class as robot
 import plan_traj as pt
+import spatialmath.base as smb
+from roboticstoolbox import DHRobot, RevoluteDH
 
-# from roboticstoolbox import DHRobot, RevoluteDH
+from spatialmath import SE3
+from spatialmath.base import trplot
 
-# from spatialmath import SE3
 # from scipy.spatial.transform import Rotation as R
 # from scipy.interpolate import CubicSpline
 
@@ -23,18 +26,23 @@ a: link length
 alpha: link twist
 offset: kinematic-joint variable offset
 """
-# std_dh_table = [
-#     RevoluteDH(d=d1, a=a1, alpha=-np.pi / 2),  # joint 1
-#     RevoluteDH(d=0, a=a2, alpha=0, offset=-np.pi / 2),  # joint 2
-#     RevoluteDH(d=0, a=a3, alpha=-np.pi / 2),  # joint 3
-#     RevoluteDH(d=d4, a=0, alpha=np.pi / 2),  # joint 4
-#     RevoluteDH(d=0, a=0, alpha=-np.pi / 2),  # joint 5
-#     RevoluteDH(d=d6, a=0, alpha=0),  # joint 6
-# ]
+std_dh_table = [
+    RevoluteDH(d=d1, a=a1, alpha=-np.pi / 2),  # joint 1
+    RevoluteDH(d=0, a=a2, alpha=0, offset=-np.pi / 2),  # joint 2
+    RevoluteDH(d=0, a=a3, alpha=-np.pi / 2),  # joint 3
+    RevoluteDH(d=d4, a=0, alpha=np.pi / 2),  # joint 4
+    RevoluteDH(d=0, a=0, alpha=-np.pi / 2),  # joint 5
+    RevoluteDH(d=d6, a=0, alpha=0),  # joint 6
+]
 
 # Create a custom robot object based on my DH parameters for std dh tbl.
-# smRobot = DHRobot(std_dh_table)
-
+smRobot = DHRobot(std_dh_table, name="smallRobotArm")
+print("Reach of the robot:", smRobot.reach)
+print("nbranches", smRobot.nbranches)
+# smRobot.islimit([0, 0, -4, 4, 0, 0])
+print("is spherical:", smRobot.isspherical())
+# Robot kinematics as an elemenary transform sequence
+smRobot.ets()
 #   x, y, z, ZYZ Euler angles}
 # Xhome = [(164.5, 0.0, 241.0, 90.0, 180.0, -90.0]
 
@@ -57,6 +65,14 @@ todo:
     14. ik and fk must take world frame and end-effector frame into consideration.
     what about cup frame? ask gpt.
     always use np.array coz it can represent any number of dimensions (vectors, matrices, tensors, etc.). 
+    15. minimizing joint movement.
+"""
+
+"""
+Create a Virtual Environment
+python -m venv myenv
+source myenv/bin/activate  # Linux/macOS
+myenv\Scripts\activate  # Windows
 """
 
 
@@ -86,8 +102,6 @@ def main() -> None:
     # robot_rest_angles = (0.0, -78.5, 73.9, -0.4, -90, 0)
     rest_pose = smallRobotArm.fk(robot_rest_angles)
     print(f"rest pose: {rest_pose}")
-
-    
 
     # print(
     #     "std_dh_tbl =\n"
@@ -186,22 +200,66 @@ def main() -> None:
     joints = poses.copy()
 
     if bTrajectory == False:
+        # fig = plt.figure()
+        # smRobot.fig = fig
+        # ax = fig.add_subplot(111, projection="3d")
         for pose in poses0:
             # poses' coordiation system is end-effector's wrt world frame.
-            T_06 = smallRobotArm.pose2T(pose, seq="ZYZ")            
+            T_06 = smallRobotArm.pose2T(pose, seq="ZYZ")
             # euler angles ZYZ according to smallrobot arm's demo
             j = smallRobotArm.ik(T_06)
-            print("my q:", j)
-            (position, euler_zyz) = smallRobotArm.fk(j)
-            print(f"my fk, p:{position}, o:{euler_zyz}")
-            # print('rbtool fk', smRobot.fkine(j).t)
-            # validate my ik
-            # iks = smRobot.ikine_LM(T_06)
-            # q = np.degrees(iks.q)
-            # print(f'rbtool q: {q.round(4)}')
+            corrected_pose = (
+                pose[0],
+                pose[1],
+                pose[2],
+                np.float64(pose[3]),  # Explicitly convert to np.float64
+                np.float64(pose[4]),
+                np.float64(pose[5]),
+            )
+            T = (
+                SE3(corrected_pose[0], corrected_pose[1], corrected_pose[2])
+                * SE3.Rz(corrected_pose[3], unit="deg")
+                * SE3.Ry(corrected_pose[4], unit="deg")
+                * SE3.Rz(corrected_pose[5], unit="deg")
+            )
+            ik_sol = smRobot.ikine_LM(T, q0=np.ones(smRobot.n))
+            if not ik_sol.success:
+                print("IK solution failed!!!")
+                continue
 
-            smallRobotArm.move_to_angles(j)
+            smRobot.plot(ik_sol.q, backend="pyplot", jointaxes=True, block=False)
+
+            # Plot the frame coordinate with customization
+            # smRobot.plot(np.radians(j), block=False, jointaxes=True)
+            j = np.degrees(ik_sol.q)
+            # print("my q:", j.round(2))
+
+            myfk_T = smallRobotArm.fk(j)
+
+            # print(f"my fk, p:{position}, o:{euler_zyz}")
+
+            fT = smRobot.fkine_all(ik_sol.q)
+            T_out = smRobot.fkine(ik_sol.q)
+            print("close T", np.allclose(T.A, myfk_T, rtol=1e-2, atol=1e-2))
+            # Get the current axes from robot.plot()
+            ax = plt.gca()
+            frame_length = 0.5  # frame length as 50% of the robot size.
+            # Plot coordinate frames for each link
+            for i, t in enumerate(fT):
+                T_arr = t.A
+                smb.trplot(T_arr, ax=ax, width=2, length=10, color=('r','g','b'))
+                              
+            # Rotate the view for better visibility (optional)
+            # ax.view_init(elev=30, azim=45)  # Adjust as needed
+            plt.draw()
+            plt.pause(0.1)  # w/o this line no frame coordiantes are displayed.
+
+            # print(smallRobotArm.T2Pose(fT.A))
+            # print(smallRobotArm.se3_to_pose_zyz(fT))
+
+            # smallRobotArm.move_to_angles(j)
             # input("Press Enter to continue...")
+        plt.show()
 
     ###################################################################
     else:
@@ -219,7 +277,7 @@ def main() -> None:
             # col 0 are time data
             _, *p = pose
             # fixed angles according to NTU course
-            T_0C = smallRobotArm.pose2T(p, seq="xyz")            
+            T_0C = smallRobotArm.pose2T(p, seq="xyz")
             T_06 = T_0C @ smallRobotArm.T_6C_inv
             joints[i, 1:7] = smallRobotArm.ik(T_06)
 
