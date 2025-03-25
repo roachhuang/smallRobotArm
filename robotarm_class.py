@@ -3,7 +3,7 @@
 import numpy as np
 import helpers as hlp
 
-# from spatialmath import SE3
+from spatialmath import SE3
 from scipy.spatial.transform import Rotation as R
 import serial_class as ser
 from abc import ABC, abstractmethod
@@ -14,6 +14,25 @@ class RobotArm(ABC):
         self.dhTbl = std_dh_tbl
         self.max_limits = (130, 150, 85, 25, 120, 180)  # 70,)
         self.min_limits = (-125, -78.5, -160, -180, -120, -180)
+
+    def se3_to_pose_zyz(self, T: SE3):
+        """
+        Converts an SE(3) transformation matrix (with ZYZ Euler orientation) to a pose.
+
+        Args:
+            T (np.ndarray): The 4x4 SE(3) transformation matrix.
+
+        Returns:
+            tuple: A tuple containing the position (list) and ZYZ Euler angles (radians).
+        """
+
+        position = T.t  # Extract position as a list
+        zyz_euler = T.eul(
+            unit="deg"
+        )  # Extract ZYZ Euler angles in radians
+
+        return (np.round(position, 2), np.round(zyz_euler, 2))
+
 
     def T2Pose(self, T, seq="xyz", degrees=True) -> tuple:
         """
@@ -159,7 +178,7 @@ class RobotArm(ABC):
 
 
 # robot arm dependent
-class SmallRbtArm(RobotArm):
+class SmallRbtArm(RobotArm):    
     def __init__(self, std_dh_tbl: np.array):
         super().__init__(std_dh_tbl)
         self.th_offset = (0.0, -np.pi / 2, 0.0, 0.0, 0.0, 0.0)
@@ -320,7 +339,7 @@ class SmallRbtArm(RobotArm):
 
     # todo: fk taks care of qs wrt t06 instead of t0-cup. don't do the transformation in fk.
     @hlp.timer
-    def fk(self, Jfk:tuple) -> tuple:
+    def fk(self, Jfk:tuple) -> np.ndarray:
         """
         arg:
             Jfk(in deg) - joints value for the calculation of the forward kinematics
@@ -357,7 +376,9 @@ class SmallRbtArm(RobotArm):
         T_45 = self.get_ti2i_1(5, theta[4])
         T_56 = self.get_ti2i_1(6, theta[5])
         # T = Twf @ T_01 @ T_12 @ T_23 @ T_34 @ T_45 @ T_56 @ Tft
-        T = T_01 @ T_12 @ T_23 @ T_34 @ T_45 @ T_56 
+        T = T_01 @ T_12 @ T_23 @ T_34 @ T_45 @ T_56         
+        return T
+    
         # print('t: ', np.around(T, 2))
         Xfk = np.zeros((6,), dtype=np.float64)
         # get position from transformation matrix
