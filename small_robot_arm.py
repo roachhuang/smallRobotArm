@@ -3,6 +3,7 @@ import logging
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+
 # import pyvista
 import equations as eq
 import robotarm_class as robot
@@ -35,14 +36,6 @@ std_dh_table = [
     RevoluteDH(d=d6, a=0, alpha=0),  # joint 6
 ]
 
-# Create a custom robot object based on my DH parameters for std dh tbl.
-smRobot = DHRobot(std_dh_table, name="smallRobotArm")
-print("Reach of the robot:", smRobot.reach)
-print("nbranches", smRobot.nbranches)
-# smRobot.islimit([0, 0, -4, 4, 0, 0])
-print("is spherical:", smRobot.isspherical())
-# Robot kinematics as an elemenary transform sequence
-smRobot.ets()
 #   x, y, z, ZYZ Euler angles}
 # Xhome = [(164.5, 0.0, 241.0, 90.0, 180.0, -90.0]
 
@@ -84,6 +77,15 @@ def main() -> None:
 
     np.set_printoptions(precision=2, suppress=True)
 
+    # Create a custom robot object based on my DH parameters for std dh tbl.
+    smRobot = DHRobot(std_dh_table, name="smallRobotArm")
+    print("Reach of the robot:", smRobot.reach)
+    print("nbranches", smRobot.nbranches)
+    # smRobot.islimit([0, 0, -4, 4, 0, 0])
+    print("is spherical:", smRobot.isspherical())
+    # Robot kinematics as an elemenary transform sequence
+    smRobot.ets()
+
     # r6=distance btw axis6 and end-effector
     std_dh_params = np.array(
         [
@@ -99,33 +101,25 @@ def main() -> None:
     smallRobotArm = robot.SmallRbtArm(std_dh_params)
     # these values derived from fig 10 of my smallrobotarm notebook
     robot_rest_angles = (0.0, -78.5, 73.9, 0.0, -90.0, 0.0)
-    # robot_rest_angles = (0.0, -78.5, 73.9, -0.4, -90, 0)
-    rest_pose = smallRobotArm.fk(robot_rest_angles)
-    print(f"rest pose: {rest_pose}")
+    """move to rest angles at begining won't work coz 1. the motors don't have encoder. 2. If your robot uses incremental encoders, it loses its position when power is cycled or the program is restarted.
+    Solution: Implement homing at startup using absolute encoders or external reference sensors.e motors have no encoder to record previous angles.
+    """
+    T = smallRobotArm.fk(robot_rest_angles)
+    print(f"rest pose: {smallRobotArm.T2Pose(T)}")
 
-    # print(
-    #     "std_dh_tbl =\n"
-    #     + np.array2string(
-    #         smallRobotArm.dhTbl, separator=", ", formatter={".2f}".format}
-    #     )
-    # )
+    # zero positon (see fig1)
+    T = smRobot.fkine(np.radians((0, 0, 0, 0, 0, 0)))
+    print(f"zero joint pose: {smallRobotArm.T2Pose(T.A)}")
+    # smallRobotArm.move_to_angles(j)
+    input("Press Enter to continue...")
 
     # there must be a delay here right after sieal is initialized
     sleep(1)  # don't remove this line!!!
     smallRobotArm.enable()
 
-    # sleep(1)
-    """this won't work coz 1. the motors don't have encoder. 2. If your robot uses incremental encoders, it loses its position when power is cycled or the program is restarted.
-    Solution: Implement homing at startup using absolute encoders or external reference sensors.e motors have no encoder to record previous angles.
-    """
     # smallRobotArm.move_to_angles(robot_rest_angles)
     # sleep(1)
 
-    # zero positon (see fig1)
-    # j = (0, 0, 0, 0, 0, 0)
-    # smallRobotArm.move_to_angles(j)
-    # input("Press Enter to continue...")
-    # sleep(1)
 
     """
     for curPos are all zero
@@ -212,11 +206,12 @@ def main() -> None:
                 continue
             # cross comparison of ik results from both libraries
             kine_j = np.degrees(ik_sol.q)
-            myfk_T = smallRobotArm.fk(kine_j)         
+            myfk_T = smallRobotArm.fk(kine_j)
             fkine_T = smRobot.fkine(np.radians(my_j))
-            if not np.allclose(fkine_T.A, myfk_T, rtol=1e-2, atol=1e-2): raise ValueError("T and myfk_T are not close")    
-            
-            '''            
+            if not np.allclose(fkine_T.A, myfk_T, rtol=1e-2, atol=1e-2):
+                raise ValueError("T and myfk_T are not close")
+
+            """            
             # Plot the frame coordinate with customization
             smRobot.plot(np.radians(my_j), backend='pyplot', block=False, jointaxes=True)
             # Get the current axes from robot.plot()          
@@ -230,11 +225,11 @@ def main() -> None:
             # Rotate the view for better visibility (optional)
             # ax.view_init(elev=30, azim=45)  # Adjust as needed
             plt.draw()
-            plt.pause(0.1)  # w/o this line no frame coordiantes are displayed.
-            '''
+            plt.pause(0.1)  # w/o this line frame coordiantes won't be displayed.
+            """
             # print(kine_j.round(2))
             smallRobotArm.move_to_angles(kine_j)
-            
+
             # input("Press Enter to continue...")
         # plt.show()
 
@@ -325,7 +320,7 @@ def main() -> None:
             # sleep(0.3)
             curr_time = perf_counter()
 
-        input("Press Enter to continue...")
+        # input("Press Enter to continue...")
 
         # this is to set ji in arduino coz of from and to args for goStrightLine
         # T_0C = smallRobotArm.pose2T(rest_pose)
