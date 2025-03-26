@@ -3,7 +3,7 @@ import logging
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import pyvista
+# import pyvista
 import equations as eq
 import robotarm_class as robot
 import plan_traj as pt
@@ -200,66 +200,43 @@ def main() -> None:
     joints = poses.copy()
 
     if bTrajectory == False:
-        # fig = plt.figure()
-        # smRobot.fig = fig
-        # ax = fig.add_subplot(111, projection="3d")
         for pose in poses0:
             # poses' coordiation system is end-effector's wrt world frame.
             T_06 = smallRobotArm.pose2T(pose, seq="ZYZ")
             # euler angles ZYZ according to smallrobot arm's demo
-            j = smallRobotArm.ik(T_06)
-            corrected_pose = (
-                pose[0],
-                pose[1],
-                pose[2],
-                np.float64(pose[3]),  # Explicitly convert to np.float64
-                np.float64(pose[4]),
-                np.float64(pose[5]),
-            )
-            T = (
-                SE3(corrected_pose[0], corrected_pose[1], corrected_pose[2])
-                * SE3.Rz(corrected_pose[3], unit="deg")
-                * SE3.Ry(corrected_pose[4], unit="deg")
-                * SE3.Rz(corrected_pose[5], unit="deg")
-            )
-            ik_sol = smRobot.ikine_LM(T, q0=np.ones(smRobot.n))
+            my_j = smallRobotArm.ik(T_06)
+            # T=smallRobotArm.pose2T(corrected_pose, seq="ZYZ")
+            ik_sol = smRobot.ikine_LM(SE3(T_06), q0=np.ones(smRobot.n))
             if not ik_sol.success:
                 print("IK solution failed!!!")
                 continue
-
-            smRobot.plot(ik_sol.q, backend="pyplot", jointaxes=True, block=False)
-
+            # cross comparison of ik results from both libraries
+            kine_j = np.degrees(ik_sol.q)
+            myfk_T = smallRobotArm.fk(kine_j)         
+            fkine_T = smRobot.fkine(np.radians(my_j))
+            if not np.allclose(fkine_T.A, myfk_T, rtol=1e-2, atol=1e-2): raise ValueError("T and myfk_T are not close")    
+            
+            '''            
             # Plot the frame coordinate with customization
-            # smRobot.plot(np.radians(j), block=False, jointaxes=True)
-            j = np.degrees(ik_sol.q)
-            # print("my q:", j.round(2))
-
-            myfk_T = smallRobotArm.fk(j)
-
-            # print(f"my fk, p:{position}, o:{euler_zyz}")
-
-            fT = smRobot.fkine_all(ik_sol.q)
-            T_out = smRobot.fkine(ik_sol.q)
-            print("close T", np.allclose(T.A, myfk_T, rtol=1e-2, atol=1e-2))
-            # Get the current axes from robot.plot()
-            ax = plt.gca()
-            frame_length = 0.5  # frame length as 50% of the robot size.
+            smRobot.plot(np.radians(my_j), backend='pyplot', block=False, jointaxes=True)
+            # Get the current axes from robot.plot()          
+            ax = plt.gca()                        
+            fkine_all_T = smRobot.fkine_all(ik_sol.q)
             # Plot coordinate frames for each link
-            for i, t in enumerate(fT):
+            for i, t in enumerate(fkine_all_T):
                 T_arr = t.A
-                smb.trplot(T_arr, ax=ax, width=2, length=10, color=('r','g','b'))
+                smb.trplot(T_arr, ax=ax, width=2, length=20, color=('r','g','b'))
                               
             # Rotate the view for better visibility (optional)
             # ax.view_init(elev=30, azim=45)  # Adjust as needed
             plt.draw()
             plt.pause(0.1)  # w/o this line no frame coordiantes are displayed.
-
-            # print(smallRobotArm.T2Pose(fT.A))
-            # print(smallRobotArm.se3_to_pose_zyz(fT))
-
-            # smallRobotArm.move_to_angles(j)
+            '''
+            # print(kine_j.round(2))
+            smallRobotArm.move_to_angles(kine_j)
+            
             # input("Press Enter to continue...")
-        plt.show()
+        # plt.show()
 
     ###################################################################
     else:

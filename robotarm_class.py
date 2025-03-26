@@ -14,7 +14,29 @@ class RobotArm(ABC):
         self.dhTbl = std_dh_tbl
         self.max_limits = (130, 150, 85, 25, 120, 180)  # 70,)
         self.min_limits = (-125, -78.5, -160, -180, -120, -180)
-
+        
+    def pose_to_se3(self, pose:np.ndarray)->SE3:
+        """
+        Convert a pose (position and ZYZ Euler angles) to a transformation matrix.
+        
+        Args:
+            position (tuple or list): A tuple or list of three elements representing [x, y, z] position.
+            zyz_euler_angles (tuple or list): A tuple or list of three elements representing [alpha, beta, gamma] ZYZ Euler angles.
+        
+        Returns:
+            SE3 object.
+        """
+        # Create an SE3 object from the position and ZYZ Euler angles
+        T = (
+            SE3(pose[0], pose[1], pose[2])
+            * SE3.Rz(pose[3], unit="deg")
+            * SE3.Ry(pose[4], unit="deg")
+            * SE3.Rz(pose[5], unit="deg")
+        )
+        
+        # Return the transformation matrix
+        return T
+    
     def se3_to_pose_zyz(self, T: SE3):
         """
         Converts an SE(3) transformation matrix (with ZYZ Euler orientation) to a pose.
