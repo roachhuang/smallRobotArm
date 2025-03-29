@@ -120,7 +120,6 @@ def main() -> None:
     # smallRobotArm.move_to_angles(robot_rest_angles)
     # sleep(1)
 
-
     """
     for curPos are all zero
     after fk for [0, 78.51, -73,9, 0, -1.14, 0], computed manually from arduino goHome code.
@@ -196,11 +195,12 @@ def main() -> None:
     if bTrajectory == False:
         for pose in poses0:
             # poses' coordiation system is end-effector's wrt world frame.
-            T_06 = smallRobotArm.pose2T(pose, seq="ZYZ")
+            T_0E = smallRobotArm.pose2T(pose, seq="ZYZ")
+            # T_06 = T_0E @ smallRobotArm.T_6E_inv
             # euler angles ZYZ according to smallrobot arm's demo
-            my_j = smallRobotArm.ik(T_06)
+            my_j = smallRobotArm.ik(T_0E)
             # T=smallRobotArm.pose2T(corrected_pose, seq="ZYZ")
-            ik_sol = smRobot.ikine_LM(SE3(T_06), q0=np.ones(smRobot.n))
+            ik_sol = smRobot.ikine_LM(SE3(T_0E), q0=np.ones(smRobot.n))
             if not ik_sol.success:
                 print("IK solution failed!!!")
                 continue
@@ -209,6 +209,8 @@ def main() -> None:
             myfk_T = smallRobotArm.fk(kine_j)
             fkine_T = smRobot.fkine(np.radians(my_j))
             if not np.allclose(fkine_T.A, myfk_T, rtol=1e-2, atol=1e-2):
+                print(myfk_T)
+                print(fkine_T.A)
                 raise ValueError("T and myfk_T are not close")
 
             """            
@@ -236,8 +238,10 @@ def main() -> None:
     ###################################################################
     else:
         # this line is required coz reach to this pose at 0 sec as the poses says. ntu: fixed euler anglers
-        T_0C_at_0s = smallRobotArm.pose2T(poses[0, 1:7], seq="xyz")
-        T_06_at_0s = T_0C_at_0s @ smallRobotArm.T_6C_inv
+        T_0E_at_0s = SE3.Trans(poses[0, 1:4]) * SE3.RPY(
+            poses[0, 4:7], order="zyx", unit="deg"
+        )
+        T_06_at_0s = T_0E_at_0s.A @ smallRobotArm.T_6E_inv
         j = smallRobotArm.ik(T_06_at_0s)
         smallRobotArm.move_to_angles(j)
         # traj planning in joint-space.
@@ -249,8 +253,9 @@ def main() -> None:
             # col 0 are time data
             _, *p = pose
             # fixed angles according to NTU course
-            T_0C = smallRobotArm.pose2T(p, seq="xyz")
-            T_06 = T_0C @ smallRobotArm.T_6C_inv
+
+            T_0E = SE3.Trans(p[0:3]) * SE3.RPY(p[3:6], order="zyx", unit="deg")
+            T_06 = T_0E.A @ smallRobotArm.T_6E_inv
             joints[i, 1:7] = smallRobotArm.ik(T_06)
 
         # display easily readable ik resutls on the screen
