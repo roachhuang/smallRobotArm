@@ -12,49 +12,8 @@ from abc import ABC, abstractmethod
 class RobotArm(ABC):
     def __init__(self):
         # init arm independent params
-        pass         
-        
-    def pose_to_se3(self, pose:np.ndarray)->SE3:
-        """
-        Convert a pose (position and ZYZ Euler angles) to a transformation matrix.
-        
-        Args:
-            position (tuple or list): A tuple or list of three elements representing [x, y, z] position.
-            zyz_euler_angles (tuple or list): A tuple or list of three elements representing [alpha, beta, gamma] ZYZ Euler angles.
-        
-        Returns:
-            SE3 object.
-        """
-        # Create an SE3 object from the position and ZYZ Euler angles
-        T = (
-            SE3(pose[0], pose[1], pose[2])
-            * SE3.Rz(pose[3], unit="deg")
-            * SE3.Ry(pose[4], unit="deg")
-            * SE3.Rz(pose[5], unit="deg")
-        )
-        
-        # Return the transformation matrix
-        return T
+        pass                 
     
-    def se3_to_pose_zyz(self, T: SE3):
-        """
-        Converts an SE(3) transformation matrix (with ZYZ Euler orientation) to a pose.
-
-        Args:
-            T (np.ndarray): The 4x4 SE(3) transformation matrix.
-
-        Returns:
-            tuple: A tuple containing the position (list) and ZYZ Euler angles (radians).
-        """
-
-        position = T.t  # Extract position as a list
-        zyz_euler = T.eul(
-            unit="deg"
-        )  # Extract ZYZ Euler angles in radians
-
-        return (np.round(position, 2), np.round(zyz_euler, 2))
-
-
     def T2Pose(self, T, seq="xyz", degrees=True) -> tuple:
         """
         Converts a 4x4 transformation matrix to a pose (position and orientation).
@@ -76,6 +35,15 @@ class RobotArm(ABC):
         euler_angles = rotation.as_euler(seq=seq, degrees=degrees)
 
         return (position, euler_angles)
+    
+        # SE3_T = SE3(T)
+        # position = SE3_T.t  # Extract position as a list
+        # zyz_euler = SE3_T.eul(
+        #     unit="deg"
+        # )  # Extract ZYZ Euler angles in radians
+
+        # return (np.round(position, 2), np.round(zyz_euler, 2))
+
 
     def pose2T(self, pose: tuple, seq="xyz") -> np.array:
         """
@@ -106,6 +74,12 @@ class RobotArm(ABC):
         # T[:3,:3] = rotation_matrix
 
         return T
+    
+        # x, y, z = pose[:3]
+        # alpha, beta, gamma = pose[3:6]
+        # # SO3.eul always zyz
+        # T = SE3(x, y, z) * SE3.Eul(alpha, beta, gamma, unit='deg')
+        # return T.A
 
     def get_ti2i_1(self, i, theta=None) -> np.array:
         """
@@ -217,15 +191,21 @@ class SmallRbtArm(RobotArm):
         # 50mm is the distance btw frame6 to end-effector
         # t_6E = smallRobotArm.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
         # hand made T_6E: gripper's len + x:180,y:-90, z:0. see their coordiation system.
-        self.T_6E = np.array([[0, 0, 1, 0], [0, -1, 0, 0], [1, 0, 0, 50], [0, 0, 0, 1]])
-        self.T_6E_inv = np.linalg.inv(self.T_6E)
+        # self.T_6E = np.array([[0, 0, 1, 0], [0, -1, 0, 0], [1, 0, 0, 50.0], [0, 0, 0, 1]])
+        # self.T_6E_inv = np.linalg.inv(self.T_6E)
         self.T_6C = np.array([[0, 0, 1, 0], [0, -1, 0, 0], [1, 0, 0, -50/2], [0, 0, 0, 1]])
         self.T_6C_inv = np.linalg.inv(self.T_6C)
+        
+         # hand made T_6E: gripper's len + x:180,y:-90, z:0. see their coordiation system.
+        tool_length = 50.0    # the tool attached to axis 6
+        self.T_6E = np.array([[0, 0, 1, 0], [0, -1, 0, 0], [1, 0, 0, tool_length], [0, 0, 0, 1]])
+        self.T_6E_inv = np.linalg.inv(self.T_6E)
         
     def limit_joint_angles(self, angles):
         """Limits joint angles to specified max/min values."""
         if len(angles) != len(self.max_qlimits) or len(angles) != len(self.min_qlimits):
             raise ValueError("Angle and qlimit lists must have the same length.")
+        # note that j4 can move only when j3 < 63.9
         return [
             max(min(a, max_val), min_val)
             for a, max_val, min_val in zip(angles, self.max_qlimits, self.min_qlimits)
@@ -271,7 +251,8 @@ class SmallRbtArm(RobotArm):
         d4 = self.dhTbl[3, 2]
         d6 = self.dhTbl[5, 2]
 
-        Jik = np.zeros((6,), dtype=np.float64)
+        Jik = np.zeros((6,), dtype=np.float64)        
+
         # T_06 = T_0E @ self.T_6E_inv
         wrist_position = T_06[:3, 3] - d6 * T_06[:3, 2]
 
@@ -401,7 +382,7 @@ class SmallRbtArm(RobotArm):
         T_45 = self.get_ti2i_1(5, theta[4])
         T_56 = self.get_ti2i_1(6, theta[5])
         # T = Twf @ T_01 @ T_12 @ T_23 @ T_34 @ T_45 @ T_56 @ Tft
-        T = T_01 @ T_12 @ T_23 @ T_34 @ T_45 @ T_56         
+        T = T_01 @ T_12 @ T_23 @ T_34 @ T_45 @ T_56        
         return T
     
         # # print('t: ', np.around(T, 2))
