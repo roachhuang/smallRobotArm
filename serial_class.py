@@ -107,10 +107,10 @@ class SerialPort:
                     self._event_ok2send.clear()
                     print("[DEBUG] Waiting for ack...")
                     # timeout must be >= 15
-                    if not self._event_ok2send.wait(timeout=15):  # timeout added.
+                    if not self._event_ok2send.wait(timeout=20):  # timeout added.
                         logging.error("Timeout waiting for Arduino acknowledgement.")
-                    else:
-                        print("[DEBUG] Ack received.")    
+                    # else:
+                    #     print("[DEBUG] Ack received.")    
             except serial.SerialTimeoutException:
                 logging.error("Serial write timeout.")
             except serial.SerialException as e:

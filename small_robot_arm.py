@@ -1,6 +1,6 @@
 from time import sleep, perf_counter
 import logging
-# import pandas as pd
+import pandas as pd
 import numpy as np
 
 # import matplotlib.pyplot as plt
@@ -70,7 +70,6 @@ source myenv/bin/activate  # Linux/macOS
 myenv\Scripts\activate  # Windows
 """
 
-
 def main() -> None:
     logging.basicConfig()
     DOF = 6
@@ -107,9 +106,11 @@ def main() -> None:
     """    
 
     # zero positon (see fig1)
-    T = smRobot.fkine(np.radians((0, 0, 0, 0, 0, 0)))
-    print(f"zero joint pose: {smallRobotArm.T2Pose(T.A)}")
+    zero_j = (0, 0, 0, 0, 0, 0)
+    T = smRobot.fkine(np.radians(zero_j))
+    # j=smallRobotArm.ik(T.A)
     # smallRobotArm.move_to_angles(j)
+    print(f"zero joint pose: {smallRobotArm.T2Pose(T.A)}")
     # input("Press Enter to continue...")
 
     # there must be a delay here right after sieal is initialized
@@ -190,9 +191,9 @@ def main() -> None:
     # this is only for giving time col to joints
     joints = poses.copy()
 
-    '''
-    elliptical trajectory
     
+    # elliptical trajectory
+    '''
     center = (50, 0, 140)  # Ellipse centered at (300, 0, 200) in mm
     radii = (100, 50)  # Ellipse radii (X = 100mm, Y = 50mm)
     tilt_angle=np.radians(30)
@@ -221,13 +222,11 @@ def main() -> None:
         # cmd = {"header": "m", "joint_angle": kine_j, "ack": True}
         # smallRobotArm.conn.send2Arduino(cmd)
         
-    smallRobotArm.move_to_angles(robot_rest_angles)
-    smallRobotArm.disable()
-    # a way to terminate thread
-    smallRobotArm.conn.disconnect()
+    smallRobotArm.go_home()
     exit(0)
-    '''
     
+    '''
+    '''
     # interpolate between two poses
     T1 = SE3.Trans(240, -140, 40) * SE3.RPY(30, 0, 30, unit='deg')
     T2 = SE3.Trans(160, 140, 140) * SE3.RPY(0, 0, 60, unit='deg')
@@ -241,6 +240,7 @@ def main() -> None:
     input("Press Enter to continue...")
     smallRobotArm.go_home()  
     exit(0)
+    '''
     
     if bTrajectory == False:
         for pose in poses0:

@@ -179,7 +179,7 @@ class RobotArm(ABC):
         return poses    
     # interface
     @abstractmethod
-    def ik(self, T_06:np.ndarray)->tuple:
+    def ik(self, T_06:ndarray)->tuple:
         raise NotImplementedError("Subclasses must implement ik()")
 
     @abstractmethod
@@ -371,7 +371,7 @@ class SmallRbtArm(RobotArm):
 
     # todo: fk taks care of qs wrt t06 instead of t0-cup. don't do the transformation in fk.
     # @hlp.timer
-    def fk(self, Jfk:tuple) -> np.ndarray:
+    def fk(self, Jfk:tuple) -> ndarray:
         """
         arg:
             Jfk(in deg) - joints value for the calculation of the forward kinematics
