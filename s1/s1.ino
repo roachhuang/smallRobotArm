@@ -159,8 +159,7 @@ void setup() {
 
   Serial.begin(115200);
   //The Arduino Mega 2560 typically uses a 16 MHz clock.
-  Timer1.initialize(150);  // 3 times higher than the pulse rate.
-  Timer1.start();
+  Timer1.initialize(150);  // pulse interval
   Timer1.attachInterrupt(ISR_routine);  
 }
 
@@ -323,8 +322,7 @@ void stepMotors() {
     PULstat2 = !PULstat2;
     curPos2 += dir2 ? dl2 / 2.0 : -dl2 / 2.0;
     lastStepTime[1] = currentMicros;
-    allMotorsStopped=false
-  
+    allMotorsStopped=false  
   }
 
    // Joint 3

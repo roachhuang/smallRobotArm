@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.interpolate import CubicSpline
+from spatialmath.base import *
+from spatialmath.base import *
 
 # import plotly.express as px
 # plt.ion()
@@ -168,6 +170,8 @@ def planTraj(p):
         # plt.subplot(fig_row, fig_col, col + 1, title=f'{col+1} to time')
         plt.plot(timeAxis, inputPoints[col], "r")
     plt.show()
+
+    # tranimate(transl(4, 3, 4)@trotx(2)@troty(-2), frame='A', arrow=False, dims=[0, 5], nframes=200)
 
     fig = plt.figure(figsize=(9, 9))
     plt.title(

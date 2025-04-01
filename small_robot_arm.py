@@ -1,18 +1,20 @@
 from time import sleep, perf_counter
 import logging
-import pandas as pd
+# import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
+
+# import matplotlib.pyplot as plt
+# from eclipse_motion_poses import generate_tilted_ellipse
 
 # import pyvista
 import equations as eq
 import robotarm_class as robot
 import plan_traj as pt
-import spatialmath.base as smb
 from roboticstoolbox import DHRobot, RevoluteDH
 
 from spatialmath import SE3
-from spatialmath.base import trplot
+
+# from spatialmath.base import trplot
 
 # from scipy.spatial.transform import Rotation as R
 # from scipy.interpolate import CubicSpline
@@ -100,26 +102,22 @@ def main() -> None:
     # create an instance of the robotarm.
     smallRobotArm = robot.SmallRbtArm(std_dh_params)
     # these values derived from fig 10 of my smallrobotarm notebook
-    robot_rest_angles = (0.0, -78.5, 73.9, 0.0, -90.0, 0.0)
     """move to rest angles at begining won't work coz 1. the motors don't have encoder. 2. If your robot uses incremental encoders, it loses its position when power is cycled or the program is restarted.
     Solution: Implement homing at startup using absolute encoders or external reference sensors.e motors have no encoder to record previous angles.
-    """
-    T = smallRobotArm.fk(robot_rest_angles)
-    print(f"rest pose: {smallRobotArm.T2Pose(T)}")
+    """    
 
     # zero positon (see fig1)
     T = smRobot.fkine(np.radians((0, 0, 0, 0, 0, 0)))
     print(f"zero joint pose: {smallRobotArm.T2Pose(T.A)}")
     # smallRobotArm.move_to_angles(j)
-    input("Press Enter to continue...")
+    # input("Press Enter to continue...")
 
     # there must be a delay here right after sieal is initialized
     sleep(1)  # don't remove this line!!!
     smallRobotArm.enable()
-
-    # smallRobotArm.move_to_angles(robot_rest_angles)
-    # sleep(1)
-
+    T = smallRobotArm.fk(smallRobotArm.robot_rest_angles)
+    print(f"rest pose: {smallRobotArm.T2Pose(T)}")
+    
     """
     for curPos are all zero
     after fk for [0, 78.51, -73,9, 0, -1.14, 0], computed manually from arduino goHome code.
@@ -180,7 +178,7 @@ def main() -> None:
     # Cup poses wrt frame {0}.
     poses = np.array(
         [
-            (0, 264.5 + 19, 70.0 + 20, 60, 0, 0.0, 35.0),
+            (0, 250, 70.0 + 20, 60, 0, 0.0, 35.0),
             (8, 264.5 + 19, 70.0 + 20, 90, 0, 0.0, 35.0),
             # rotate cup 60 degrees around y axis wrt the world frame.
             (20, 264.5 - 120, 70.0 + 60, 350.0, 0, -60.0, 0.0),
@@ -192,10 +190,62 @@ def main() -> None:
     # this is only for giving time col to joints
     joints = poses.copy()
 
+    '''
+    elliptical trajectory
+    
+    center = (50, 0, 140)  # Ellipse centered at (300, 0, 200) in mm
+    radii = (100, 50)  # Ellipse radii (X = 100mm, Y = 50mm)
+    tilt_angle=np.radians(30)
+    """Generate SE(3) poses for an elliptical trajectory on a tilted plane."""
+    # poses = em.generate_tilted_ellipse(center, radii, tilt_angle)
+    for T in generate_tilted_ellipse(
+        center=(50, 0, 140),
+        radii=(100, 50),
+        tilt_angle=np.radians(-30),
+        num_points=50,
+    ):
+        my_j= smallRobotArm.ik(T.A)
+        ik_sol = smRobot.ikine_LM(SE3(T), q0=np.ones(smRobot.n))
+        if not ik_sol.success:
+            print("IK solution failed!!!")
+            continue
+        # cross comparison of ik results from both libraries
+        kine_j = np.degrees(ik_sol.q)
+        myfk_T = smallRobotArm.fk(kine_j)
+        fkine_T = smRobot.fkine(np.radians(my_j))
+        if not np.allclose(fkine_T.A, myfk_T, rtol=1e-2, atol=1e-2):
+            print(myfk_T)
+            print(fkine_T.A)
+            raise ValueError("T and myfk_T are not close")
+        smallRobotArm.move_to_angles(kine_j)
+        # cmd = {"header": "m", "joint_angle": kine_j, "ack": True}
+        # smallRobotArm.conn.send2Arduino(cmd)
+        
+    smallRobotArm.move_to_angles(robot_rest_angles)
+    smallRobotArm.disable()
+    # a way to terminate thread
+    smallRobotArm.conn.disconnect()
+    exit(0)
+    '''
+    
+    # interpolate between two poses
+    T1 = SE3.Trans(240, -140, 40) * SE3.RPY(30, 0, 30, unit='deg')
+    T2 = SE3.Trans(160, 140, 140) * SE3.RPY(0, 0, 60, unit='deg')
+    poses = smallRobotArm.interpolate_poses(T1.A, T2.A) # Get 10 smooth poses.
+    for pose in poses:        
+        ik_sol = smRobot.ikine_LM(pose, q0=np.ones(smRobot.n))
+        if not ik_sol.success:
+            print("IK solution failed!!!")
+            exit(0)
+        smallRobotArm.move_to_angles(np.degrees(ik_sol.q))
+    input("Press Enter to continue...")
+    smallRobotArm.go_home()  
+    exit(0)
+    
     if bTrajectory == False:
         for pose in poses0:
             # poses' coordiation system is end-effector's wrt world frame.
-            T_0E = smallRobotArm.pose2T(pose, seq="ZYZ")
+            T_0E = smallRobotArm.pose2T(pose, seq="zyz")
             # T_06 = T_0E @ smallRobotArm.T_6E_inv
             # euler angles ZYZ according to smallrobot arm's demo
             my_j = smallRobotArm.ik(T_0E)
@@ -208,6 +258,7 @@ def main() -> None:
             kine_j = np.degrees(ik_sol.q)
             myfk_T = smallRobotArm.fk(kine_j)
             fkine_T = smRobot.fkine(np.radians(my_j))
+            # SE3(T_0E).printline()
             if not np.allclose(fkine_T.A, myfk_T, rtol=1e-2, atol=1e-2):
                 print(myfk_T)
                 print(fkine_T.A)
@@ -244,6 +295,7 @@ def main() -> None:
         T_06_at_0s = T_0E_at_0s.A @ smallRobotArm.T_6E_inv
         j = smallRobotArm.ik(T_06_at_0s)
         smallRobotArm.move_to_angles(j)
+        input("Press Enter to continue...")
         # traj planning in joint-space.
         """
         there is another method: in cartesian-space. if it needs 100 operating point in 1s (100hz) for period of 9s,
@@ -339,12 +391,8 @@ def main() -> None:
     # smallRobotArm.moveTo([47.96, 0.0, 268.02, 180, 94.61, 180.0])
     # initPose[0:3] = [11.31000000e02, 1.94968772e-31, 2.78500000e02]
     # initPose[3:6] = [10.00000000e00, 1.27222187e-14, 1.80000000e02]
-    sleep(2)
-    # rest pose
-    smallRobotArm.move_to_angles(robot_rest_angles)
-    smallRobotArm.disable()
-    # a way to terminate thread
-    smallRobotArm.conn.disconnect()
+    # smallRobotArm.moveTo(initPose)
+    smallRobotArm.go_home()
     print("THREAD TERMINATED!")
 
 

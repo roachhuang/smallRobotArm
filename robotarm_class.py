@@ -1,10 +1,12 @@
 # the reason for importing cos and sin from sympy is Rot case (can't import them from math, plz note!!!)
 # from sympy import symbols  # , nsimplify, Matrix
 import numpy as np
-import helpers as hlp
-
+from numpy import ndarray
+# import helpers as hlp
+from numpy import ndarray
+from spatialmath.base import trinterp
 from spatialmath import SE3
-from scipy.spatial.transform import Rotation as R
+# from scipy.spatial.transform import Rotation as R
 import serial_class as ser
 from abc import ABC, abstractmethod
 
@@ -28,24 +30,24 @@ class RobotArm(ABC):
             position: a 3 element numpy array.
             euler_angles: a 3 element numpy array.
         """
-        position = T[:3, 3]  # Extract position (translation)
-        rotation_matrix = T[:3, :3]  # Extract rotation matrix
+        # position = T[:3, 3]  # Extract position (translation)
+        # rotation_matrix = T[:3, :3]  # Extract rotation matrix
 
-        rotation = R.from_matrix(rotation_matrix)
-        euler_angles = rotation.as_euler(seq=seq, degrees=degrees)
+        # rotation = R.from_matrix(rotation_matrix)
+        # euler_angles = rotation.as_euler(seq=seq, degrees=degrees)
 
-        return (position, euler_angles)
+        # return (position, euler_angles)
     
-        # SE3_T = SE3(T)
-        # position = SE3_T.t  # Extract position as a list
-        # zyz_euler = SE3_T.eul(
-        #     unit="deg"
-        # )  # Extract ZYZ Euler angles in radians
+        SE3_T = SE3(T)
+        position = SE3_T.t  # Extract position as a list
+        zyz_euler = SE3_T.eul(
+            unit="deg"
+        )  # Extract ZYZ Euler angles in radians
 
-        # return (np.round(position, 2), np.round(zyz_euler, 2))
+        return (np.round(position, 4), np.round(zyz_euler, 4))
 
 
-    def pose2T(self, pose: tuple, seq="xyz") -> np.array:
+    def pose2T(self, pose: tuple, seq="xyz") -> ndarray:
         """
         Args: position (x,y,z) + 3 rotation angles in ZYZ order in degree
         Returns: transformation matrix from pose
@@ -57,31 +59,31 @@ class RobotArm(ABC):
         NOTE: uppercase 'ZYZ' for intrinsic rotation; lowercase->fixed angles sequence
         """
         # avoid naming roll, pitch and yaw with zyz coz of misleading
-        x, y, z, psi, theta, phi = pose
-        r = R.from_euler(seq=seq, angles=[psi, theta, phi], degrees=True)
+        # x, y, z, psi, theta, phi = pose
+        # r = R.from_euler(seq=seq, angles=[psi, theta, phi], degrees=True)
 
         # Translation matrix
-        translation_matrix = np.eye(4)
-        translation_matrix[:3, 3] = [x, y, z]
+        # translation_matrix = np.eye(4)
+        # translation_matrix[:3, 3] = [x, y, z]
 
         # Homogeneous transformation matrix
-        T = np.eye(4)
-        T[:3, :3] = r.as_matrix()  # rotation_matrix
-        T[:3, 3] = [x, y, z]
+        # T = np.eye(4)
+        # T[:3, :3] = r.as_matrix()  # rotation_matrix
+        # T[:3, 3] = [x, y, z]
 
         # Alternatively, you can multiply the translation and rotation matrix.
         # T = translation_matrix @ np.eye(4)
         # T[:3,:3] = rotation_matrix
 
-        return T
+        # return T
     
-        # x, y, z = pose[:3]
-        # alpha, beta, gamma = pose[3:6]
-        # # SO3.eul always zyz
-        # T = SE3(x, y, z) * SE3.Eul(alpha, beta, gamma, unit='deg')
-        # return T.A
+        x, y, z = pose[:3]
+        alpha, beta, gamma = pose[3:6]
+        # SO3.eul always zyz
+        T = SE3(x, y, z) * SE3.Eul(alpha, beta, gamma, unit='deg')
+        return T.A
 
-    def get_ti2i_1(self, i, theta=None) -> np.array:
+    def get_ti2i_1(self, i, theta=None) -> ndarray:
         """
         todo: when theta will be none? examin intput theta's procision by checking its number of decimal points.
         Creates a DH transformation matrix using NumPy.
@@ -158,6 +160,23 @@ class RobotArm(ABC):
             # Matrix objects have a numpy method that returns a numpy.ndarray
             # float32 maintains only approximately 7 decimal digits fo precision internally.
             return m.astype(np.float64)
+        
+    def interpolate_poses(self, start_pose: ndarray, end_pose: ndarray, num_poses=10):
+        """Generates smooth poses between two poses."""
+        # Ensure inputs are SE3 objects
+        # if not isinstance(start_pose, SE3) or not isinstance(end_pose, SE3):
+        #     raise ValueError("start_pose and end_pose must be SE3 objects")
+
+        # Generate interpolation values
+        s_values = np.linspace(0, 1, num_poses + 2)[1:-1]  # Get 'in-between' values.
+
+        # Interpolate poses
+        poses = []
+        for s in s_values:
+            print(f"Interpolating with s={s}")
+            pose = trinterp(start_pose, end_pose, s)  # Use .A matrices
+            poses.append(SE3(pose))  # Convert back to SE3
+        return poses    
     # interface
     @abstractmethod
     def ik(self, T_06:np.ndarray)->tuple:
@@ -174,9 +193,10 @@ class RobotArm(ABC):
 
 # robot arm dependent
 class SmallRbtArm(RobotArm):    
-    def __init__(self, std_dh_tbl: np.array):
+    def __init__(self, std_dh_tbl: ndarray):
         # super().__init__(std_dh_tbl)        
         self.dhTbl = std_dh_tbl  
+        self.robot_rest_angles = (0.0, -78.5, 73.9, 0.0, -90.0, 0.0)       
         
         self.max_qlimits = ( 130, 130.0, 73.9,  50, 120, 180) 
         self.min_qlimits = (-130, -78.5, -66, -30, -90, -180)
@@ -232,9 +252,15 @@ class SmallRbtArm(RobotArm):
         limited_j = self.limit_joint_angles(j)
         cmd = {"header": "g", "joint_angle": limited_j, "ack": True}
         self.conn.send2Arduino(cmd)
-
+        
+    def go_home(self):
+        self.move_to_angles(self.robot_rest_angles)
+        self.disable()
+        # a way to terminate thread
+        self.conn.disconnect()
+        
     # @hlp.timer
-    def ik(self, T_06: np.array) -> tuple | None:
+    def ik(self, T_06: ndarray) -> tuple | None:
         """
         in general, the T taken in is the desired pose of the end-effector frame relative to the world frame)
         
