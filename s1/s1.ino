@@ -28,29 +28,29 @@
 #define EN6_PIN 38
 
 // rest pose (power off) of the robot arm.
-float curPos1 = 0.0;
-float curPos2 = -78.51;
-float curPos3 = 73.90;
-float curPos4 = 0.0;
-float curPos5 = -90.0;
-float curPos6 = 0.0;
+volatile float curPos1 = 0.0;
+volatile float curPos2 = -78.51;
+volatile float curPos3 = 73.90;
+volatile float curPos4 = 0.0;
+volatile float curPos5 = -90.0;
+volatile float curPos6 = 0.0;
 // float Ji[6] = { curPos1, curPos2, curPos3, curPos4, curPos5, curPos6 };  //{x, y, z, ZYZ Euler angles} home position
 
 // Motor step direction flags
-volatile bool dir1 = false;
-volatile bool dir2 = false;
-volatile bool dir3 = false;
-volatile bool dir4 = false;
-volatile bool dir5 = false;
-volatile bool dir6 = false;
+bool dir1 = false;
+bool dir2 = false;
+bool dir3 = false;
+bool dir4 = false;
+bool dir5 = false;
+bool dir6 = false;
 
 // Motor pulsing flags
-volatile bool PULstat1 = false;
-volatile bool PULstat2 = false;
-volatile bool PULstat3 = false;
-volatile bool PULstat4 = false;
-volatile bool PULstat5 = false;
-volatile bool PULstat6 = false;
+bool PULstat1 = false;
+bool PULstat2 = false;
+bool PULstat3 = false;
+bool PULstat4 = false;
+bool PULstat5 = false;
+bool PULstat6 = false;
 
 //robot geometry
 /*
@@ -67,16 +67,16 @@ const double dl4 = 360.0 / 200.0 / 32.0 / 2.8;
 const double dl5 = 360.0 / 200.0 / 32.0 / 2.1;
 const double dl6 = 360.0 / 200.0 / 32.0 / 1.0;
 // Target joint positions
-volatile float targetPos1 = 0.0;
-volatile float targetPos2 = 0.0;
-volatile float targetPos3 = 0.0;
-volatile float targetPos4 = 0.0;
-volatile float targetPos5 = 0.0;
-volatile float targetPos6 = 0.0;
+float targetPos1 = 0.0;
+float targetPos2 = 0.0;
+float targetPos3 = 0.0;
+float targetPos4 = 0.0;
+float targetPos5 = 0.0;
+float targetPos6 = 0.0;
 
 // Stepping enable flag
 volatile bool stepping = false;
-volatile bool lastSteppingState = false;
+
 // String dataIn = ""; //variable to store the bluetooth command
 // int index = 0; //index corresonding to the robot position
 // float Joint1[50], Joint2[50], Joint3[50], Joint4[50], Joint5[50], Joint6[50], MaxSpeed[50], InSpeed[50], FinSpeed[50];
@@ -159,8 +159,8 @@ void setup() {
 
   Serial.begin(115200);
   //The Arduino Mega 2560 typically uses a 16 MHz clock.
-  Timer1.initialize(150);  // pulse interval
-  Timer1.attachInterrupt(ISR_routine);  
+  Timer1.initialize(300);  // pulse interval
+  Timer1.attachInterrupt(ISR_routine);
 }
 
 void loop() {
@@ -208,22 +208,27 @@ void loop() {
     }
   }
 
-  cli();
-  bool isSteppingDone = (!stepping && lastSteppingState);
-  lastSteppingState = stepping; 
-  sei();
-  if (isSteppingDone) {    
-    // curPos1 = targetAngles[0]; // updated in isr
-    // curPos2 = targetAngles[1];
-    // curPos3 = targetAngles[2];
-    // curPos4 = targetAngles[3];
-    // curPos5 = targetAngles[4];
-    // curPos6 = targetAngles[5];
+  // Ensure 'ack' is sent when movement completes
+  static bool ackSent = false;
+  // static bool lastSteppingState = false;
+  // cli();
+  // bool isSteppingDone = (!stepping && lastSteppingState);
+  // lastSteppingState = stepping;
+  // sei();
+
+
+  if (!stepping && !ackSent) {
     Serial.println("ack");
+    Serial.flush();  // Ensure data is sent immediately
+    ackSent = true;  // small dealy to ensure the msg is sent
+  }
+
+  if (stepping) {
+    ackSent = false;
   }
 
   // Small delay to prevent serial communication interference
-  delayMicroseconds(50);  // Adjust to a suitable value (e.g., 50 or 100)
+  // delayMicroseconds(50);  // Adjust to a suitable value (e.g., 50 or 100)
 }
 
 void goStrightLine(float* xfi, float* xff, float vel0, float acc0, float velini, float velfin) {
@@ -298,82 +303,88 @@ void ISR_routine() {
 }
 
 
-volatile unsigned long lastStepTime[6] = {0, 0, 0, 0, 0, 0}; // Track last step time for each joint
-const unsigned long stepDelay[6] = {0, 50, 100, 150, 200, 250}; // Staggered delays in microseconds
+volatile unsigned long lastStepTime[6] = { 0, 0, 0, 0, 0, 0 };     // Track last step time for each joint
+const unsigned long stepDelay[6] = { 0, 50, 100, 150, 200, 250 };  // Staggered delays in microseconds
 
 //Pulse Interval (µs) = (60 * 1,000,000) / (200 * microstep * RMP * gear_ratio)
 void stepMotors() {
-  bool allMotorsStopped = true;
+  bool anyMotorMoving = false;
   unsigned long currentMicros = micros();
   // Joint 1
-  if (abs(targetPos1 - curPos1) > dl1 / 2.0 && currentMicros - lastStepTime[0] >= stepDelay[0]) {
-    digitalWrite(DIR1_PIN, dir1 ? HIGH : LOW);
-    digitalWrite(PUL1_PIN, PULstat1 ? LOW : HIGH);
-    PULstat1 = !PULstat1;
-    curPos1 += dir1 ? dl1 / 2.0 : -dl1 / 2.0;
-    lastStepTime[0] = currentMicros;
-    allMotorsStopped=false  
+  if (abs(targetPos1 - curPos1) > dl1 / 2.0) {
+    if (currentMicros - lastStepTime[0] >= stepDelay[0]) {
+      digitalWrite(DIR1_PIN, dir1 ? HIGH : LOW);
+      digitalWrite(PUL1_PIN, PULstat1 ? LOW : HIGH);
+      PULstat1 = !PULstat1;
+      curPos1 += dir1 ? dl1 / 2.0 : -dl1 / 2.0;
+      lastStepTime[0] = currentMicros;
+    }
+    anyMotorMoving = true;
   }
-
   // Joint 2
-  if (abs(targetPos2 - curPos2) > dl2 / 2.0 && currentMicros - lastStepTime[1] >= stepDelay[1]) {
-    digitalWrite(DIR2_PIN, dir2 ? HIGH : LOW);
-    digitalWrite(PUL2_PIN, PULstat2 ? LOW : HIGH);
-    PULstat2 = !PULstat2;
-    curPos2 += dir2 ? dl2 / 2.0 : -dl2 / 2.0;
-    lastStepTime[1] = currentMicros;
-    allMotorsStopped=false  
+  if (abs(targetPos2 - curPos2) > dl2 / 2.0) {
+    if (currentMicros - lastStepTime[1] >= stepDelay[1]) {
+      digitalWrite(DIR2_PIN, dir2 ? HIGH : LOW);
+      digitalWrite(PUL2_PIN, PULstat2 ? LOW : HIGH);
+      PULstat2 = !PULstat2;
+      curPos2 += dir2 ? dl2 / 2.0 : -dl2 / 2.0;
+      lastStepTime[1] = currentMicros;
+    }
+    anyMotorMoving = true;
+  }
+  // Joint 3
+  if (abs(targetPos3 - curPos3) > dl3 / 2.0) {
+    if (currentMicros - lastStepTime[2] >= stepDelay[2]) {
+      digitalWrite(DIR3_PIN, dir3 ? LOW : HIGH);
+      digitalWrite(PUL3_PIN, PULstat3 ? LOW : HIGH);
+      PULstat3 = !PULstat3;
+      curPos3 += dir3 ? dl3 / 2.0 : -dl3 / 2.0;
+      lastStepTime[2] = currentMicros;
+    }
+    anyMotorMoving = true;
   }
 
-   // Joint 3
-   if (abs(targetPos3 - curPos3) > dl3 / 2.0 && currentMicros - lastStepTime[2] >= stepDelay[2]) {
-    digitalWrite(DIR3_PIN, dir3 ? LOW : HIGH);
-    digitalWrite(PUL3_PIN, PULstat3 ? LOW : HIGH);
-    PULstat3 = !PULstat3;
-    curPos3 += dir3 ? dl3 / 2.0 : -dl3 / 2.0;
-    lastStepTime[2] = currentMicros;
-    allMotorsStopped=false
+  // Joint 4
+  if (abs(targetPos4 - curPos4) > dl4 / 2.0) {
+    if (currentMicros - lastStepTime[3] >= stepDelay[3]) {
+      digitalWrite(DIR4_PIN, dir4 ? HIGH : LOW);
+      digitalWrite(PUL4_PIN, PULstat4 ? LOW : HIGH);
+      PULstat4 = !PULstat4;
+      curPos4 += dir4 ? dl4 / 2.0 : -dl4 / 2.0;
+      lastStepTime[3] = currentMicros;
+    }
+    anyMotorMoving = true;
   }
-  
-
-   // Joint 4
-   if (abs(targetPos4 - curPos4) > dl4 / 2.0 && currentMicros - lastStepTime[3] >= stepDelay[3]) {
-    digitalWrite(DIR4_PIN, dir4 ? HIGH : LOW);
-    digitalWrite(PUL4_PIN, PULstat4 ? LOW : HIGH);
-    PULstat4 = !PULstat4;
-    curPos4 += dir4 ? dl4 / 2.0 : -dl4 / 2.0;
-    lastStepTime[3] = currentMicros;
-    allMotorsStopped=false
-  }
-  
 
   // Joint 5
-  if (abs(targetPos5 - curPos5) > dl5 / 2.0 && currentMicros - lastStepTime[4] >= stepDelay[4]) {
-    digitalWrite(DIR5_PIN, dir5 ? HIGH : LOW);
-    digitalWrite(PUL5_PIN, PULstat5 ? LOW : HIGH);
-    PULstat5 = !PULstat5;
-    curPos5 += dir5 ? dl5 / 2.0 : -dl5 / 2.0;
-    lastStepTime[4] = currentMicros;
-    allMotorsStopped=false
+  if (abs(targetPos5 - curPos5) > dl5 / 2.0) {
+    if (currentMicros - lastStepTime[4] >= stepDelay[4]) {
+      digitalWrite(DIR5_PIN, dir5 ? HIGH : LOW);
+      digitalWrite(PUL5_PIN, PULstat5 ? LOW : HIGH);
+      PULstat5 = !PULstat5;
+      curPos5 += dir5 ? dl5 / 2.0 : -dl5 / 2.0;
+      lastStepTime[4] = currentMicros;
+    }
+    anyMotorMoving = true;
   }
-  
 
   // Joint 6
-  if (abs(targetPos6 - curPos6) > dl6 / 2.0 && currentMicros - lastStepTime[5] >= stepDelay[5]) {
-    digitalWrite(DIR6_PIN, dir6 ? HIGH : LOW);
-    digitalWrite(PUL6_PIN, PULstat6 ? LOW : HIGH);
-    PULstat6 = !PULstat6;
-    curPos6 += dir6 ? dl6 / 2.0 : -dl6 / 2.0;
-    lastStepTime[5] = currentMicros;
-    allMotorsStopped=false
+  if (abs(targetPos6 - curPos6) > dl6 / 2.0) {
+    if (currentMicros - lastStepTime[5] >= stepDelay[5]) {
+      digitalWrite(DIR6_PIN, dir6 ? HIGH : LOW);
+      digitalWrite(PUL6_PIN, PULstat6 ? LOW : HIGH);
+      PULstat6 = !PULstat6;
+      curPos6 += dir6 ? dl6 / 2.0 : -dl6 / 2.0;
+      lastStepTime[5] = currentMicros;
+    }
+    anyMotorMoving = true;
   }
 
-  if (allMotorsStopped) {
-    stepping = false;
-  }
+  stepping = anyMotorMoving;
 
   // OCR1A = 300; // micro second
 }
+
 
 /*
 void stepMotors() {
