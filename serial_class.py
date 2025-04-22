@@ -6,7 +6,9 @@ import serial
 # import platform
 import logging
 from threading import Thread, Event
+
 # import time
+
 
 class SerialPort:
     def __init__(self):
@@ -23,6 +25,7 @@ class SerialPort:
         port = self._get_serial_port()
         if port:
             try:
+                # self.ser = serial.Serial(port, baudrate=115200, rtscts=True, timeout=1)
                 self.ser = serial.Serial(port, baudrate=115200, timeout=1)
                 print(f"[INFO] Connected to serial port {self.ser.name}")
                 self._event_ok2send.set()
@@ -110,7 +113,7 @@ class SerialPort:
                     if not self._event_ok2send.wait(timeout=20):  # timeout added.
                         logging.error("Timeout waiting for Arduino acknowledgement.")
                     # else:
-                    #     print("[DEBUG] Ack received.")    
+                    #     print("[DEBUG] Ack received.")
             except serial.SerialTimeoutException:
                 logging.error("Serial write timeout.")
             except serial.SerialException as e:
@@ -135,7 +138,7 @@ class SerialPort:
                     line = self.ser.readline().decode("utf-8").rstrip()
                     if line:
                         print(f"[DEBUG] received: {line}")
-                        if line.lower() == "ack":
+                        if line.lower() == "a": #ack is received
                             self._event_ok2send.set()
                         # else:
                         #     logging.debug(

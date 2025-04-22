@@ -1,9 +1,20 @@
-numpy< 2.0.0
+# sudo apt install python3-venv  # For Ubuntu/Debian
+
+# cd /path/to/cloned_repo
+# python3 -m venv myenv  # Creates a folder `myenv` with the isolated environment
+# source myenv/bin/activate  # Linux/macOS
+
+# run below installation after source myenv/bin/activate
+# pip3 install -r requirements.txt
+
+# deactivate  # Exit the environment
+
+numpy >=1.17.3, <2.0.0
 scipy >= 1.6
 pyserial >= 3.5
 spatialmath-python >= 1.1.14
-roboticstoolbox-python >= 1.1.1
 pandas >= 1.2.4
 matplotlib >= 3.3.4
+roboticstoolbox-python == 1.1.1
 
-# pip3 install -r requirements.txt
+

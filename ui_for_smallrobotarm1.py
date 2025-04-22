@@ -145,9 +145,9 @@ class Application(tk.Frame):
 
         plt.show()
 
-        command = "g{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}\n".format(
-            *self.__to_deg)
-        print(command)
+        # command = "g{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}\n".format(
+        #     *self.__to_deg)
+        # print(command)
         # send the command to the Arduino  
         cmd = {'header': 'g', 'joint_angle': self.__to_deg, 'ack': True}
         smallRobotArm.conn.send2Arduino(cmd)
