@@ -73,8 +73,8 @@ myenv\Scripts\activate  # Windows
 def main() -> None:
     logging.basicConfig()
     DOF = 6
-    bTrajectory = True
-    # bTrajectory = False
+    # bTrajectory = True
+    bTrajectory = False
 
     np.set_printoptions(precision=2, suppress=True)
 
