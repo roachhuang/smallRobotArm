@@ -159,6 +159,7 @@ void setup() {
 
   Serial.begin(115200);
   //The Arduino Mega 2560 typically uses a 16 MHz clock.
+  // set 500 microsecond pulse width seems ok for non-trajectory mode.
   Timer1.initialize(300);  // pulse interval
   Timer1.attachInterrupt(ISR_routine);
 }
@@ -227,6 +228,16 @@ void loop() {
     ackSent = false;
   }
 
+  // Send current joint positions to ROS 2 periodically
+  if (millis() % 1000 == 0) {  // Adjust the interval as needed
+    //   sendCurrentJointPositions();
+    Serial.print(curPos1); Serial.print(" ");
+    Serial.print(curPos2); Serial.print(" ");
+    Serial.print(curPos3); Serial.print(" ");
+    Serial.print(curPos4); Serial.print(" ");
+    Serial.print(curPos5); Serial.print(" ");
+    Serial.println(curPos6);
+  }
   // Small delay to prevent serial communication interference
   // delayMicroseconds(50);  // Adjust to a suitable value (e.g., 50 or 100)
 }

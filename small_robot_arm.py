@@ -73,8 +73,8 @@ myenv\Scripts\activate  # Windows
 def main() -> None:
     logging.basicConfig()
     DOF = 6
-    # bTrajectory = True
     bTrajectory = False
+    # bTrajectory = False
 
     np.set_printoptions(precision=2, suppress=True)
 
@@ -116,8 +116,10 @@ def main() -> None:
     # there must be a delay here right after sieal is initialized
     sleep(1)  # don't remove this line!!!
     smallRobotArm.enable()
-    T = smallRobotArm.fk(smallRobotArm.robot_rest_angles)
-    print(f"rest pose: {smallRobotArm.T2Pose(T)}")
+    
+    
+    # T = smallRobotArm.fk(smallRobotArm.robot_rest_angles)
+    # print(f"rest pose: {smallRobotArm.T2Pose(T)}")
     
     """
     for curPos are all zero
@@ -158,7 +160,7 @@ def main() -> None:
             (164.5, 0.0, 141.0, 90.0, 180.0, -90.0),  # j1
             (164.5, -100.0, 141.0, 90.0, -90.0, 0.0),  # j4
             (164.5, 0.0, 141.0, 90.0, 180.0, -90.0),  # j1
-            (164.5, 0.0, 241.0, 90.0, 180.0, -90.0),  # Home (x, y, z, ZYZ Euler angles)
+            (164.5, 0.0, 241.0, 90.0, 180.0, 90.0),  # Home (x, y, z, ZYZ Euler angles)
         ]
     )
 
@@ -285,6 +287,8 @@ def main() -> None:
 
             # input("Press Enter to continue...")
         # plt.show()
+        
+        
 
     ###################################################################
     else:
@@ -295,7 +299,7 @@ def main() -> None:
         T_06_at_0s = T_0E_at_0s.A @ smallRobotArm.T_6E_inv
         j = smallRobotArm.ik(T_06_at_0s)
         smallRobotArm.move_to_angles(j)
-        input("Press Enter to continue...")
+        # input("Press Enter to continue...")
         # traj planning in joint-space.
         """
         there is another method: in cartesian-space. if it needs 100 operating point in 1s (100hz) for period of 9s,
@@ -394,7 +398,6 @@ def main() -> None:
     # smallRobotArm.moveTo(initPose)
     smallRobotArm.go_home()
     print("THREAD TERMINATED!")
-
 
 if __name__ == "__main__":
     main()
