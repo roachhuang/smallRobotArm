@@ -244,6 +244,9 @@ class SmallRbtArm(RobotArm):
         # self.conn.ser.write(b"rst\n")
         # sleep(.5)
 
+    def calibrate(self):
+        self.conn.ser.write(b"g28\n")  # G28 is the command to home the robot arm
+        
     def disable(self):
         self.conn.ser.write(b"dis\n")
 
