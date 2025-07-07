@@ -138,7 +138,7 @@ class SerialPort:
                     line = self.ser.readline().decode("utf-8").rstrip()
                     if line:
                         print(f"[DEBUG] received: {line}")
-                        if line.lower() == "a": #ack is received
+                        if line.lower() == "ack": #ack is received
                             self._event_ok2send.set()
                         # else:
                         #     logging.debug(

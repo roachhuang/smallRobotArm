@@ -2,6 +2,7 @@ from time import sleep, perf_counter
 import logging
 import pandas as pd
 import numpy as np
+import signal   
 
 # import matplotlib.pyplot as plt
 # from eclipse_motion_poses import generate_tilted_ellipse
@@ -69,8 +70,23 @@ python -m venv myenv
 source myenv/bin/activate  # Linux/macOS
 myenv\Scripts\activate  # Windows
 """
+smallRobotArm = None  # Declare at module level
+def handler(signum, frame):
+    """
+    Signal handler to gracefully exit the program on Ctrl+C.
+    """
+    print("\nSignal received, exiting gracefully...")
+    if smallRobotArm is not None:
+        smallRobotArm.go_home()  # Move the robot arm to home position
+        sleep(3)  # Wait for the robot arm to reach home position    
+        smallRobotArm.disable()  # Disable the robot arm
+        smallRobotArm.conn.close()  # Close the serial connection
+    exit(0)  # Exit the program
 
 def main() -> None:
+    global smallRobotArm  # Tell Python to use the global variable
+    signal.signal(signal.SIGINT, handler)
+    
     logging.basicConfig()
     DOF = 6
     bTrajectory = False
@@ -85,8 +101,8 @@ def main() -> None:
     # smRobot.islimit([0, 0, -4, 4, 0, 0])
     print("is spherical:", smRobot.isspherical())
     # Robot kinematics as an elemenary transform sequence
-    smRobot.ets()
-
+    smRobot.ets()    
+    
     # r6=distance btw axis6 and end-effector
     std_dh_params = np.array(
         [
@@ -100,6 +116,15 @@ def main() -> None:
     )
     # create an instance of the robotarm.
     smallRobotArm = robot.SmallRbtArm(std_dh_params)
+    
+    # Compute the Jacobian matrix in the base frame
+    jacobian_matrix = smRobot.jacob0(smallRobotArm.robot_rest_angles)
+    print("Jacobian Matrix (in base frame):\n", jacobian_matrix)
+    # Compute the Jacobian matrix in the end-effector frame
+    # jacobian_matrix_ee = smRobot.jacobe(smallRobotArm.robot_rest_angles )
+    # print("Jacobian Matrix (in end-effector frame):\n", jacobian_matrix_ee)
+    
+    
     # these values derived from fig 10 of my smallrobotarm notebook
     """move to rest angles at begining won't work coz 1. the motors don't have encoder. 2. If your robot uses incremental encoders, it loses its position when power is cycled or the program is restarted.
     Solution: Implement homing at startup using absolute encoders or external reference sensors.e motors have no encoder to record previous angles.
@@ -116,7 +141,12 @@ def main() -> None:
     # there must be a delay here right after sieal is initialized
     sleep(1)  # don't remove this line!!!
     smallRobotArm.enable()
-    
+    sleep(1)
+    # calibration
+    smallRobotArm.calibrate()
+    smallRobotArm.conn._event_ok2send.clear()
+    print("[DEBUG] Waiting for ack...")
+    sleep(2)
     
     # T = smallRobotArm.fk(smallRobotArm.robot_rest_angles)
     # print(f"rest pose: {smallRobotArm.T2Pose(T)}")

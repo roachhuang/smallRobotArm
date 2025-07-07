@@ -239,10 +239,7 @@ class SmallRbtArm(RobotArm):
 
     def enable(self):
         # motors are disabled in arduino's setup()
-        self.conn.ser.write(b"en\n")
-        # sleep(.5)
-        # self.conn.ser.write(b"rst\n")
-        # sleep(.5)
+        self.conn.ser.write(b"en\n")       
 
     def calibrate(self):
         self.conn.ser.write(b"g28\n")  # G28 is the command to home the robot arm
