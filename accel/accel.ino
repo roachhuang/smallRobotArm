@@ -47,8 +47,8 @@ void setup() {
 
   // Configure steppers
   for (int i = 0; i < 6; i++) {
-    steppers[i].setMaxSpeed(MAX_SPEED);     // steps/sec (adjust based on your requirements)
-    steppers[i].setAcceleration(500);  // steps/sec²
+    steppers[i].setMaxSpeed(MAX_SPEED);  // steps/sec (adjust based on your requirements)
+    steppers[i].setAcceleration(500);    // steps/sec²
   }
 
   // Set initial positions
@@ -74,10 +74,10 @@ void loop() {
   for (int i = 0; i < 6; i++) {
     steppers[i].run();
     if (steppers[i].distanceToGo() != 0) {
-      allDone= false;
+      allDone = false;
     }
   }
-  if (waitingAck && allDone == true){
+  if (waitingAck && allDone == true) {
     Serial.println("ack");  // arduino is free.
     waitingAck = false;
   }
@@ -195,16 +195,19 @@ void parseFloats(const char *str, float *out, int maxCount) {
 // Keep your existing serialEvent() and parsing functions
 // Add command processing in processCommand():
 void processCommand(const char *cmd) {
-  if (cmd[0] == 'g') {
+  if (strcmp(cmd, "g28") == 0) {
+    move_j2_up();
+    homeJoint(Y_MAX_PIN, 2);  // Home joint 3 using limit switch
+    homeJoint(Z_MAX_PIN, 1);  // Home joint 2 using limit switch
+    Serial.println("ack");
+  } else if (cmd[0] == 'g') {
     float targets[6];
     parseFloats(cmd + 1, targets, 6);
-    // targets are in degrees
+    // non-blocking mode. targets are in degrees
     // moveToPosition(targets);
     moveToPositionSync(targets);  // NEW
     waitingAck = true;
-  }
-
-  else if (strcmp(cmd, "eOn") == 0) {
+  } else if (strcmp(cmd, "eOn") == 0) {
     digitalWrite(END_EFFECTOR_PIN, HIGH);
   } else if (strcmp(cmd, "eOff") == 0) {
     digitalWrite(END_EFFECTOR_PIN, LOW);
@@ -212,11 +215,6 @@ void processCommand(const char *cmd) {
     enableMotors(true);
   } else if (strcmp(cmd, "dis") == 0) {
     enableMotors(false);
-  } else if (strcmp(cmd, "g28") == 0) {
-    move_j2_up();
-    homeJoint(Y_MAX_PIN, 2);  // Home joint 3 using limit switch
-    homeJoint(Z_MAX_PIN, 1);  // Home joint 2 using limit switch
-    // Serial.println("ack");
   }
 }
 
@@ -233,8 +231,8 @@ void move_j2_up() {
   AccelStepper &stepper = steppers[1];  // Joint 2
 
   // Configure motion parameters
-  stepper.setAcceleration(500);         // Steps/sec²
-  stepper.setMaxSpeed(800);             // Steps/sec
+  stepper.setAcceleration(500);  // Steps/sec²
+  stepper.setMaxSpeed(800);      // Steps/sec
 
   // Move a bit upward (+ direction)
   long step_offset = 400;  // Move 400 steps upward (~tune based on gear ratio)
@@ -254,8 +252,8 @@ void homeJoint(uint8_t limitPin, uint8_t joint_num) {
   int homeSpeed = 800;
   AccelStepper &stepper = steppers[joint_num];
   stepper.setAcceleration(500);
-  
-  bool triggered = joint_num == 2? LOW: HIGH;
+
+  bool triggered = joint_num == 2 ? LOW : HIGH;
 
   // Step 1: If switch already triggered, back off
   if (digitalRead(limitPin) == triggered) {
@@ -330,7 +328,7 @@ void moveToPositionSync(float targetDegrees[6]) {
     float speedRatio = maxDelta == 0 ? 0 : (float)deltaSteps[i] / maxDelta;
     float scaledSpeed = MAX_SPEED * speedRatio;  // Use your existing MAX_SPEED here
     steppers[i].setMaxSpeed(scaledSpeed);
-    steppers[i].setAcceleration(500.0*speedRatio);  // Adjust to your needs or scale it too
+    steppers[i].setAcceleration(500.0 * speedRatio);  // Adjust to your needs or scale it too
     steppers[i].moveTo(targetSteps[i]);
   }
 }

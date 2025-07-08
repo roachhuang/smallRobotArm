@@ -3,10 +3,6 @@ import logging
 import pandas as pd
 import numpy as np
 import signal   
-
-# import matplotlib.pyplot as plt
-# from eclipse_motion_poses import generate_tilted_ellipse
-
 # import pyvista
 import equations as eq
 import robotarm_class as robot
@@ -14,8 +10,6 @@ import plan_traj as pt
 from roboticstoolbox import DHRobot, RevoluteDH
 
 from spatialmath import SE3
-
-# from spatialmath.base import trplot
 
 # from scipy.spatial.transform import Rotation as R
 # from scipy.interpolate import CubicSpline
@@ -50,26 +44,21 @@ todo:
     3. sigularities, numberical instability.
     4. precision test for position
     5. add ai onto it.
-    6. ros2
     7. ar4 or ar4-mk3   
     8. reachable workspace
     9. from a point to b point, may have mutilple soultions from ik. choose minimum thetas
     10. research spatialmath
-    11. refact s1.ino
     12. use 'g' command, like 3-d printer. 
     13. ik takes desired pose of end-effector frame relative to the world frame.
     14. ik and fk must take world frame and end-effector frame into consideration.
     what about cup frame? ask gpt.
     always use np.array coz it can represent any number of dimensions (vectors, matrices, tensors, etc.). 
     15. minimizing joint movement.
-"""
-
-"""
 Create a Virtual Environment
 python -m venv myenv
 source myenv/bin/activate  # Linux/macOS
-myenv\Scripts\activate  # Windows
 """
+
 smallRobotArm = None  # Declare at module level
 def handler(signum, frame):
     """
@@ -78,9 +67,6 @@ def handler(signum, frame):
     print("\nSignal received, exiting gracefully...")
     if smallRobotArm is not None:
         smallRobotArm.go_home()  # Move the robot arm to home position
-        sleep(3)  # Wait for the robot arm to reach home position    
-        smallRobotArm.disable()  # Disable the robot arm
-        smallRobotArm.conn.close()  # Close the serial connection
     exit(0)  # Exit the program
 
 def main() -> None:
@@ -90,7 +76,7 @@ def main() -> None:
     logging.basicConfig()
     DOF = 6
     bTrajectory = False
-    # bTrajectory = False
+    # bTrajectory = True
 
     np.set_printoptions(precision=2, suppress=True)
 
@@ -120,6 +106,7 @@ def main() -> None:
     # Compute the Jacobian matrix in the base frame
     jacobian_matrix = smRobot.jacob0(smallRobotArm.robot_rest_angles)
     print("Jacobian Matrix (in base frame):\n", jacobian_matrix)
+    M_q = smRobot.inertia(smallRobotArm.robot_rest_angles)      # 6x6 joint-space inertia matrix
     # Compute the Jacobian matrix in the end-effector frame
     # jacobian_matrix_ee = smRobot.jacobe(smallRobotArm.robot_rest_angles )
     # print("Jacobian Matrix (in end-effector frame):\n", jacobian_matrix_ee)
@@ -136,7 +123,6 @@ def main() -> None:
     # j=smallRobotArm.ik(T.A)
     # smallRobotArm.move_to_angles(j)
     print(f"zero joint pose: {smallRobotArm.T2Pose(T.A)}")
-    # input("Press Enter to continue...")
 
     # there must be a delay here right after sieal is initialized
     sleep(1)  # don't remove this line!!!
@@ -222,57 +208,6 @@ def main() -> None:
 
     # this is only for giving time col to joints
     joints = poses.copy()
-
-    
-    # elliptical trajectory
-    '''
-    center = (50, 0, 140)  # Ellipse centered at (300, 0, 200) in mm
-    radii = (100, 50)  # Ellipse radii (X = 100mm, Y = 50mm)
-    tilt_angle=np.radians(30)
-    """Generate SE(3) poses for an elliptical trajectory on a tilted plane."""
-    # poses = em.generate_tilted_ellipse(center, radii, tilt_angle)
-    for T in generate_tilted_ellipse(
-        center=(50, 0, 140),
-        radii=(100, 50),
-        tilt_angle=np.radians(-30),
-        num_points=50,
-    ):
-        my_j= smallRobotArm.ik(T.A)
-        ik_sol = smRobot.ikine_LM(SE3(T), q0=np.ones(smRobot.n))
-        if not ik_sol.success:
-            print("IK solution failed!!!")
-            continue
-        # cross comparison of ik results from both libraries
-        kine_j = np.degrees(ik_sol.q)
-        myfk_T = smallRobotArm.fk(kine_j)
-        fkine_T = smRobot.fkine(np.radians(my_j))
-        if not np.allclose(fkine_T.A, myfk_T, rtol=1e-2, atol=1e-2):
-            print(myfk_T)
-            print(fkine_T.A)
-            raise ValueError("T and myfk_T are not close")
-        smallRobotArm.move_to_angles(kine_j)
-        # cmd = {"header": "m", "joint_angle": kine_j, "ack": True}
-        # smallRobotArm.conn.send2Arduino(cmd)
-        
-    smallRobotArm.go_home()
-    exit(0)
-    
-    '''
-    '''
-    # interpolate between two poses
-    T1 = SE3.Trans(240, -140, 40) * SE3.RPY(30, 0, 30, unit='deg')
-    T2 = SE3.Trans(160, 140, 140) * SE3.RPY(0, 0, 60, unit='deg')
-    poses = smallRobotArm.interpolate_poses(T1.A, T2.A) # Get 10 smooth poses.
-    for pose in poses:        
-        ik_sol = smRobot.ikine_LM(pose, q0=np.ones(smRobot.n))
-        if not ik_sol.success:
-            print("IK solution failed!!!")
-            exit(0)
-        smallRobotArm.move_to_angles(np.degrees(ik_sol.q))
-    input("Press Enter to continue...")
-    smallRobotArm.go_home()  
-    exit(0)
-    '''
     
     if bTrajectory == False:
         for pose in poses0:
@@ -280,21 +215,23 @@ def main() -> None:
             T_0E = smallRobotArm.pose2T(pose, seq="zyz")
             # T_06 = T_0E @ smallRobotArm.T_6E_inv
             # euler angles ZYZ according to smallrobot arm's demo
-            my_j = smallRobotArm.ik(T_0E)
+            # my_j = smallRobotArm.ik(T_0E)
             # T=smallRobotArm.pose2T(corrected_pose, seq="ZYZ")
             ik_sol = smRobot.ikine_LM(SE3(T_0E), q0=np.ones(smRobot.n))
             if not ik_sol.success:
                 print("IK solution failed!!!")
                 continue
-            # cross comparison of ik results from both libraries
             kine_j = np.degrees(ik_sol.q)
+            
+            '''
+            # cross comparison of ik results from both libraries
             myfk_T = smallRobotArm.fk(kine_j)
             fkine_T = smRobot.fkine(np.radians(my_j))
-            # SE3(T_0E).printline()
             if not np.allclose(fkine_T.A, myfk_T, rtol=1e-2, atol=1e-2):
                 print(myfk_T)
                 print(fkine_T.A)
                 raise ValueError("T and myfk_T are not close")
+            '''
 
             """            
             # Plot the frame coordinate with customization
@@ -313,11 +250,20 @@ def main() -> None:
             plt.pause(0.1)  # w/o this line frame coordiantes won't be displayed.
             """
             # print(kine_j.round(2))
-            smallRobotArm.move_to_angles(kine_j)
+            # Generate original straight-line path
+            original_path = smallRobotArm.generate_path(smallRobotArm.current_angles, kine_j, steps=5)
+            # compute the joint-space inertia matrix
+            M=smRobot.inertia(kine_j)  # 6x6 joint-space inertia matrix
+            eigvals, eigvecs = np.linalg.eig(M)
+            # 2. Find "easy-move" direction
+            easy_direction = eigvecs[:, np.argmin(eigvals)]
+            # 3. Adjust motion path to align with easy direction            
+            adjusted_j = smallRobotArm.align_path_to_vector(original_path, easy_direction)
+            for angles in adjusted_j:
+                smallRobotArm.move_to_angles(angles)
 
             # input("Press Enter to continue...")
         # plt.show()
-        
         
 
     ###################################################################
@@ -404,7 +350,7 @@ def main() -> None:
                     )
 
             # ask arduino to run goTractory(Xx)
-            cmd = {"header": "m", "joint_angle": Xx, "ack": True}
+            cmd = {"header": "g", "joint_angle": Xx, "ack": False}
             # print(f"Xx: {Xx}")
             smallRobotArm.conn.send2Arduino(cmd)
             # must be a delay here. ack takes too long causing discontinued arm movement.

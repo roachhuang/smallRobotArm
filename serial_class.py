@@ -26,7 +26,7 @@ class SerialPort:
         if port:
             try:
                 # self.ser = serial.Serial(port, baudrate=115200, rtscts=True, timeout=1)
-                self.ser = serial.Serial(port, baudrate=115200, timeout=1)
+                self.ser = serial.Serial(port, baudrate=250000, timeout=1)
                 print(f"[INFO] Connected to serial port {self.ser.name}")
                 self._event_ok2send.set()
                 self._event_run.set()
@@ -103,12 +103,12 @@ class SerialPort:
             )
             try:
                 self.ser.write(msg.encode("utf-8"))
-                print(f"[INFO] Sent: {msg.strip()}")
+                # print(f"[INFO] Sent: {msg.strip()}")
                 # logging.debug(f"Sent command: {msg.strip()}")
                 self._event_ok2send.clear()
                 if cmd["ack"]:
                     self._event_ok2send.clear()
-                    print("[DEBUG] Waiting for ack...")
+                    # print("[DEBUG] Waiting for ack...")
                     # timeout must be >= 15
                     if not self._event_ok2send.wait(timeout=20):  # timeout added.
                         logging.error("Timeout waiting for Arduino acknowledgement.")
@@ -137,8 +137,8 @@ class SerialPort:
                 try:
                     line = self.ser.readline().decode("utf-8").rstrip()
                     if line:
-                        print(f"[DEBUG] received: {line}")
-                        if line.lower() == "ack": #ack is received
+                        # print(f"[DEBUG] received: {line}")
+                        if line == "ack": #ack is received
                             self._event_ok2send.set()
                         # else:
                         #     logging.debug(
