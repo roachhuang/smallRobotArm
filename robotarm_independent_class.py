@@ -4,42 +4,29 @@ import numpy as np
 from numpy import ndarray
 from spatialmath import SE3
 import serial_class as ser
+from scipy.interpolate import CubicSpline
+import matplotlib.pyplot as plt
 
 # robot arm independent, inherited by robot arm dependent classes.
 class RobotArm(ABC):
     def __init__(self):
         # init arm independent params
         self.conn = ser.SerialPort()
-        self.conn.connect()
-                         
-    def generate_path(self, start_angles, target_angles, steps=10):
-        """
-        Creates a straight-line path in joint space from start to target angles
-        start_angles: Current joint angles [j1, j2, ..., jn] (radians)
-        target_angles: Desired joint angles [j1, j2, ..., jn] (radians)
-        steps: Number of intermediate points
-        Returns: List of joint angle arrays
-        """
-        path = []
-        
-        # Convert to numpy arrays for vector math
-        start = np.array(start_angles)
-        target = np.array(target_angles)
-        
-        # Calculate total change per joint
-        delta = target - start
-        
-        # Generate equally spaced points
-        for i in range(steps):
-            # Fraction of path completion (0 to 1)
-            fraction = i / (steps - 1)
-            
-            # Linear interpolation for all joints
-            point = start + fraction * delta
-            
-            path.append(point)
-        
+        self.conn.connect()        
+    
+    def generate_linear_path(self, start, end, steps):
+        """Generates joint-space straight-line path from start to end."""
+        start = np.array(start)
+        end = np.array(end)
+        path = [start + (end - start) * t / (steps - 1) for t in range(steps)]
         return path
+    
+    def smooth_path(self, path, alpha=0.3):
+        smoothed = [path[0]]
+        for i in range(1, len(path)):
+            smooth = alpha * np.array(path[i]) + (1 - alpha) * np.array(smoothed[-1])
+            smoothed.append(smooth)
+        return smoothed         
     
     def align_path_to_vector(self, original_path, easy_direction, strength=0.7):
         """
@@ -270,18 +257,34 @@ class RobotArm(ABC):
     def disable(self):
         self.conn.ser.write(b"dis\n")
 
-    def move_to_angles(self, j: tuple) -> None:
+    def move_to_angles(self, j: tuple, header='g', ack=True) -> None:
         # return super().moveTo(end_effector_pose)
         # limited_j = self.limit_joint_angles(j)
-        cmd = {"header": "g", "joint_angle": j, "ack": True}
+        cmd = {"header": header, "joint_angle": j, "ack": ack}
         self.conn.send2Arduino(cmd)
-        self.current_angles = j
         
     def go_home(self):
         self.move_to_angles(self.robot_rest_angles)
         self.disable()
         # a way to terminate thread
         self.conn.disconnect()
+    
+    def plot_frame_coordinates(self, smRobot, my_j, ik_sol):
+        # Plot the frame coordinate with customization
+        smRobot.plot(np.radians(my_j), backend='pyplot', block=False, jointaxes=True)
+        # Get the current axes from robot.plot()          
+        ax = plt.gca()                        
+        fkine_all_T = smRobot.fkine_all(ik_sol.q)
+        # Plot coordinate frames for each link
+        for i, t in enumerate(fkine_all_T):
+            T_arr = t.A
+            smRobot.trplot(T_arr, ax=ax, width=2, length=20, color=('r','g','b'))
+                            
+        # Rotate the view for better visibility (optional)
+        # ax.view_init(elev=30, azim=45)  # Adjust as needed
+        plt.draw()
+        plt.pause(0.1)  # w/o this line frame coordiantes won't be displayed.
+        
         
     # interface
     @abstractmethod

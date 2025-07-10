@@ -129,10 +129,10 @@ def main() -> None:
     smallRobotArm.enable()
     sleep(1)
     # calibration
-    smallRobotArm.calibrate()
-    smallRobotArm.conn._event_ok2send.clear()
-    print("[DEBUG] Waiting for ack...")
-    sleep(2)
+    # smallRobotArm.calibrate()
+    # smallRobotArm.conn._event_ok2send.clear()    
+    # print("[DEBUG] Waiting for ack...")
+    # sleep(2)
     
     # T = smallRobotArm.fk(smallRobotArm.robot_rest_angles)
     # print(f"rest pose: {smallRobotArm.T2Pose(T)}")
@@ -232,39 +232,28 @@ def main() -> None:
                 print(fkine_T.A)
                 raise ValueError("T and myfk_T are not close")
             '''
-
-            """            
-            # Plot the frame coordinate with customization
-            smRobot.plot(np.radians(my_j), backend='pyplot', block=False, jointaxes=True)
-            # Get the current axes from robot.plot()          
-            ax = plt.gca()                        
-            fkine_all_T = smRobot.fkine_all(ik_sol.q)
-            # Plot coordinate frames for each link
-            for i, t in enumerate(fkine_all_T):
-                T_arr = t.A
-                smb.trplot(T_arr, ax=ax, width=2, length=20, color=('r','g','b'))
-                              
-            # Rotate the view for better visibility (optional)
-            # ax.view_init(elev=30, azim=45)  # Adjust as needed
-            plt.draw()
-            plt.pause(0.1)  # w/o this line frame coordiantes won't be displayed.
-            """
+           
             # print(kine_j.round(2))
-            # Generate original straight-line path
-            original_path = smallRobotArm.generate_path(smallRobotArm.current_angles, kine_j, steps=5)
+            
+            diff = np.linalg.norm(np.array(kine_j) - np.array(smallRobotArm.current_angles))
+            steps = min(20, max(5, int(diff / 10 * 10)))  # Scale reasonably (5 deg per step)s = int(diff * 10)  # 10 steps per radian of total joint-space distance
+            linear_path = smallRobotArm.generate_linear_path(smallRobotArm.current_angles, kine_j, steps)
+            
             # compute the joint-space inertia matrix
             M=smRobot.inertia(kine_j)  # 6x6 joint-space inertia matrix
             eigvals, eigvecs = np.linalg.eig(M)
             # 2. Find "easy-move" direction
             easy_direction = eigvecs[:, np.argmin(eigvals)]
             # 3. Adjust motion path to align with easy direction            
-            adjusted_j = smallRobotArm.align_path_to_vector(original_path, easy_direction)
+            adjusted_j = smallRobotArm.align_path_to_vector(linear_path, easy_direction)
             for angles in adjusted_j:
-                smallRobotArm.move_to_angles(angles)
-
+                smallRobotArm.move_to_angles(angles, header="g", ack=True)
+            
+            
+            # smallRobotArm.move_to_angles(kine_j, header="g", ack=True)
+            smallRobotArm.current_angles = kine_j  # Important to track for next segment
+            
             # input("Press Enter to continue...")
-        # plt.show()
-        
 
     ###################################################################
     else:
