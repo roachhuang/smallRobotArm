@@ -35,5 +35,30 @@ const int MAX_INPUT_SIZE = 100;
 
 const int lower_limit[6] = { -114, -81, -180, -180, -139, -180 };
 const int upper_limit[6] = { 114, 77, 70, 180, 139, 180 };
-const float MAX_SPEED = 1000.0;
+const float MAX_SPEED = 2000.0;
+
+#define MAX_QUEUE_SIZE 64
+float waypointQueue[MAX_QUEUE_SIZE][6];
+int head = 0, tail = 0;
+
+
+// Stepper motor objects
+AccelStepper steppers[6] = {
+  AccelStepper(AccelStepper::DRIVER, PUL_PINS[0], DIR_PINS[0]),
+  AccelStepper(AccelStepper::DRIVER, PUL_PINS[1], DIR_PINS[1]),
+  AccelStepper(AccelStepper::DRIVER, PUL_PINS[2], DIR_PINS[2]),
+  AccelStepper(AccelStepper::DRIVER, PUL_PINS[3], DIR_PINS[3]),
+  AccelStepper(AccelStepper::DRIVER, PUL_PINS[4], DIR_PINS[4]),
+  AccelStepper(AccelStepper::DRIVER, PUL_PINS[5], DIR_PINS[5])
+};
+
+// Current positions in degrees
+float currentPositions[6] = { 0.0, -78.51, 73.90, 0.0, -90.0, 0.0 };
+const float homePositions[6] = { 0.0, -78.51, 73.90, 0.0, -90.0, 0.0 };
+// float currentPositions[6] = { 0.0, -1.37, 1.2898, 0.0, -1.5708, 0.0 }; in radians
+
+char inputBuffer[MAX_INPUT_SIZE];
+int inputIndex = 0;
+bool newCommandReady = false;
+const int step_threshold = 300; // 200 steps
 #endif  // DEFINE_H_

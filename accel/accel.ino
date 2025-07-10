@@ -1,25 +1,6 @@
 #include <AccelStepper.h>
 #include "define.h"
 
-// Stepper motor objects
-AccelStepper steppers[6] = {
-  AccelStepper(AccelStepper::DRIVER, PUL_PINS[0], DIR_PINS[0]),
-  AccelStepper(AccelStepper::DRIVER, PUL_PINS[1], DIR_PINS[1]),
-  AccelStepper(AccelStepper::DRIVER, PUL_PINS[2], DIR_PINS[2]),
-  AccelStepper(AccelStepper::DRIVER, PUL_PINS[3], DIR_PINS[3]),
-  AccelStepper(AccelStepper::DRIVER, PUL_PINS[4], DIR_PINS[4]),
-  AccelStepper(AccelStepper::DRIVER, PUL_PINS[5], DIR_PINS[5])
-};
-
-// Current positions in degrees
-float currentPositions[6] = { 0.0, -78.51, 73.90, 0.0, -90.0, 0.0 };
-const float homePositions[6] = { 0.0, -78.51, 73.90, 0.0, -90.0, 0.0 };
-// float currentPositions[6] = { 0.0, -1.37, 1.2898, 0.0, -1.5708, 0.0 }; in radians
-
-char inputBuffer[MAX_INPUT_SIZE];
-int inputIndex = 0;
-bool newCommandReady = false;
-
 void setup() {
   Serial.begin(115200);
   while (!Serial) {
@@ -73,12 +54,13 @@ void loop() {
   // Non-blocking motor control. don't move it into processcommand!
   for (int i = 0; i < 6; i++) {
     steppers[i].run();
-    if (steppers[i].distanceToGo() != 0) {
+    // allow py to send cmd 200 steps prior to done moving.
+    if (steppers[i].distanceToGo() > step_threshold) {
       allDone = false;
     }
   }
   if (waitingAck && allDone == true) {
-    Serial.println("ack");  // arduino is free.
+    Serial.println("ack");  // todo: avoid blocking in loop (serial.println() is blocking)
     waitingAck = false;
   }
 
@@ -330,5 +312,5 @@ void moveToPositionSync(float targetDegrees[6]) {
     steppers[i].setMaxSpeed(scaledSpeed);
     steppers[i].setAcceleration(500.0 * speedRatio);  // Adjust to your needs or scale it too
     steppers[i].moveTo(targetSteps[i]);
-  }
+  } 
 }
