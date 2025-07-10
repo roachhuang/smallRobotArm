@@ -26,7 +26,7 @@ class SerialPort:
         if port:
             try:
                 # self.ser = serial.Serial(port, baudrate=115200, rtscts=True, timeout=1)
-                self.ser = serial.Serial(port, baudrate=250000, timeout=1)
+                self.ser = serial.Serial(port, baudrate=115200, timeout=1)
                 print(f"[INFO] Connected to serial port {self.ser.name}")
                 self._event_ok2send.set()
                 self._event_run.set()
@@ -105,8 +105,8 @@ class SerialPort:
                 self.ser.write(msg.encode("utf-8"))
                 # print(f"[INFO] Sent: {msg.strip()}")
                 # logging.debug(f"Sent command: {msg.strip()}")
-                self._event_ok2send.clear()
-                if cmd["ack"]:
+                # self._event_ok2send.clear()
+                if cmd["ack"] == True:
                     self._event_ok2send.clear()
                     # print("[DEBUG] Waiting for ack...")
                     # timeout must be >= 15
