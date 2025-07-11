@@ -13,7 +13,7 @@ import robotarm_class as smRbt
 import tkinter as tk
 
 from time import sleep
-import serial_class as com
+import robot_tools.serial.serial_class as com
 
 font_size = 18
 slider_size = 14

@@ -4,12 +4,12 @@ import pandas as pd
 import numpy as np
 import signal   
 # import pyvista
-import equations as eq
-import robotarm_class as robot
-import robot_controller as controller
-import plan_traj as pt
-from roboticstoolbox import DHRobot, RevoluteDH
+import robot_tools.trajectory.equations as eq
+import robot_tools.kinematics.robotarm_class as robot
+import robot_tools.controller.robot_controller as controller
+import robot_tools.trajectory.plan_traj as pt
 
+from roboticstoolbox import DHRobot, RevoluteDH
 from spatialmath import SE3
 
 # from scipy.spatial.transform import Rotation as R
