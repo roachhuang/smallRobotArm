@@ -6,6 +6,7 @@ import signal
 # import pyvista
 import equations as eq
 import robotarm_class as robot
+import robot_controller as controller
 import plan_traj as pt
 from roboticstoolbox import DHRobot, RevoluteDH
 
@@ -102,16 +103,9 @@ def main() -> None:
     )
     # create an instance of the robotarm.
     smallRobotArm = robot.SmallRbtArm(std_dh_params)
-    
-    # Compute the Jacobian matrix in the base frame
-    jacobian_matrix = smRobot.jacob0(smallRobotArm.robot_rest_angles)
-    print("Jacobian Matrix (in base frame):\n", jacobian_matrix)
-    M_q = smRobot.inertia(smallRobotArm.robot_rest_angles)      # 6x6 joint-space inertia matrix
-    # Compute the Jacobian matrix in the end-effector frame
-    # jacobian_matrix_ee = smRobot.jacobe(smallRobotArm.robot_rest_angles )
-    # print("Jacobian Matrix (in end-effector frame):\n", jacobian_matrix_ee)
-    
-    
+    rbt_controller = controller.RobotController(smRobot)
+    smallRobotArm.controller = rbt_controller  # Assign the controller to the robot arm instance
+                    
     # these values derived from fig 10 of my smallrobotarm notebook
     """move to rest angles at begining won't work coz 1. the motors don't have encoder. 2. If your robot uses incremental encoders, it loses its position when power is cycled or the program is restarted.
     Solution: Implement homing at startup using absolute encoders or external reference sensors.e motors have no encoder to record previous angles.
@@ -126,7 +120,7 @@ def main() -> None:
 
     # there must be a delay here right after sieal is initialized
     sleep(1)  # don't remove this line!!!
-    smallRobotArm.enable()
+    smallRobotArm.controller.enable()  # enable the robot arm
     sleep(1)
     # calibration
     # smallRobotArm.calibrate()
@@ -210,6 +204,41 @@ def main() -> None:
     joints = poses.copy()
     
     if bTrajectory == False:
+        
+        # Compute the Jacobian matrix in the base frame
+        # jacobian_matrix = smRobot.jacob0(smallRobotArm.robot_rest_angles)
+        # Desired end-effector velocity in world frame (ẋ = [vx, vy, vz, ωx, ωy, ωz])
+        # my dhtbl is in mm, so here x,y,z in mm/s
+        # x_dot = np.array([10.0, 10.0, 10.0, 0.0, 0.0, 0.0])  # [m/s, rad/s]
+        # dt = 0.02  # control period (e.g. 50Hz)
+        # q = np.radians(smallRobotArm.current_angles)  # joint angles in radians
+        
+        # # simulating velocity control in joint space
+        # max_qdot = np.radians(10)  # max joint velocity in rad
+        # for step in range(250):  # run for 5 seconds. steps= duration in sec/0.02
+        #     J = smRobot.jacob0(q)  # 6x6 Jacobian at current joint state
+        #     q_dot = np.linalg.pinv(J, rcond=1e-4) @ x_dot  # 6x1 joint velocity vector
+        #     q_dot = np.clip(q_dot, -max_qdot, max_qdot)
+        #     q += q_dot * dt  # integrate to get next joint position
+
+        #     deg_q = np.degrees(q)
+        #     smallRobotArm.move_to_angles(deg_q, header="g", ack=True)
+        #     smallRobotArm.current_angles = deg_q.copy()
+
+        #     sleep(dt)
+            
+        
+        zero_j = (0, 0, 0, 0, 0, 0)
+        smallRobotArm.controller.move_to_angles(zero_j, header="g", ack=True)  
+        # q_final = smallRobotArm.velocity_control(smRobot, zero_j, smallRobotArm.circle_xy_velocity, dt=0.05, duration=5.0)
+        smallRobotArm.controller.velocity_control(robot=smRobot, q_init=np.radians(zero_j), x_dot_func=lambda t: smallRobotArm.controller.circle_xy_velocity(t, radius 
+                                                                                                                                       =40, period=15.0), dt=0.05, duration=15.0)
+        input("Press Enter to continue...")
+        smallRobotArm.controller.velocity_control(robot=smRobot, q_init=np.radians(zero_j), x_dot_func=lambda t: smallRobotArm.controller.square_xz_velocity(t, side_length=40, period=15.0), dt=0.05, duration=15.0)
+        input("Press Enter to continue...")
+        smallRobotArm.controller.go_home()
+        exit(0)
+        
         for pose in poses0:
             # poses' coordiation system is end-effector's wrt world frame.
             T_0E = smallRobotArm.pose2T(pose, seq="zyz")
@@ -235,9 +264,9 @@ def main() -> None:
            
             # print(kine_j.round(2))
             
-            diff = np.linalg.norm(np.array(kine_j) - np.array(smallRobotArm.current_angles))
+            diff = np.linalg.norm(np.array(kine_j) - np.array(smallRobotArm.controller.current_angles))
             steps = min(20, max(5, int(diff / 10 * 10)))  # Scale reasonably (5 deg per step)s = int(diff * 10)  # 10 steps per radian of total joint-space distance
-            linear_path = smallRobotArm.generate_linear_path(smallRobotArm.current_angles, kine_j, steps)
+            linear_path = smallRobotArm.generate_linear_path(smallRobotArm.controller.current_angles, kine_j, steps)
             
             # compute the joint-space inertia matrix
             M=smRobot.inertia(kine_j)  # 6x6 joint-space inertia matrix
@@ -245,13 +274,13 @@ def main() -> None:
             # 2. Find "easy-move" direction
             easy_direction = eigvecs[:, np.argmin(eigvals)]
             # 3. Adjust motion path to align with easy direction            
-            adjusted_j = smallRobotArm.align_path_to_vector(linear_path, easy_direction)
+            adjusted_j = smallRobotArm.controller.align_path_to_vector(linear_path, easy_direction)
             for angles in adjusted_j:
-                smallRobotArm.move_to_angles(angles, header="g", ack=True)
+                smallRobotArm.controller.move_to_angles(angles, header="g", ack=True)
             
             
             # smallRobotArm.move_to_angles(kine_j, header="g", ack=True)
-            smallRobotArm.current_angles = kine_j  # Important to track for next segment
+            smallRobotArm.controller.current_angles = kine_j  # Important to track for next segment
             
             # input("Press Enter to continue...")
 
@@ -263,7 +292,7 @@ def main() -> None:
         )
         T_06_at_0s = T_0E_at_0s.A @ smallRobotArm.T_6E_inv
         j = smallRobotArm.ik(T_06_at_0s)
-        smallRobotArm.move_to_angles(j)
+        smallRobotArm.controller.move_to_angles(j)
         # input("Press Enter to continue...")
         # traj planning in joint-space.
         """
@@ -341,7 +370,7 @@ def main() -> None:
             # ask arduino to run goTractory(Xx)
             cmd = {"header": "g", "joint_angle": Xx, "ack": False}
             # print(f"Xx: {Xx}")
-            smallRobotArm.conn.send2Arduino(cmd)
+            smallRobotArm.controller.conn.send2Arduino(cmd)
             # must be a delay here. ack takes too long causing discontinued arm movement.
             # sleep(0.3)
             curr_time = perf_counter()
@@ -361,7 +390,7 @@ def main() -> None:
     # initPose[0:3] = [11.31000000e02, 1.94968772e-31, 2.78500000e02]
     # initPose[3:6] = [10.00000000e00, 1.27222187e-14, 1.80000000e02]
     # smallRobotArm.moveTo(initPose)
-    smallRobotArm.go_home()
+    smallRobotArm.controller.go_home()
     print("THREAD TERMINATED!")
 
 if __name__ == "__main__":

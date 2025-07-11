@@ -1,59 +1,16 @@
 from abc import ABC, abstractmethod
-from typing import List, Tuple
+# from typing import List, Tuple
 import numpy as np
 from numpy import ndarray
 from spatialmath import SE3
-import serial_class as ser
-from scipy.interpolate import CubicSpline
+# from scipy.interpolate import CubicSpline
 import matplotlib.pyplot as plt
 
 # robot arm independent, inherited by robot arm dependent classes.
 class RobotArm(ABC):
     def __init__(self):
         # init arm independent params
-        self.conn = ser.SerialPort()
-        self.conn.connect()        
-    
-    def generate_linear_path(self, start, end, steps):
-        """Generates joint-space straight-line path from start to end."""
-        start = np.array(start)
-        end = np.array(end)
-        path = [start + (end - start) * t / (steps - 1) for t in range(steps)]
-        return path
-    
-    def smooth_path(self, path, alpha=0.3):
-        smoothed = [path[0]]
-        for i in range(1, len(path)):
-            smooth = alpha * np.array(path[i]) + (1 - alpha) * np.array(smoothed[-1])
-            smoothed.append(smooth)
-        return smoothed         
-    
-    def align_path_to_vector(self, original_path, easy_direction, strength=0.7):
-        """
-        Adjusts path to favor movement in the "easy" direction
-        original_path: Nx6 array-like joint angle path
-        easy_direction: 6D eigenvector from inertia matrix
-        strength: 0-1, how much to bias toward easy direction
-        """
-        adjusted_path = []
-
-        # Normalize the easy direction
-        easy_direction = easy_direction / np.linalg.norm(easy_direction)
-
-        N = len(original_path)
-        for i, point in enumerate(original_path):
-            progress = i / (N - 1) if N > 1 else 0.0  # safe division
-
-            # Bell-curve weighting to bias mid-path
-            adjustment_factor = strength * np.exp(-10 * (progress - 0.5)**2)
-            delta = original_path[i] - original_path[i - 1]
-            magnitude = np.linalg.norm(delta)
-            adjusted_point = point + adjustment_factor * easy_direction * magnitude
-
-            adjusted_path.append(adjusted_point)
-
-        return adjusted_path
-
+        pass
     
     def T2Pose(self, T, seq="xyz", degrees=True) -> tuple:
         """
@@ -199,75 +156,6 @@ class RobotArm(ABC):
             # Matrix objects have a numpy method that returns a numpy.ndarray
             # float32 maintains only approximately 7 decimal digits fo precision internally.
             return m.astype(np.float64)
-    
-    def eigen_analysis(smRobot, q):
-        '''
-        Eigen-Property	        Control Decision	                Value Impact
-        min(S) < 0.1	        Adjust pose to avoid singularity	Prevents 90% of motion failures
-        Vt[0] = [0, 0.9, ...]	Prioritize J2 for precise motions	25% faster settling time
-        min_inertia_dir = +Y	Orient payloads along Y-axis	    18% energy reduction
-        
-        '''
-        J = smRobot.jacob0(q)
-        M = smRobot.inertia(q)
-        
-        # SVD for kinematics
-        U, S, Vt = np.linalg.svd(J)
-        
-        # Eigen-decomposition for dynamics
-        eigvals_M, eigvecs_M = np.linalg.eig(M)
-        
-        return {
-            'optimal_cartesian_dir': U[:,0],
-            'optimal_joint_dir': Vt[0,:],
-            'min_inertia_dir': eigvecs_M[:, np.argmin(eigvals_M)],
-            'manipulability': np.prod(S)
-        }
-        
-    def interpolate_poses(self, start_pose: ndarray, end_pose: ndarray, num_poses=10):
-        """Generates smooth poses between two poses."""
-        # Ensure inputs are SE3 objects
-        # if not isinstance(start_pose, SE3) or not isinstance(end_pose, SE3):
-        #     raise ValueError("start_pose and end_pose must be SE3 objects")
-
-        # Generate interpolation values
-        s_values = np.linspace(0, 1, num_poses + 2)[1:-1]  # Get 'in-between' values.
-
-        # Interpolate poses
-        poses = []
-        for s in s_values:
-            print(f"Interpolating with s={s}")
-            # pose = trinterp(start_pose, end_pose, s)  # Use .A matrices
-            # poses.append(SE3(pose))  # Convert back to SE3
-        return poses
-    
-    def grab(self):
-        self.conn.ser.write(b"eOn\n")
-
-    def drop(self):
-        self.conn.ser.write(b"eOff\n")
-
-    def enable(self):
-        # motors are disabled in arduino's setup()
-        self.conn.ser.write(b"en\n")       
-
-    def calibrate(self):
-        self.conn.ser.write(b"g28\n")  # G28 is the command to home the robot arm
-        
-    def disable(self):
-        self.conn.ser.write(b"dis\n")
-
-    def move_to_angles(self, j: tuple, header='g', ack=True) -> None:
-        # return super().moveTo(end_effector_pose)
-        # limited_j = self.limit_joint_angles(j)
-        cmd = {"header": header, "joint_angle": j, "ack": ack}
-        self.conn.send2Arduino(cmd)
-        
-    def go_home(self):
-        self.move_to_angles(self.robot_rest_angles)
-        self.disable()
-        # a way to terminate thread
-        self.conn.disconnect()
     
     def plot_frame_coordinates(self, smRobot, my_j, ik_sol):
         # Plot the frame coordinate with customization

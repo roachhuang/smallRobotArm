@@ -103,27 +103,19 @@ class SerialPort:
             )
             try:
                 self.ser.write(msg.encode("utf-8"))
-                # print(f"[INFO] Sent: {msg.strip()}")
                 # logging.debug(f"Sent command: {msg.strip()}")
-                # self._event_ok2send.clear()
                 if cmd["ack"] == True:
                     self._event_ok2send.clear()
                     # print("[DEBUG] Waiting for ack...")
                     # timeout must be >= 15
                     if not self._event_ok2send.wait(timeout=20):  # timeout added.
                         logging.error("Timeout waiting for Arduino acknowledgement.")
-                    # else:
-                    #     print("[DEBUG] Ack received.")
             except serial.SerialTimeoutException:
                 logging.error("Serial write timeout.")
             except serial.SerialException as e:
                 logging.error(f"Serial write error: {e}")
         else:
             logging.error("Serial port not connected. Can't send cmd")
-            # wait till the event is set in rcvThread.
-            # self._event_ok2send.wait()
-        # while event_ack.is_set() and bWaitAck is True:
-        #    pass
 
     def _ReceiveThread(self):
         """

@@ -15,11 +15,11 @@ class SmallRbtArm(RobotArm):
     def __init__(self, std_dh_tbl: ndarray):
         super().__init__()        
         self.dhTbl = std_dh_tbl  
-        self.robot_rest_angles = (0.0, -78.5, 73.9, 0.0, -90.0, 0.0)       
-        self.current_angles = self.robot_rest_angles
+        
         self.max_qlimits = ( 130, 130.0, 73.9,  50, 120, 180) 
         self.min_qlimits = (-130, -78.5, -66, -30, -90, -180)
         self.th_offset = (0.0, -np.pi / 2, 0.0, 0.0, 0.0, 0.0)
+        self.controller = None
       
         self.cup_height = 50
         # 4x4 transformation matrix from end-effector frame to cup frame

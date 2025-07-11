@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from smallRobotArm.test.ik_smallrobotarm import InverseK
+from smallRobotArm_pkg.test.ik_smallrobotarm import InverseK
 from math import radians
 import std_dh_tbl as stdDh
 import serial
