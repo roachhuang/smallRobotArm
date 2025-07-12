@@ -4,7 +4,7 @@ import numpy as np
 from numpy import ndarray
 # import helpers as hlp
 from numpy import ndarray
-from spatialmath.base import trinterp
+# from spatialmath.base import trinterp
 from spatialmath import SE3
 # from scipy.spatial.transform import Rotation as R
 
@@ -21,23 +21,34 @@ class SmallRbtArm(RobotArm):
         self.th_offset = (0.0, -np.pi / 2, 0.0, 0.0, 0.0, 0.0)
         self.controller = None
       
-        self.cup_height = 50
+        self.T_wd = np.array([[1, 0, 0, 440], [0, 1, 0, -75], [0, 0, 1, 0], [0, 0, 0, 1]])
+        robot_base_height = 0.0
+        T_w0 = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, robot_base_height], [0, 0, 0, 1]])
+        self.T_w0_inv = np.linalg.inv(T_w0)
+        
+        tool_length = 36.0    # the tool attached to axis 6
+        T_6c = np.array([[0, 0, 1, 0], [0, -1, 0, 0], [1, 0, 0, tool_length], [0, 0, 0, 1]])
+        self.T_6c_inv = np.linalg.inv(T_6c)
+      
         # 4x4 transformation matrix from end-effector frame to cup frame
-        self.T_EC=np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 50/2], [0, 0, 0, 1]])
-        self.T_EC_inv=np.linalg.inv(self.T_EC)
         # tool frame. this is for generating T_6E (end-effector/gripper to {6})
-        # 50mm is the distance btw frame6 to end-effector
         # t_6E = smallRobotArm.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
         # hand made T_6E: gripper's len + x:180,y:-90, z:0. see their coordiation system.
-        # self.T_6E = np.array([[0, 0, 1, 0], [0, -1, 0, 0], [1, 0, 0, 50.0], [0, 0, 0, 1]])
-        # self.T_6E_inv = np.linalg.inv(self.T_6E)
-        self.T_6C = np.array([[0, 0, 1, 0], [0, -1, 0, 0], [1, 0, 0, -50/2], [0, 0, 0, 1]])
-        self.T_6C_inv = np.linalg.inv(self.T_6C)
-        
-         # hand made T_6E: gripper's len + x:180,y:-90, z:0. see their coordiation system.
-        tool_length = 50.0    # the tool attached to axis 6
-        self.T_6E = np.array([[0, 0, 1, 0], [0, -1, 0, 0], [1, 0, 0, tool_length], [0, 0, 0, 1]])
-        self.T_6E_inv = np.linalg.inv(self.T_6E)
+    
+    def convert_p_dc_to_T06(self, p:tuple)->ndarray:
+        """
+        Convert a desk/cup pose to the robot's joint-space transformation matrix T0_6.
+
+        Args:
+            p (tuple): A 6-element tuple containing (x, y, z, roll, pitch, yaw) in mm and degrees.
+
+        Returns:
+            ndarray: 4x4 transformation matrix representing the pose in the robot's joint frame.
+        """
+        T_dc = SE3.Trans(p[0:3]) * SE3.RPY(p[3:6], order="zyx", unit="deg")
+        T_wc = self.T_wd @ T_dc.A
+        T_06 = self.T_w0_inv @ T_wc @ self.T_6c_inv
+        return T_06        
         
     def limit_joint_angles(self, angles):
         """Limits joint angles to specified max/min values."""

@@ -179,9 +179,12 @@ class RobotController:
         # limited_j = self.limit_joint_angles(j)
         cmd = {"header": header, "joint_angle": j, "ack": ack}
         self.conn.send2Arduino(cmd)
+        # naively assume motors moved accordinly. remove this line if motors have encoder.
+        self.current_angles = j
         
     def go_home(self):
         self.move_to_angles(self.robot_rest_angles)
+        self.current_angles = self.robot_rest_angles
         self.disable()
         # a way to terminate thread
         self.conn.disconnect()
