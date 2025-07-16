@@ -1,13 +1,18 @@
 from time import sleep, perf_counter
 import logging
 import numpy as np
-import signal   
+import signal
+
+'''When you do import robot_tools.controller.robot_controller as controller,
+controller refers to the module robot_controller.py, not to an object.
+The method velocity_control is defined inside the RobotController class, so you need to call it on an instance of that class.'''
+   
 from robot_tools.kinematics.robotarm_class import SmallRbtArm
 import robot_tools.controller.robot_controller as controller
-import robot_tools.trajectory.plan_traj as pt
+# import robot_tools.trajectory.plan_traj as pt
 
 from roboticstoolbox import DHRobot, RevoluteDH
-from spatialmath import SE3
+# from spatialmath import SE3
 
 # from scipy.spatial.transform import Rotation as R
 # from scipy.interpolate import CubicSpline
@@ -77,19 +82,25 @@ def main() -> None:
     # smallRobotArm.controller.move_to_angles(zero_j, header="g", ack=True)
     
     # Compute the Jacobian matrix in the base frame
-    jacobian_matrix = smRobot.jacob0(smallRobotArm.controller.robot_rest_angles)
+    # jacobian_matrix = smRobot.jacob0(smallRobotArm.controller.robot_rest_angles)
     # Desired end-effector velocity in world frame (ẋ = [vx, vy, vz, ωx, ωy, ωz])
     # my dhtbl is in mm, so here x,y,z in mm/s
-    x_dot = np.array([10.0, 10.0, 10.0, 0.0, 0.0, 0.0])  # [m/s, rad/s]
+    ''' 
+    linear vel: vx, vy, vz; angular vel: wx, wy, wz
+    '''
+    x_dot = np.array([10.0, 10.0, 10.0, 0.0, 0.0, 0.0])  # [mm/s, rad/s]
     dt = 0.02  # control period (e.g. 50Hz)
     q = np.radians(smallRobotArm.controller.current_angles)  # joint angles in radians
     
     # simulating velocity control in joint space
-    max_qdot = np.radians(10)  # max joint velocity in rad
     for step in range(250):  # run for 5 seconds. steps= duration in sec/0.02
         J = smRobot.jacob0(q)  # 6x6 Jacobian at current joint state
-        q_dot = np.linalg.pinv(J, rcond=1e-4) @ x_dot  # 6x1 joint velocity vector
-        q_dot = np.clip(q_dot, -max_qdot, max_qdot)
+        U, Sigma, Vt = np.linalg.svd(J)
+        Sigma_plus = np.diag([1/s if s > 1e-6 else 0 for s in Sigma])  # Damped pseudoinverse
+        J_plus = Vt.T @ Sigma_plus @ U.T
+        # q_dot = np.linalg.pinv(J, rcond=1e-4) @ x_dot  # 6x1 joint velocity vector
+        q_dot = J_plus @ x_dot  # Joint velocities
+        # q_dot = np.clip(q_dot, 0.1, 0.5)
         q += q_dot * dt  # integrate to get next joint position
 
         deg_q = np.degrees(q)
@@ -98,14 +109,50 @@ def main() -> None:
 
         sleep(dt)
       
-    input("Press Enter to continue...")
+    # input("Press Enter to continue... square w/ corners vel")    
+    # smallRobotArm.controller.velocity_control(
+    # robot=smRobot,
+    # q_init=np.radians(smallRobotArm.controller.current_angles),
+    # x_dot_func=lambda t: smallRobotArm.controller.square_with_corners_velocity(
+    #     t, side_length=100, edge_period=2.0, hover_duration=2.0, circle_radius=25.0, circle_period=2.0),
+    # dt=0.05,
+    # duration=4 * (4.0 + 2.0 + 2.0)  # 32s = 4 corners * (edge+hover+circle)
+    # )
     
+    input("Press Enter to continue circle vel...")    
     smallRobotArm.controller.velocity_control(robot=smRobot, q_init=np.radians(smallRobotArm.controller.current_angles), x_dot_func=lambda t: smallRobotArm.controller.circle_xy_velocity(t, radius=40, period=15.0), dt=0.05, duration=15.0)
-    input("Press Enter to continue...")
+   
+    # input("Press Enter to continue square vel...")
+    # smallRobotArm.controller.velocity_control(robot=smRobot, q_init=np.radians(smallRobotArm.controller.current_angles), x_dot_func=lambda t: smallRobotArm.controller.square_xz_velocity(t, side_length=40, period=15.0), dt=0.05, duration=15.0)
     
-    smallRobotArm.controller.velocity_control(robot=smRobot, q_init=np.radians(smallRobotArm.controller.current_angles), x_dot_func=lambda t: smallRobotArm.controller.square_xz_velocity(t, side_length=40, period=15.0), dt=0.05, duration=15.0)
+    # input("Press Enter to continue figure_eight vel...")
+    # smallRobotArm.controller.velocity_control(
+    # robot=smRobot,
+    # q_init=np.radians(smallRobotArm.controller.current_angles),
+    # x_dot_func=lambda t:smallRobotArm.controller.figure_eight_velocity(t, radius=30, freq=1.0),
+    # dt=0.05,
+    # duration=30.0    
+    # )
     
-    input("Press Enter to continue...")
+    # input("Press Enter to continue Zigzag/sawtooth pattern...")
+    # smallRobotArm.controller.velocity_control(
+    # robot=smRobot,
+    # q_init=np.radians(smallRobotArm.controller.current_angles),
+    # x_dot_func=lambda t:smallRobotArm.controller.zigzag_velocity(t, side_length=40, period=20.0),
+    # dt=0.05,
+    # duration=30.0    
+    # )
+
+    # input("Press Enter to continue spiral vel...")
+    # smallRobotArm.controller.velocity_control(
+    # robot=smRobot,
+    # q_init=np.radians(smallRobotArm.controller.current_angles),
+    # x_dot_func=lambda t:smallRobotArm.controller.spiral_velocity(t, radius_rate=2.0, angular_speed=0.5),
+    # dt=0.05,
+    # duration=30.0    
+    # )
+
+    input("Press Enter to go home...")   
     smallRobotArm.controller.go_home()
         
 if __name__ == "__main__":

@@ -17,9 +17,13 @@ class RobotController:
         max_qdot = np.radians(10)  # max joint velocity in rad
         for i in range(n_steps):
             J = robot.jacob0(q)
+            U, Sigma, Vt = np.linalg.svd(J)
+            Sigma_plus = np.diag([1/s if s > 1e-6 else 0 for s in Sigma])  # Damped pseudoinverse
+            J_plus = Vt.T @ Sigma_plus @ U.T
             x_dot = x_dot_func(i * dt)  # Desired end-effector vel in base/world frame (6D)
-            q_dot = np.linalg.pinv(J, rcond=1e-4) @ x_dot
-            q_dot = np.clip(q_dot, -max_qdot, max_qdot)
+            # q_dot = np.linalg.pinv(J, rcond=1e-4) @ x_dot
+            q_dot = J_plus @ x_dot
+            # q_dot = np.clip(q_dot, 0.1, 5)
             q += q_dot * dt  # Integrate joint velocity
             q_deg = np.degrees(q)
 
@@ -49,6 +53,80 @@ class RobotController:
             v[2] = speed
         return v
 
+    def figure_eight_velocity(self, t, radius=30, freq=1.0):
+        v = np.zeros(6)
+        v[0] = -radius * 2 * np.pi * freq * np.sin(2 * np.pi * freq * t)      # x
+        v[1] = radius * 2 * np.pi * freq * np.cos(4 * np.pi * freq * t)       # y
+        return v
+    
+    def spiral_velocity(self, t, radius_rate=2.0, angular_speed=0.5):
+        r = radius_rate * t
+        v = np.zeros(6)
+        v[0] = -r * angular_speed * np.sin(angular_speed * t) + radius_rate * np.cos(angular_speed * t)  # x
+        v[1] = r * angular_speed * np.cos(angular_speed * t) + radius_rate * np.sin(angular_speed * t)   # y
+        return v
+
+    def zigzag_velocity(self, t, side_length=40, period=10.0):
+        v = np.zeros(6)
+        step = int((t / (period / 4)) % 2)
+        v[0] = side_length / (period / 4) if step == 0 else -side_length / (period / 4)
+        v[1] = 10 * np.sin(4 * np.pi * t / period)  # Adds jagged pattern
+        return v
+
+
+    def square_with_corners_velocity(self, t, side_length=80, edge_period=2.0, hover_duration=2.0,  circle_radius=20.0, circle_period=2.0):
+        """
+        Move along square edges with cosine-blended velocity.
+        Pause (hover) at corners for N seconds.
+        At each corner, trace a small circle (e.g., 20mm radius) before continuing.
+        Produces velocity vector that follows a square path with:
+        - cosine-blended edges,
+        - circular motion at corners,
+        - hover pauses.
+
+        Total duration per corner segment = edge_period + hover_duration + circle_period
+        Square has 4 corners, so total = 4 * (edge + hover + circle)
+        """
+        total_phase_time = edge_period + hover_duration + circle_period
+        full_duration = total_phase_time * 4
+        t = t % full_duration  # Loop over full square
+
+        corner = int(t // total_phase_time)
+        local_t = t % total_phase_time
+
+        v = np.zeros(6)  # 6D vel
+
+        # Phase 1: move along edge (cosine-blended)
+        if local_t < edge_period:
+            progress = local_t / edge_period
+            blend = 0.5 * (1 - np.cos(np.pi * progress))  # cosine blend 0 → 1
+            speed = side_length / edge_period
+
+            if corner == 0:   # → along X
+                v[0] = speed * blend
+            elif corner == 1: # ↓ along Z
+                v[2] = -speed * blend
+            elif corner == 2: # ← along X
+                v[0] = -speed * blend
+            elif corner == 3: # ↑ along Z
+                v[2] = speed * blend
+
+        # Phase 2: hover
+        elif local_t < edge_period + hover_duration:
+            return np.zeros(6)
+
+        # Phase 3: circle at corner (in XY plane)
+        else:
+            circle_t = local_t - (edge_period + hover_duration)
+            omega = 2 * np.pi / circle_period
+            blend = 0.5 * (1 - np.cos(2 * np.pi * circle_t / circle_period))  # circle blend
+
+            v[0] = -circle_radius * omega * np.sin(omega * circle_t) * blend
+            v[1] =  circle_radius * omega * np.cos(omega * circle_t) * blend
+
+        return v
+
+    
     def circle_xy_velocity(self, t, radius, period):
         """
         Generate velocity vector for a circular motion in the XY-plane.
@@ -184,8 +262,8 @@ class RobotController:
         
     def go_home(self):
         self.move_to_angles(self.robot_rest_angles)
-        self.current_angles = self.robot_rest_angles
-        self.disable()
+        # self.current_angles = self.robot_rest_angles
+        # self.disable()
         # a way to terminate thread
-        self.conn.disconnect()
+        # self.conn.disconnect()
     

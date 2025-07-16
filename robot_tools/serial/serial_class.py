@@ -5,9 +5,9 @@ import serial
 
 # import platform
 import logging
-from threading import Thread, Event
+from threading import Thread, Event, Lock
 
-# import time
+import time
 
 
 class SerialPort:
@@ -15,7 +15,9 @@ class SerialPort:
         self.ser = None
         self._event_run = Event()
         self._event_ok2send = Event()
+        self.lock = Lock()
         self.t = None  # Ensure thread is tracked properly
+        self.i = 0
         logging.basicConfig(
             level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s"
         )
@@ -26,7 +28,7 @@ class SerialPort:
         if port:
             try:
                 # self.ser = serial.Serial(port, baudrate=115200, rtscts=True, timeout=1)
-                self.ser = serial.Serial(port, baudrate=115200, timeout=1)
+                self.ser = serial.Serial(port, baudrate=500000, timeout=1)
                 print(f"[INFO] Connected to serial port {self.ser.name}")
                 self._event_ok2send.set()
                 self._event_run.set()
@@ -97,19 +99,27 @@ class SerialPort:
             bWaitAck (bool): wait for ack from arduino or not
         """
         if self.ser and self.ser.is_open:
-            # msg = '{}{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}\n'.format(cmd['header'], *j)
             msg = "{}{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}\n".format(
                 cmd["header"], *cmd["joint_angle"]
             )
             try:
-                self.ser.write(msg.encode("utf-8"))
-                # logging.debug(f"Sent command: {msg.strip()}")
-                if cmd["ack"] == True:
-                    self._event_ok2send.clear()
-                    # print("[DEBUG] Waiting for ack...")
-                    # timeout must be >= 15
-                    if not self._event_ok2send.wait(timeout=20):  # timeout added.
-                        logging.error("Timeout waiting for Arduino acknowledgement.")
+                self.i = 0
+                self._event_ok2send.set()
+                while (self.i < 1): # retry if buffer is full
+                    if self._event_ok2send:
+                        with self.lock:
+                            self.ser.write(msg.encode("utf-8"))
+                            self._event_ok2send.clear()
+                            time.sleep(0.02)
+                
+                # self.ser.write(msg.encode("utf-8"))
+                # # logging.debug(f"Sent command: {msg.strip()}")
+                # if cmd["ack"] == True:
+                #     self._event_ok2send.clear()
+                #     # print("[DEBUG] Waiting for ack...")
+                #     # timeout must be >= 15
+                #     if not self._event_ok2send.wait(timeout=20):  # timeout added.
+                #         logging.error("Timeout waiting for Arduino acknowledgement.")
             except serial.SerialTimeoutException:
                 logging.error("Serial write timeout.")
             except serial.SerialException as e:
@@ -129,10 +139,14 @@ class SerialPort:
                 try:
                     line = self.ser.readline().decode("utf-8").rstrip()
                     if line:
-                        # print(f"[DEBUG] received: {line}")
-                        if line == "ack": #ack is received
+                        print(f"[DEBUG] received: {line}")
+                        if line == "ack":   #ack is received
                             self._event_ok2send.set()
-                        # else:
+                            self.i +=1
+                            # time.sleep(0.2)
+                        elif line == 'buffer_full':
+                            # time.sleep(0.05)
+                            self._event_ok2send.set()
                         #     logging.debug(
                         #         f"Received from Arduino: {line}"
                         #     )  # add debug line.
