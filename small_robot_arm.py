@@ -58,10 +58,23 @@ def handler(signum, frame):
     """
     Signal handler to gracefully exit the program on Ctrl+C.
     """
+    
     print("\nSignal received, exiting gracefully...")
     if smallRobotArm is not None:
-        smallRobotArm.go_home()  # Move the robot arm to home position
-    exit(0)  # Exit the program
+        try:
+            smallRobotArm.controller.go_home()
+        except Exception as e:
+            print(f"[WARN] Could not go home: {e}")
+        # Only join the thread if it exists and is alive
+        t = getattr(getattr(smallRobotArm.controller, 'conn', None), 't', None)
+        if t is not None:
+            try:
+                if hasattr(t, 'is_alive') and t.is_alive():
+                    t.join(timeout=2)
+            except Exception as e:
+                print(f"[WARN] Could not join thread: {e}")
+    import os
+    os._exit(0)  # Force exit the program
 
 def main() -> None:
     global smallRobotArm  # Tell Python to use the global variable
@@ -213,7 +226,7 @@ def main() -> None:
             smallRobotArm.controller.move_to_angles(angles, header="g", ack=True)
         
         # smallRobotArm.move_to_angles(kine_j, header="g", ack=True)
-        smallRobotArm.controller.current_angles = kine_j  # Important to track for next segment
+        # smallRobotArm.controller.current_angles = kine_j  # Important to track for next segment
         
     smallRobotArm.controller.go_home()
     print("THREAD TERMINATED!")

@@ -1,8 +1,20 @@
 #ifndef DEFINE_H_
 #define DEFINE_H_
 
-bool waitingAck;
-bool allDone;
+// bool waitingAck;
+bool buf_full=false;
+
+#define BAUD_RATE 115200
+// Command buffer definitions
+#define BUFFER_SIZE 100
+float targetBuffer[BUFFER_SIZE][6];
+volatile int writeIndex = 0;
+volatile int readIndex = 0;
+// === Macros ===
+#define BUFFER_EMPTY()      (readIndex == writeIndex)
+#define BUFFER_FULL()       (((writeIndex + 1) % BUFFER_SIZE) == readIndex)
+#define BUFFER_INCREMENT(idx)  ((idx + 1) % BUFFER_SIZE)
+
 const uint8_t END_EFFECTOR_PIN = 16;
 const uint8_t ledPin = 13;  // the LED is connected to digital pin 13
 #define PI 3.14159          //26535897932384626433832795
@@ -12,7 +24,7 @@ const uint8_t DIR_PINS[6] = { 37, 41, 45, 48, A7, A1 };
 // enable pin for the axis 3, 2 and 1
 const uint8_t EN_PINS[4] = { 32, A8, A2, 38 };  // EN321, EN4, EN5, EN6
 const float GEAR_RATIOS[6] = { 4.8, 4.0, 5.0, 2.8, 2.1, 1.0 };
-const float MICROSTEPS = 32;
+// const float MICROSTEPS = 32;
 // Must match hardware config, Conversion factors(degrees per step)
 const double DEG_PER_STEP[6] = {
   360.0 / 200.0 / 16.0 / 4.8,
@@ -35,12 +47,9 @@ const int MAX_INPUT_SIZE = 100;
 
 const int lower_limit[6] = { -114, -81, -180, -180, -139, -180 };
 const int upper_limit[6] = { 114, 77, 70, 180, 139, 180 };
-const float MAX_SPEED = 2000.0;
-
-#define MAX_QUEUE_SIZE 64
-float waypointQueue[MAX_QUEUE_SIZE][6];
-int head = 0, tail = 0;
-
+#define MAX_SPEED 2200
+#define MAX_ACCEL 1000  // increase from 500
+#define MIN_ACCEL 300
 
 // Stepper motor objects
 AccelStepper steppers[6] = {
@@ -56,9 +65,9 @@ AccelStepper steppers[6] = {
 float currentPositions[6] = { 0.0, -78.51, 73.90, 0.0, -90.0, 0.0 };
 const float homePositions[6] = { 0.0, -78.51, 73.90, 0.0, -90.0, 0.0 };
 // float currentPositions[6] = { 0.0, -1.37, 1.2898, 0.0, -1.5708, 0.0 }; in radians
-
+// float jointSpaceCmd[6];  // in angle 
 char inputBuffer[MAX_INPUT_SIZE];
 int inputIndex = 0;
 bool newCommandReady = false;
-const int step_threshold = 300; // 200 steps
+const uint8_t step_threshold = 128; // 200 steps
 #endif  // DEFINE_H_

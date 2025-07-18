@@ -9,7 +9,6 @@ from threading import Thread, Event, Lock
 
 import time
 
-
 class SerialPort:
     def __del__(self):
         # Ensure resources are cleaned up if disconnect was not called explicitly
@@ -20,7 +19,6 @@ class SerialPort:
         self._event_ok2send = Event()
         self.lock = Lock()
         self.t = None  # Ensure thread is tracked properly
-        self.i = 0
         logging.basicConfig(
             level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s"
         )
@@ -144,10 +142,7 @@ class SerialPort:
                         print(f"[DEBUG] received: {line}")
                         if line == "ack":   #ack is received
                             self._event_ok2send.set()
-                            # self.i +=1
-                            # time.sleep(0.2)
                         elif line == 'buffer_full':
-                            # time.sleep(0.02)
                             self._event_ok2send.clear()
                         #     logging.debug(
                         #         f"Received from Arduino: {line}"

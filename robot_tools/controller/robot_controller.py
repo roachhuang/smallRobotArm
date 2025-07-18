@@ -261,9 +261,10 @@ class RobotController:
         self.current_angles = j
         
     def go_home(self):
-        self.move_to_angles(self.robot_rest_angles)
+        print('gohome')
+        self.move_to_angles(j=self.robot_rest_angles)
         # self.current_angles = self.robot_rest_angles
         # self.disable()
         # a way to terminate thread
-        # self.conn.disconnect()
+        self.conn.disconnect()
     

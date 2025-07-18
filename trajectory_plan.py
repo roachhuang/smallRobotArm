@@ -42,7 +42,7 @@ def handler(signum, frame):
     """
     print("\nSignal received, exiting gracefully...")
     if smallRobotArm is not None:
-        smallRobotArm.go_home()  # Move the robot arm to home position
+        smallRobotArm.controller.go_home()  # Move the robot arm to home position
     exit(0)  # Exit the program
 
 def main() -> None:
@@ -196,9 +196,10 @@ def main() -> None:
                 )
 
         # ask arduino to run goTractory(Xx)
-        cmd = {"header": "g", "joint_angle": Xx, "ack": False}
-        # print(f"Xx: {Xx}")
-        smallRobotArm.controller.conn.send2Arduino(cmd)
+        smallRobotArm.controller.move_to_angles(Xx, header="g", ack=True)
+        # cmd = {"header": "g", "joint_angle": Xx, "ack": False}
+        # # print(f"Xx: {Xx}")
+        # smallRobotArm.controller.conn.send2Arduino(cmd)
         # must be a delay here. ack takes too long causing discontinued arm movement.
         # sleep(0.3)
         curr_time = perf_counter()
