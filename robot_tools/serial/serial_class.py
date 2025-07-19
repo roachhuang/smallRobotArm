@@ -6,8 +6,8 @@ import serial
 # import platform
 import logging
 from threading import Thread, Event, Lock
-
-import time
+import robot_tools.misc.helpers as hlp
+# import time
 
 class SerialPort:
     def __del__(self):
@@ -88,9 +88,11 @@ class SerialPort:
         except Exception as e:
             logging.error(f"Error getting serial ports: {e}")
         return None
-
+    
+    @hlp.timer
     def send2Arduino(self, cmd: dict) -> None:
         """
+        constrain the speed of sending a CMD to arduino in about 10~20ms. avoid faster than it!!! 
         send robot cmd to arduino
         Args:
             ser (_type_): _description_
@@ -139,7 +141,7 @@ class SerialPort:
                 try:
                     line = self.ser.readline().decode("utf-8").rstrip()
                     if line:
-                        print(f"[DEBUG] received: {line}")
+                        # print(f"[DEBUG] received: {line}")
                         if line == "ack":   #ack is received
                             self._event_ok2send.set()
                         elif line == 'buffer_full':

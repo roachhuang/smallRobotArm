@@ -42,8 +42,20 @@ def handler(signum, frame):
     """
     print("\nSignal received, exiting gracefully...")
     if smallRobotArm is not None:
-        smallRobotArm.controller.go_home()  # Move the robot arm to home position
-    exit(0)  # Exit the program
+        try:
+            smallRobotArm.controller.go_home()
+        except Exception as e:
+            print(f"[WARN] Could not go home: {e}")
+        # Only join the thread if it exists and is alive
+        t = getattr(getattr(smallRobotArm.controller, 'conn', None), 't', None)
+        if t is not None:
+            try:
+                if hasattr(t, 'is_alive') and t.is_alive():
+                    t.join(timeout=2)
+            except Exception as e:
+                print(f"[WARN] Could not join thread: {e}")
+    import os
+    os._exit(0)  # Force exit the program
 
 def main() -> None:
     global smallRobotArm  # Tell Python to use the global variable
@@ -107,22 +119,41 @@ def main() -> None:
     # Cup poses wrt frame {desk}.
     poses = np.array(
         [
-            (0, -250, 70.0 + 20, 60, 0.0, 0.0, 35.0),
-            (8, -264.5 + 19, 70.0 + 20, 90, 0, 0.0, 35.0),
+            (0, -150,        190, 60, 0.0, 0.0, 35.0),
+            (8, -164.5 + 19, 190, 90, 0.0, 0.0, 35.0),
             # rotate cup 60 degrees around y axis wrt the world frame.
-            (20, -264.5 - 120, 70.0 + 60, 350.0, 0, -60.0, 0.0),
-            (24, -264.5 - 120, 70.0 + 100, 355.0, 0, -60.0, 0.0),
+            (20, -164.5 - 120, 170.0 + 60, 350.0, 0, -60.0, 0.0),
+            (24, -164.5 - 120, 170.0 + 100, 355.0, 0, -60.0, 0.0),
         ],
         dtype=np.float64,
     )
+    # poses = np.array(
+    #     [
+    #         (0, -250,        90, 60, 0.0, 0.0, 35.0),
+    #         (8, -264.5 + 19, 90, 90, 0.0, 0.0, 35.0),
+    #         # rotate cup 60 degrees around y axis wrt the world frame.
+    #         (20, -264.5 - 120, 70.0 + 60, 350.0, 0, -60.0, 0.0),
+    #         (24, -264.5 - 120, 70.0 + 100, 355.0, 0, -60.0, 0.0),
+    #     ],
+    #     dtype=np.float64,
+    # )
 
     # this is only for giving time col to joints
     joints = poses.copy()
     
     # this line is required coz reach to this pose at 0 sec as the poses says. ntu: fixed euler anglers
-    T_06_at_0s = smallRobotArm.convert_p_dc_to_T06(poses[0, 1:])
+    p_dc = poses[0, 1:]
+    # T_dc = SE3.Trans(p_dc[0:3]) * SE3.RPY(p_dc[3:6], order="zyx", unit="deg")
+    # new_T_dc = smallRobotArm.controller.compute_approach_pose(T_dc.A, approach_vec_cup=[1,0,0], offset=50)
+    # new_p_dc = smallRobotArm.T2Pose(new_T_dc)
+    # T_approach = smallRobotArm.convert_p_dc_to_T06(new_p_dc)    
+    # j = smallRobotArm.ik(T_approach)
+    # smallRobotArm.controller.move_to_angles(j)
+    # sleep(1)
+    T_06_at_0s = smallRobotArm.convert_p_dc_to_T06(p_dc)
     j = smallRobotArm.ik(T_06_at_0s)
     smallRobotArm.controller.move_to_angles(j)
+    
     input("Press Enter to continue...")
     # traj planning in joint-space.
     """

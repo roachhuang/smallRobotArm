@@ -40,8 +40,8 @@ class RobotArm(ABC):
             unit="deg"
         )  # Extract ZYZ Euler angles in radians
 
-        return (np.round(position, 4), np.round(zyz_euler, 4))
-
+        # return (np.round(position, 4), np.round(zyz_euler, 4))
+        return tuple(np.round(np.concatenate([position, zyz_euler]), 4).tolist())
 
     def pose2T(self, pose: tuple, seq="xyz") -> ndarray:
         """

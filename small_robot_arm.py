@@ -8,7 +8,7 @@ import signal
 from robot_tools.kinematics.robotarm_class import SmallRbtArm
 import robot_tools.controller.robot_controller as controller
 import robot_tools.trajectory.plan_traj as pt
-
+import robot_tools.trajectory.interpolation as traj_path
 from roboticstoolbox import DHRobot, RevoluteDH
 from spatialmath import SE3
 
@@ -79,6 +79,8 @@ def handler(signum, frame):
 def main() -> None:
     global smallRobotArm  # Tell Python to use the global variable
     signal.signal(signal.SIGINT, handler)
+    
+    path = traj_path.Interp()
     
     logging.basicConfig()
     DOF = 6
@@ -172,28 +174,29 @@ def main() -> None:
             (164.5, 0.0, 241.0, 90.0, 180.0, 90.0),  # Home (x, y, z, ZYZ Euler angles)
         ]
     )
+   
+    T_inter_poses=[]
+    # Loop through consecutive pairs and interpolate
+    for i in range(len(poses0) - 1):
+        start_pose = smallRobotArm.pose2T(poses0[i])
+        end_pose = smallRobotArm.pose2T(poses0[i + 1])
+        
+        T_inter_poses.append(start_pose)  # Keep the original
+        interpolated = path.interpolate_poses(SE3(start_pose), SE3(end_pose), num_poses=5)
+        T_inter_poses.extend(interpolated)
 
-    # we use ntu example: orientation with euler FIXED angles
-    # Cup poses wrt frame {0}.
-    poses = np.array(
-        [
-            (0, -250, 70.0 + 20, 60, 0.0, 0.0, 35.0),
-            (8, -264.5 + 19, 70.0 + 20, 90, 0, 0.0, 35.0),
-            # rotate cup 60 degrees around y axis wrt the world frame.
-            (20, -264.5 - 120, 70.0 + 60, 350.0, 0, -60.0, 0.0),
-            (24, -264.5 - 120, 70.0 + 100, 355.0, 0, -60.0, 0.0),
-        ],
-        dtype=np.float64,
-    )
-
-    for pose in poses0:
+    # Append the final pose
+    T_inter_poses.append(smallRobotArm.pose2T(poses0[-1]))
+    # T_smooth_poses = path.smooth_pose_path(SE3(T_inter_poses))
+    
+    for T in T_inter_poses:
         # poses' coordiation system is end-effector's wrt world frame.
-        T_0E = smallRobotArm.pose2T(pose, seq="zyz")
-        # T_06 = T_0E @ smallRobotArm.T_6E_inv
+        # T_0E = smallRobotArm.pose2T(pose, seq="zyz")
+        
         # euler angles ZYZ according to smallrobot arm's demo
         # my_j = smallRobotArm.ik(T_0E)
         # T=smallRobotArm.pose2T(corrected_pose, seq="ZYZ")
-        ik_sol = smRobot.ikine_LM(SE3(T_0E), q0=np.ones(smRobot.n))
+        ik_sol = smRobot.ikine_LM(SE3(T), q0=np.ones(smRobot.n))
         if not ik_sol.success:
             print("IK solution failed!!!")
             continue
@@ -213,7 +216,9 @@ def main() -> None:
         
         diff = np.linalg.norm(np.array(kine_j) - np.array(smallRobotArm.controller.current_angles))
         steps = min(20, max(5, int(diff / 10 * 10)))  # Scale reasonably (5 deg per step)s = int(diff * 10)  # 10 steps per radian of total joint-space distance
-        linear_path = smallRobotArm.controller.generate_linear_path(smallRobotArm.controller.current_angles, kine_j, steps)
+        
+        linear_path = path.generate_linear_path_in_js(smallRobotArm.controller.
+                                                                    current_angles, kine_j, steps)
         
         # compute the joint-space inertia matrix
         M=smRobot.inertia(kine_j)  # 6x6 joint-space inertia matrix

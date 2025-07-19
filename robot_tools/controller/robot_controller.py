@@ -152,20 +152,6 @@ class RobotController:
         # Z (x_dot[2]) remains 0 → fixed height
         return x_dot
     
-    def generate_linear_path(self, start, end, steps):
-        """Generates joint-space straight-line path from start to end."""
-        start = np.array(start)
-        end = np.array(end)
-        path = [start + (end - start) * t / (steps - 1) for t in range(steps)]
-        return path
-    
-    def smooth_path(self, path, alpha=0.3):
-        smoothed = [path[0]]
-        for i in range(1, len(path)):
-            smooth = alpha * np.array(path[i]) + (1 - alpha) * np.array(smoothed[-1])
-            smoothed.append(smooth)
-        return smoothed         
-    
     def align_path_to_vector(self, original_path, easy_direction, strength=0.7):
         """
         Adjusts path to favor movement in the "easy" direction
@@ -195,22 +181,22 @@ class RobotController:
     def move_to_angles(self, angles, header="g", ack=True):
         self.robot.move_to_angles(angles, header=header, ack=ack)
 
-    def interpolate_poses(self, start_pose: ndarray, end_pose: ndarray, num_poses=10):
-        """Generates smooth poses between two poses."""
-        # Ensure inputs are SE3 objects
-        # if not isinstance(start_pose, SE3) or not isinstance(end_pose, SE3):
-        #     raise ValueError("start_pose and end_pose must be SE3 objects")
+    # def interpolate_poses(self, start_pose: ndarray, end_pose: ndarray, num_poses=10):
+    #     """Generates smooth poses between two poses."""
+    #     # Ensure inputs are SE3 objects
+    #     # if not isinstance(start_pose, SE3) or not isinstance(end_pose, SE3):
+    #     #     raise ValueError("start_pose and end_pose must be SE3 objects")
 
-        # Generate interpolation values
-        s_values = np.linspace(0, 1, num_poses + 2)[1:-1]  # Get 'in-between' values.
+    #     # Generate interpolation values
+    #     s_values = np.linspace(0, 1, num_poses + 2)[1:-1]  # Get 'in-between' values.
 
-        # Interpolate poses
-        poses = []
-        for s in s_values:
-            print(f"Interpolating with s={s}")
-            # pose = trinterp(start_pose, end_pose, s)  # Use .A matrices
-            # poses.append(SE3(pose))  # Convert back to SE3
-        return poses
+    #     # Interpolate poses
+    #     poses = []
+    #     for s in s_values:
+    #         print(f"Interpolating with s={s}")
+    #         # pose = trinterp(start_pose, end_pose, s)  # Use .A matrices
+    #         # poses.append(SE3(pose))  # Convert back to SE3
+    #     return poses
     
     def eigen_analysis(smRobot, q):
         '''
@@ -235,6 +221,29 @@ class RobotController:
             'min_inertia_dir': eigvecs_M[:, np.argmin(eigvals_M)],
             'manipulability': np.prod(S)
         }
+    
+    def compute_approach_pose(self, T_cup, approach_vec_cup, offset=50):
+        R_cup = T_cup[0:3, 0:3]
+        p_cup = T_cup[0:3, 3]
+
+        approach_vec_base = R_cup @ approach_vec_cup
+        p_tcp = p_cup + offset * approach_vec_base
+        z_tcp = -approach_vec_base
+
+        world_up = np.array([0, 0, 1])
+        x_tcp = np.cross(world_up, z_tcp)
+        if np.linalg.norm(x_tcp) < 1e-3:
+            world_up = np.array([0, 1, 0])
+            x_tcp = np.cross(world_up, z_tcp)
+        x_tcp /= np.linalg.norm(x_tcp)
+        y_tcp = np.cross(z_tcp, x_tcp)
+
+        R_tcp = np.column_stack((x_tcp, y_tcp, z_tcp))
+        T_tcp = np.eye(4)
+        T_tcp[0:3, 0:3] = R_tcp
+        T_tcp[0:3, 3] = p_tcp
+        return T_tcp
+
         
     def grab(self):
         self.conn.ser.write(b"eOn\n")
