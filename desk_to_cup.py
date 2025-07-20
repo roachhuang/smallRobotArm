@@ -1,7 +1,7 @@
 from time import sleep, perf_counter
-import logging
+# import logging
 import numpy as np
-import signal   
+from signal import signal, SIGINT   
 from robot_tools.kinematics.robotarm_class import SmallRbtArm
 import robot_tools.controller.robot_controller as controller
 import robot_tools.trajectory.plan_traj as pt
@@ -42,7 +42,7 @@ def handler(signum, frame):
 
 def main() -> None:
     global smallRobotArm  # Tell Python to use the global variable
-    signal.signal(signal.SIGINT, handler)
+    signal(SIGINT, handler)
     # Create a custom robot object based on my DH parameters for std dh tbl.
     smRobot = DHRobot(std_dh_table, name="smallRobotArm")
     print("Reach of the robot:", smRobot.reach)

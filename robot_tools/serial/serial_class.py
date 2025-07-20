@@ -1,7 +1,7 @@
 # pip3 install pyserial
 import serial.tools.list_ports
 
-import serial
+from serial import Serial, SerialException, SerialTimeoutException
 
 # import platform
 import logging
@@ -73,7 +73,7 @@ class SerialPort:
 
     @event_run.setter
     def event_run(self, state):
-        if state == True:
+        if state:
             self._event_run.set()
         else:
             self._event_run.clear()
@@ -114,7 +114,7 @@ class SerialPort:
                         # time.sleep(0.05)
                 
                 # logging.debug(f"Sent command: {msg.strip()}")
-                if cmd["ack"] == True:
+                if cmd["ack"]:
                     self.ser.write(msg.encode("utf-8"))                           
                     self._event_ok2send.clear()
                     # print("[DEBUG] Waiting for ack...")

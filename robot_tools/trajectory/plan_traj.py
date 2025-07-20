@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 # from scipy.interpolate import CubicSpline
-from spatialmath.base import *
+# from spatialmath.base import *
 
 # import plotly.express as px
 # plt.ion()

@@ -1,16 +1,17 @@
 from time import sleep, perf_counter
 import logging
-import pandas as pd
+# import pandas as pd
 import numpy as np
-import signal   
 # import pyvista
-# import robot_tools.trajectory.equations as eq
-from robot_tools.kinematics.robotarm_class import SmallRbtArm
-import robot_tools.controller.robot_controller as controller
-import robot_tools.trajectory.plan_traj as pt
-import robot_tools.trajectory.interpolation as traj_path
+# preferred - use absolute imports for package structure
+from robot_tools.kinematics import SmallRbtArm
+from robot_tools.controller import RobotController
+from robot_tools.trajectory import Interp
+from robot_tools.misc.signal_handler import setup_signal_handler
+
 from roboticstoolbox import DHRobot, RevoluteDH
 from spatialmath import SE3
+import sys
 
 # from scipy.spatial.transform import Rotation as R
 # from scipy.interpolate import CubicSpline
@@ -53,35 +54,9 @@ python -m venv myenv
 source myenv/bin/activate  # Linux/macOS
 """
 
-smallRobotArm = None  # Declare at module level
-def handler(signum, frame):
-    """
-    Signal handler to gracefully exit the program on Ctrl+C.
-    """
-    
-    print("\nSignal received, exiting gracefully...")
-    if smallRobotArm is not None:
-        try:
-            smallRobotArm.controller.go_home()
-        except Exception as e:
-            print(f"[WARN] Could not go home: {e}")
-        # Only join the thread if it exists and is alive
-        t = getattr(getattr(smallRobotArm.controller, 'conn', None), 't', None)
-        if t is not None:
-            try:
-                if hasattr(t, 'is_alive') and t.is_alive():
-                    t.join(timeout=2)
-            except Exception as e:
-                print(f"[WARN] Could not join thread: {e}")
-    import os
-    os._exit(0)  # Force exit the program
+# smallRobotArm = None  # Declare at module level
 
 def main() -> None:
-    global smallRobotArm  # Tell Python to use the global variable
-    signal.signal(signal.SIGINT, handler)
-    
-    path = traj_path.Interp()
-    
     logging.basicConfig()
     DOF = 6
 
@@ -107,10 +82,13 @@ def main() -> None:
             [0, 0, d6],
         ]
     )
+    
     # create an instance of the robotarm.
     smallRobotArm = SmallRbtArm(std_dh_params)
-    rbt_controller = controller.RobotController(smRobot)
-    smallRobotArm.controller = rbt_controller  # Assign the controller to the robot arm instance
+    controller = RobotController(smRobot)
+    interp = Interp()
+    # Set up signal handler for graceful exit on Ctrl+C
+    setup_signal_handler(smallRobotArm)
                     
     # these values derived from fig 10 of my smallrobotarm notebook
     """move to rest angles at begining won't work coz 1. the motors don't have encoder. 2. If your robot uses incremental encoders, it loses its position when power is cycled or the program is restarted.
@@ -126,7 +104,7 @@ def main() -> None:
 
     # there must be a delay here right after sieal is initialized
     sleep(1)  # don't remove this line!!!
-    smallRobotArm.controller.enable()  # enable the robot arm
+    controller.enable()  # enable the robot arm
     sleep(1)
     # calibration
     # smallRobotArm.calibrate()
@@ -182,7 +160,7 @@ def main() -> None:
         end_pose = smallRobotArm.pose2T(poses0[i + 1])
         
         T_inter_poses.append(start_pose)  # Keep the original
-        interpolated = path.interpolate_poses(SE3(start_pose), SE3(end_pose), num_poses=5)
+        interpolated = interp.interpolate_poses(SE3(start_pose), SE3(end_pose), num_poses=5)
         T_inter_poses.extend(interpolated)
 
     # Append the final pose
@@ -214,10 +192,10 @@ def main() -> None:
         
         # print(kine_j.round(2))
         
-        diff = np.linalg.norm(np.array(kine_j) - np.array(smallRobotArm.controller.current_angles))
+        diff = np.linalg.norm(np.array(kine_j) - np.array(controller.current_angles))
         steps = min(20, max(5, int(diff / 10 * 10)))  # Scale reasonably (5 deg per step)s = int(diff * 10)  # 10 steps per radian of total joint-space distance
         
-        linear_path = path.generate_linear_path_in_js(smallRobotArm.controller.
+        linear_path = interp.generate_linear_path_in_js(controller.
                                                                     current_angles, kine_j, steps)
         
         # compute the joint-space inertia matrix
@@ -226,15 +204,16 @@ def main() -> None:
         # 2. Find "easy-move" direction
         easy_direction = eigvecs[:, np.argmin(eigvals)]
         # 3. Adjust motion path to align with easy direction            
-        adjusted_j = smallRobotArm.controller.align_path_to_vector(linear_path, easy_direction)
+        adjusted_j = controller.align_path_to_vector(linear_path, easy_direction)
         for angles in adjusted_j:
-            smallRobotArm.controller.move_to_angles(angles, header="g", ack=True)
+            controller.move_to_angles(angles, header="g", ack=True)
         
         # smallRobotArm.move_to_angles(kine_j, header="g", ack=True)
-        # smallRobotArm.controller.current_angles = kine_j  # Important to track for next segment
-        
-    smallRobotArm.controller.go_home()
+        # controller.current_angles = kine_j  # Important to track for next segment
+    
+    input("Press Enter to continue...")
+    controller.go_home()
     print("THREAD TERMINATED!")
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

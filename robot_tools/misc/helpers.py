@@ -8,7 +8,7 @@ def timer(func):
         start_time = time.perf_counter()    # 1
         res = func(*args, **kwargs)
         end_time = time.perf_counter()      # 2        
-        print(f"Finished {func.__name__!r} in {1000*(end_time- start_time)} ms")       
+        print(f"Finished {func.__name__!r} in {round(1000*(end_time- start_time))} ms")       
         # print(f"Finished {func.__name__!r} in {end_time- start_time:.4f} ms")       
         return res
     return wrapped
