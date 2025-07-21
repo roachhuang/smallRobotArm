@@ -1,6 +1,7 @@
 import time
 import numpy as np
 from numpy import ndarray
+from spatialmath import SE3
 import robot_tools.serial.serial_class as ser
 
 class RobotController:
@@ -125,30 +126,29 @@ class RobotController:
             v[1] =  circle_radius * omega * np.cos(omega * circle_t) * blend
 
         return v
-
     
-    def circle_xy_velocity(self, t, radius, period):
-        """
-        Generate velocity vector for a circular motion in the XY-plane.
-
+    def fourier_circle_velocity(self, t, radius=40, period=15.0, harmonics=1):
+        ''' harmonics = 1 for circle
         Parameters:
-        - t: current time (seconds)
-        - radius: radius of the circle (mm)
-        - period: time to complete one full circle (seconds)
+            - t: current time (seconds)
+            - radius: radius of the circle (mm)
+            - period: time to complete one full circle (seconds)
 
         Returns:
-        - x_dot: 6D end-effector velocity in base frame [vx, vy, vz, wx, wy, wz]
-        """
-        omega = 2 * np.pi / period  # angular speed (rad/s)
-        speed = omega * radius      # linear speed (mm/s)
-
-        # Tangent velocity on the circle
-        vx = -speed * np.sin(omega * t)
-        vy =  speed * np.cos(omega * t)
-
+            - x_dot: 6D end-effector velocity in base frame [vx, vy, vz, wx, wy, wz]
+        '''
+        omega = 2 * np.pi / period  # angular velocity (rad/s)
+        speed = omega * radius      # linear  velocity (mm/s)
         x_dot = np.zeros(6)
-        x_dot[0] = vx  # X direction
-        x_dot[1] = vy  # Y direction
+        vx, vy = 0, 0
+
+        for n in range(1, harmonics + 1):
+            # Tangent velocity on the circle
+            vx += -n * speed * np.sin(n * omega * t)
+            vy +=  n * speed * np.cos(n * omega * t)
+
+        x_dot[0] = vx   # x direction
+        x_dot[1] = vy   # y direction
         # Z (x_dot[2]) remains 0 → fixed height
         return x_dot
     
@@ -178,26 +178,6 @@ class RobotController:
 
         return adjusted_path
 
-    def move_to_angles(self, angles, header="g", ack=True):
-        self.robot.move_to_angles(angles, header=header, ack=ack)
-
-    # def interpolate_poses(self, start_pose: ndarray, end_pose: ndarray, num_poses=10):
-    #     """Generates smooth poses between two poses."""
-    #     # Ensure inputs are SE3 objects
-    #     # if not isinstance(start_pose, SE3) or not isinstance(end_pose, SE3):
-    #     #     raise ValueError("start_pose and end_pose must be SE3 objects")
-
-    #     # Generate interpolation values
-    #     s_values = np.linspace(0, 1, num_poses + 2)[1:-1]  # Get 'in-between' values.
-
-    #     # Interpolate poses
-    #     poses = []
-    #     for s in s_values:
-    #         print(f"Interpolating with s={s}")
-    #         # pose = trinterp(start_pose, end_pose, s)  # Use .A matrices
-    #         # poses.append(SE3(pose))  # Convert back to SE3
-    #     return poses
-    
     def eigen_analysis(smRobot, q):
         '''
         Eigen-Property	        Control Decision	                Value Impact
@@ -222,28 +202,49 @@ class RobotController:
             'manipulability': np.prod(S)
         }
     
+        
     def compute_approach_pose(self, T_cup, approach_vec_cup, offset=50):
+        """
+        Compute an approach pose with a specified offset from the target.
+        
+        Args:
+            T_cup: 4x4 transformation matrix of the cup/target
+            approach_vec_cup: 3D vector defining approach direction in cup frame
+            offset: distance in mm to offset from the target
+        
+        Returns:
+            4x4 transformation matrix for the approach pose
+        """
+        # Extract rotation and position from target transformation
         R_cup = T_cup[0:3, 0:3]
         p_cup = T_cup[0:3, 3]
 
+        # Transform approach vector to base frame
         approach_vec_base = R_cup @ approach_vec_cup
+        
+        # Calculate position with offset
         p_tcp = p_cup + offset * approach_vec_base
-        z_tcp = -approach_vec_base
-
+        
+        # Calculate orientation (z-axis aligned with approach vector)
+        z_tcp = -approach_vec_base  # Negative because we approach opposite to vector
+        
+        # Find perpendicular vectors to form coordinate frame
         world_up = np.array([0, 0, 1])
         x_tcp = np.cross(world_up, z_tcp)
         if np.linalg.norm(x_tcp) < 1e-3:
+            # Handle singularity if approach is parallel to world up
             world_up = np.array([0, 1, 0])
             x_tcp = np.cross(world_up, z_tcp)
         x_tcp /= np.linalg.norm(x_tcp)
         y_tcp = np.cross(z_tcp, x_tcp)
 
+        # Construct rotation matrix and transformation
         R_tcp = np.column_stack((x_tcp, y_tcp, z_tcp))
         T_tcp = np.eye(4)
         T_tcp[0:3, 0:3] = R_tcp
         T_tcp[0:3, 3] = p_tcp
+        
         return T_tcp
-
         
     def grab(self):
         self.conn.ser.write(b"eOn\n")

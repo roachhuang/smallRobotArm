@@ -2,6 +2,18 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 
+
+def rose_xy_position(t, R=40):
+    return R * np.cos(3*t) * np.cos(t), R * np.cos(3*t) * np.sin(t)
+
+ts = np.linspace(0, 2*np.pi, 500)
+xs, ys = zip(*[rose_xy_position(t) for t in ts])
+plt.plot(xs, ys); plt.axis("equal")
+
+plt.show()
+
+input("Press Enter to continue...")
+
 # Generate some random data
 x = np.random.rand(100)
 y = np.random.rand(100)

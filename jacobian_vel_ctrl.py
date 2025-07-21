@@ -110,8 +110,9 @@ def main() -> None:
     # duration=4 * (4.0 + 2.0 + 2.0)  # 32s = 4 corners * (edge+hover+circle)
     # )
     
-    input("Press Enter to continue circle vel...")    
-    controller.velocity_control(robot=smRobot, q_init=np.radians(controller.current_angles), x_dot_func=lambda t: controller.circle_xy_velocity(t, radius=40, period=15.0), dt=0.05, duration=15.0)
+    input("Press Enter to continue circle vel...") 
+    # duration/period = number of circular loop. t goes from 0 to duration (stepping by dt)
+    controller.velocity_control(robot=smRobot, q_init=np.radians(controller.current_angles), x_dot_func=lambda t: controller.fourier_circle_velocity(t, radius=40, period=15.0), dt=0.05, duration=15.0)
    
     # input("Press Enter to continue square vel...")
     # controller.velocity_control(robot=smRobot, q_init=np.radians(controller.current_angles), x_dot_func=lambda t: controller.square_xz_velocity(t, side_length=40, period=15.0), dt=0.05, duration=15.0)

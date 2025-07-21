@@ -35,3 +35,28 @@ class Interp:
             smooth_pose = smoothed[-1].interp(path[i], alpha)
             smoothed.append(smooth_pose)
         return smoothed
+    
+    def fourier_xy_velocity(self, t):
+        # Example Fourier synthesis for x(t) and y(t)
+        T = 15.0  # Period
+        A_list = [
+            [0, 0, 40],  # A_n for x — 3rd harmonic cosine only
+            [0, 20, 0],  # A_n for y — 2nd harmonic cosine only
+        ]
+        B_list = [
+            [0, 0, 0],   # B_n for x
+            [0, 0, 0],   # B_n for y
+        ]
+
+        x_dot = self.general_fourier_velocity(t, A_list[0], B_list[0], T)
+        y_dot = self.general_fourier_velocity(t, A_list[1], B_list[1], T)
+
+        return np.array([x_dot, y_dot, 0, 0, 0, 0])  # Cartesian velocity vector (6D)
+
+    
+    def general_fourier_velocity(self, t, A, B, T):
+        omega = 2 * np.pi / T
+        result = 0
+        for n in range(1, len(A) + 1):
+            result += A[n-1] * np.cos(n * omega * t) + B[n-1] * np.sin(n * omega * t)
+        return result
