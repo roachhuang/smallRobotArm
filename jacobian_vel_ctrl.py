@@ -79,26 +79,12 @@ def main() -> None:
     ''' 
     linear vel: vx, vy, vz; angular vel: wx, wy, wz
     '''
-    x_dot = np.array([20.0, 20.0, 10.0, 0.0, 0.0, 0.0])  # [mm/s, rad/s]
+    x_dot = np.array([20.0, 20.
+                      0, 20.0, 0.0, 0.0, 0.0])  # [mm/s, rad/s]
     dt = 0.02  # control period (e.g. 50Hz)
     q = np.radians(controller.current_angles)  # joint angles in radians
     
-    # simulating velocity control in joint space
-    for step in range(250):  # run for 5 seconds. steps= duration in sec/0.02
-        J = smRobot.jacob0(q)  # 6x6 Jacobian at current joint state
-        U, Sigma, Vt = np.linalg.svd(J)
-        Sigma_plus = np.diag([1/s if s > 1e-6 else 0 for s in Sigma])  # Damped pseudoinverse
-        J_plus = Vt.T @ Sigma_plus @ U.T
-        # q_dot = np.linalg.pinv(J, rcond=1e-4) @ x_dot  # 6x1 joint velocity vector
-        q_dot = J_plus @ x_dot  # Joint velocities
-        # q_dot = np.clip(q_dot, 0.1, 0.5)
-        q += q_dot * dt  # integrate to get next joint position
-
-        deg_q = np.degrees(q)
-        controller.move_to_angles(deg_q, header="g", ack=True)
-        # controller.current_angles = deg_q.copy()
-
-        sleep(dt)
+    controller.velocity_control(robot=smRobot, q_init=q, x_dot_func=lambda t: x_dot, dt=dt, duration=5.0)       
       
     # input("Press Enter to continue... square w/ corners vel")    
     # controller.velocity_control(
@@ -109,6 +95,7 @@ def main() -> None:
     # dt=0.05,
     # duration=4 * (4.0 + 2.0 + 2.0)  # 32s = 4 corners * (edge+hover+circle)
     # )
+    
     
     input("Press Enter to continue circle vel...") 
     # duration/period = number of circular loop. t goes from 0 to duration (stepping by dt)
@@ -123,14 +110,14 @@ def main() -> None:
     # q_init=np.radians(controller.current_angles),
     # x_dot_func=lambda t:controller.figure_eight_velocity(t, radius=30, freq=1.0),
     # dt=0.05,
-    # duration=30.0    
+    # duration=10.0    
     # )
     
     # input("Press Enter to continue Zigzag/sawtooth pattern...")
     # controller.velocity_control(
     # robot=smRobot,
     # q_init=np.radians(controller.current_angles),
-    # x_dot_func=lambda t:controller.zigzag_velocity(t, side_length=40, period=20.0),
+    # x_dot_func=lambda t:controller.zigzag_velocity(t, side_length=40, period=30.0),
     # dt=0.05,
     # duration=30.0    
     # )
