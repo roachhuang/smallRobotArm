@@ -1,18 +1,35 @@
+"""Trajectory Planning Module
+
+This module implements trajectory planning using Linear Functions with Parabolic Blends (LFPB).
+It generates smooth trajectories between waypoints with controlled acceleration and deceleration.
+
+Functions:
+    planTraj: Plan a trajectory with linear segments and parabolic blends
+"""
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-# from scipy.interpolate import CubicSpline
-# from spatialmath.base import *
 
-# import plotly.express as px
-# plt.ion()
-
-# 開始規劃 trajectory. Degree Of Freedom.
+# Degrees of Freedom for the robot arm
 DOF = 6
 
 
 def planTraj(p):
-    # in 0, 0.5s. col[1~3]: x, y, z
+    """Plan a trajectory with linear segments and parabolic blends.
+    
+    This function implements the Linear Functions with Parabolic Blends (LFPB) algorithm
+    to generate a smooth trajectory between waypoints. It creates linear segments for
+    constant velocity motion and parabolic blends for smooth acceleration/deceleration.
+    
+    Args:
+        p (ndarray): Array containing waypoints with timing information.
+                    First column is time, remaining columns are joint angles or positions.
+    
+    Returns:
+        tuple: (v, a) where v is velocity array and a is acceleration array
+    """
+    # Equation for initial acceleration (0 to 0.5s)
     def eq1(t, col):
         dt = t - 0
         v0 = v[0, col]
@@ -21,7 +38,7 @@ def planTraj(p):
         # Xeq1(t) = x0+v0*dt+1/2*at^2, here we replace d with theta
         return p[0, col + 1] + v0 * dt + 1 / 2 * a0 * dt**2
 
-    # in 0.5, 1.75
+    # Equation for constant velocity after initial acceleration
     def eq2(t, col):
         # Xeq2(t)=x0+v1*dt.
         dt = t - 0.25
@@ -29,7 +46,7 @@ def planTraj(p):
         # linear segment.
         return p[0, col + 1] + v1 * dt
 
-    # in 1.75, 2.25
+    # Equation for transition blend at first via point
     def eq3(t, col):
         v1 = v[1, col]
         a1 = a[1, col]
@@ -37,13 +54,13 @@ def planTraj(p):
         dt2 = t - (ts[1] - 0.25)
         return p[0, col + 1] + v1 * dt1 + 1 / 2 * a1 * dt2**2
 
-    # in 2.25, 5.75
+    # Equation for constant velocity after first via point
     def eq4(t, col):
         dt = t - ts[1]
         v2 = v[2, col]
         return p[1, col + 1] + v2 * dt
 
-    # 5.75, 6.25
+    # Equation for transition blend at second via point
     def eq5(t, col):
         dt1 = t - ts[1]
         dt2 = t - (ts[2] - 0.25)
@@ -51,14 +68,13 @@ def planTraj(p):
         a2 = a[2, col]
         return p[1, col + 1] + v2 * dt1 + 1 / 2 * a2 * dt2**2
 
-    # 6.25, 8.5
+    # Equation for constant velocity after second via point
     def eq6(t, col):
         dt = t - ts[2]
         v3 = v[3, col]
         return p[2, col + 1] + v3 * dt
 
-    # col - 0:x, 1:y, 2:theta
-    # 8.5 ~9s
+    # Equation for final deceleration
     def eq7(t, col):
         dt1 = t - ts[2]
         dt2 = t - (ts[totalPoints - 1] - 0.5)

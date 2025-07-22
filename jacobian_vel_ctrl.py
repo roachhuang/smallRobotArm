@@ -79,8 +79,7 @@ def main() -> None:
     ''' 
     linear vel: vx, vy, vz; angular vel: wx, wy, wz
     '''
-    x_dot = np.array([20.0, 20.
-                      0, 20.0, 0.0, 0.0, 0.0])  # [mm/s, rad/s]
+    x_dot = np.array([20.0, 20.0, 20.0, 0.0, 0.0, 0.0])  # [mm/s, rad/s]
     dt = 0.02  # control period (e.g. 50Hz)
     q = np.radians(controller.current_angles)  # joint angles in radians
     

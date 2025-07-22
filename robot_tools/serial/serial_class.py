@@ -1,18 +1,38 @@
-# pip3 install pyserial
+"""Serial Communication Module
+
+This module provides serial communication functionality for the small robot arm,
+handling the connection to the Arduino controller and implementing a reliable
+communication protocol with acknowledgment.
+
+Classes:
+    SerialPort: Manages serial communication with the Arduino
+"""
+
 import serial.tools.list_ports
-
 from serial import Serial, SerialException, SerialTimeoutException
-
-# import platform
 import logging
 from threading import Thread, Event, Lock
 import robot_tools.misc.helpers as hlp
-# import time
 
 class SerialPort:
+    """Serial port manager for Arduino communication.
+    
+    This class handles the serial connection to the Arduino, including automatic port
+    detection, command sending with acknowledgment, and response handling through
+    a dedicated receiver thread.
+    
+    Attributes:
+        ser: Serial connection object
+        _event_run: Event to control the receiver thread
+        _event_ok2send: Event for flow control (wait for acknowledgment)
+        lock: Thread lock for thread-safe operations
+        t: Receiver thread
+    """
+    
     def __del__(self):
         # Ensure resources are cleaned up if disconnect was not called explicitly
         self.disconnect()
+        
     def __init__(self):
         self.ser = None
         self._event_run = Event()
@@ -69,16 +89,33 @@ class SerialPort:
 
     @property
     def event_run(self):
+        """Get the state of the run event.
+        
+        Returns:
+            bool: True if the receiver thread should be running
+        """
         return self._event_run.is_set()
 
     @event_run.setter
     def event_run(self, state):
+        """Set the state of the run event.
+        
+        Args:
+            state (bool): True to set the event, False to clear it
+        """
         if state:
             self._event_run.set()
         else:
             self._event_run.clear()
 
     def _get_serial_port(self):
+        """Automatically detect and return the first available suitable serial port.
+        
+        Looks for ports with 'USB' in the description or 'COM' in the device name.
+        
+        Returns:
+            str: Device path of the detected serial port, or None if not found
+        """
         """Automatically detects and returns the 1st available serial port."""
         try:
             ports = list(serial.tools.list_ports.comports())

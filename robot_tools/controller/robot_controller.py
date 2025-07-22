@@ -1,3 +1,15 @@
+"""Robot Controller Module
+
+This module provides high-level control functionality for the small robot arm,
+including velocity control, motion patterns, and direct joint control.
+
+The controller handles communication with the hardware through a serial connection
+and provides methods for various motion patterns and approach pose calculations.
+
+Classes:
+    RobotController: Main controller class for the robot arm
+"""
+
 import time
 import numpy as np
 from numpy import ndarray
@@ -5,6 +17,19 @@ from spatialmath import SE3
 import robot_tools.serial.serial_class as ser
 
 class RobotController:
+    """Controller for the small robot arm.
+    
+    This class provides methods to control the robot arm, including velocity control,
+    motion patterns, and direct joint control. It handles communication with the
+    Arduino hardware through a serial connection.
+    
+    Attributes:
+        robot_rest_angles (tuple): Default rest position angles for the robot
+        current_angles (tuple): Current joint angles of the robot
+        robot: Robot model used for kinematics calculations
+        conn (SerialPort): Serial connection to the Arduino
+    """
+    
     def __init__(self, robot):
         self.robot_rest_angles = (0.0, -78.5, 73.9, 0.0, -90.0, 0.0)       
         self.current_angles = self.robot_rest_angles
@@ -13,6 +38,22 @@ class RobotController:
         self.conn.connect()
     
     def velocity_control(self, robot, q_init, x_dot_func, duration, dt=0.05):
+        """Control robot using velocity control in task space.
+        
+        This method implements Jacobian-based velocity control, converting desired
+        end-effector velocities to joint velocities using the damped pseudoinverse
+        of the Jacobian matrix.
+        
+        Args:
+            robot: Robot model with jacobian method
+            q_init (ndarray): Initial joint angles in radians
+            x_dot_func (callable): Function that takes time and returns 6D velocity vector
+            duration (float): Duration of motion in seconds
+            dt (float): Time step for control loop in seconds
+            
+        Returns:
+            ndarray: Final joint angles in degrees
+        """
         q = np.array(q_init, dtype=np.float64)  # Ensure q is a float array
         n_steps = int(duration / dt)
         max_qdot = np.radians(10)  # max joint velocity in rad
@@ -34,6 +75,16 @@ class RobotController:
         return q_deg
         
     def square_xz_velocity(self, t, side_length, period):
+        """Generate velocity vector for square motion in XZ plane.
+        
+        Args:
+            t (float): Current time in seconds
+            side_length (float): Length of square side in mm
+            period (float): Time to complete full square in seconds
+            
+        Returns:
+            ndarray: 6D velocity vector [vx, vy, vz, wx, wy, wz]
+        """
         # side_duration = 1.0
         # speed = 20.0 # 0.01  # mm/s
         # phase = int(t // side_duration) % 4
@@ -55,12 +106,35 @@ class RobotController:
         return v
 
     def figure_eight_velocity(self, t, radius=30, freq=1.0):
+        """Generate velocity vector for figure-eight pattern in XY plane.
+        
+        Creates a figure-eight pattern by using sine for x-axis motion with frequency f
+        and cosine for y-axis motion with frequency 2f.
+        
+        Args:
+            t (float): Current time in seconds
+            radius (float): Size of figure-eight pattern in mm
+            freq (float): Frequency of pattern in Hz (cycles per second)
+            
+        Returns:
+            ndarray: 6D velocity vector [vx, vy, vz, wx, wy, wz]
+        """
         v = np.zeros(6)
         v[0] = -radius * 2 * np.pi * freq * np.sin(2 * np.pi * freq * t)      # x
         v[1] = radius * 2 * np.pi * freq * np.cos(4 * np.pi * freq * t)       # y
         return v
     
     def spiral_velocity(self, t, radius_rate=2.0, angular_speed=0.5):
+        """Generate velocity vector for spiral motion in XY plane.
+        
+        Args:
+            t (float): Current time in seconds
+            radius_rate (float): Rate of spiral expansion in mm/s
+            angular_speed (float): Angular velocity in rad/s
+            
+        Returns:
+            ndarray: 6D velocity vector [vx, vy, vz, wx, wy, wz]
+        """
         r = radius_rate * t
         v = np.zeros(6)
         v[0] = -r * angular_speed * np.sin(angular_speed * t) + radius_rate * np.cos(angular_speed * t)  # x
@@ -68,6 +142,16 @@ class RobotController:
         return v
 
     def zigzag_velocity(self, t, side_length=40, period=10.0):
+        """Generate velocity vector for zigzag motion in XY plane.
+        
+        Args:
+            t (float): Current time in seconds
+            side_length (float): Length of zigzag segment in mm
+            period (float): Time to complete one zigzag cycle in seconds
+            
+        Returns:
+            ndarray: 6D velocity vector [vx, vy, vz, wx, wy, wz]
+        """
         v = np.zeros(6)
         step = int((t / (period / 4)) % 2)
         v[0] = side_length / (period / 4) if step == 0 else -side_length / (period / 4)
@@ -178,7 +262,18 @@ class RobotController:
 
         return adjusted_path
 
-    def eigen_analysis(smRobot, q):
+    def eigen_analysis(self, smRobot, q):
+        """Perform eigenvalue analysis of robot Jacobian and inertia matrices.
+        
+        This analysis helps identify optimal motion directions and potential singularities.
+        
+        Args:
+            q (ndarray): Joint angles in radians
+            
+        Returns:
+            dict: Dictionary containing analysis results including optimal directions
+                 and manipulability measure
+        """
         '''
         Eigen-Property	        Control Decision	                Value Impact
         min(S) < 0.1	        Adjust pose to avoid singularity	Prevents 90% of motion failures
@@ -247,22 +342,34 @@ class RobotController:
         return T_tcp
         
     def grab(self):
+        """Activate the gripper to grab an object."""
         self.conn.ser.write(b"eOn\n")
 
     def drop(self):
+        """Deactivate the gripper to release an object."""
         self.conn.ser.write(b"eOff\n")
 
     def enable(self):
+        """Enable all motors on the robot arm."""
         # motors are disabled in arduino's setup()
         self.conn.ser.write(b"en\n")       
 
     def calibrate(self):
+        """Calibrate the robot by homing all axes."""
         self.conn.ser.write(b"g28\n")  # G28 is the command to home the robot arm
         
     def disable(self):
+        """Disable all motors on the robot arm."""
         self.conn.ser.write(b"dis\n")
 
     def move_to_angles(self, j: tuple, header='g', ack=True) -> None:
+        """Move the robot to specified joint angles.
+        
+        Args:
+            j (tuple): Target joint angles in degrees
+            header (str): Command header for Arduino protocol
+            ack (bool): Whether to wait for acknowledgment from Arduino
+        """
         # return super().moveTo(end_effector_pose)
         # limited_j = self.limit_joint_angles(j)
         cmd = {"header": header, "joint_angle": j, "ack": ack}
@@ -271,6 +378,10 @@ class RobotController:
         self.current_angles = j
         
     def go_home(self):
+        """Move the robot to its home/rest position and disconnect.
+        
+        This is typically called before shutting down the system.
+        """
         print('gohome')
         self.move_to_angles(j=self.robot_rest_angles)
         # self.current_angles = self.robot_rest_angles

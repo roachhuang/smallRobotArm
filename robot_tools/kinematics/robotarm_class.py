@@ -1,18 +1,41 @@
-# the reason for importing cos and sin from sympy is Rot case (can't import them from math, plz note!!!)
-# from sympy import symbols  # , nsimplify, Matrix
+"""Small Robot Arm Kinematics Module
+
+This module implements the forward and inverse kinematics for the small robot arm
+based on the standard Denavit-Hartenberg parameters.
+
+Classes:
+    SmallRbtArm: Kinematics implementation for the specific robot arm
+"""
+
 import numpy as np
 from numpy import ndarray
-# import helpers as hlp
-from numpy import ndarray
-# from spatialmath.base import trinterp
 from spatialmath import SE3
-# from scipy.spatial.transform import Rotation as R
 
 from .robotarm_independent_class import RobotArm
 
-# robot arm dependent
 class SmallRbtArm(RobotArm):    
+    """Small Robot Arm kinematics implementation.
+    
+    This class implements the specific kinematics for the small robot arm,
+    including forward and inverse kinematics, joint limits, and coordinate
+    transformations between different reference frames.
+    
+    Attributes:
+        dhTbl (ndarray): DH parameters table
+        max_qlimits (tuple): Maximum joint angle limits in degrees
+        min_qlimits (tuple): Minimum joint angle limits in degrees
+        th_offset (tuple): Joint angle offsets in radians
+        controller: Reference to the robot controller
+        T_wd (ndarray): Transformation from world to desk frame
+        T_w0_inv (ndarray): Inverse transformation from world to robot base frame
+        T_6c_inv (ndarray): Inverse transformation from joint 6 to cup/tool frame
+    """
     def __init__(self, std_dh_tbl: ndarray):
+        """Initialize the small robot arm with DH parameters.
+        
+        Args:
+            std_dh_tbl (ndarray): Standard DH parameters table
+        """
         super().__init__()        
         self.dhTbl = std_dh_tbl  
         
@@ -51,7 +74,17 @@ class SmallRbtArm(RobotArm):
         return T_06        
         
     def limit_joint_angles(self, angles):
-        """Limits joint angles to specified max/min values."""
+        """Limit joint angles to specified max/min values.
+        
+        Args:
+            angles (list or tuple): Joint angles to be limited
+            
+        Returns:
+            list: Joint angles clipped to the allowed range
+            
+        Raises:
+            ValueError: If the input angles list length doesn't match limits length
+        """
         if len(angles) != len(self.max_qlimits) or len(angles) != len(self.min_qlimits):
             raise ValueError("Angle and qlimit lists must have the same length.")
         # note that j4 can move only when j3 < 63.9
