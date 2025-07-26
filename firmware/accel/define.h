@@ -6,7 +6,7 @@ bool buf_full=false;
 
 #define BAUD_RATE 115200
 // Command buffer definitions
-#define BUFFER_SIZE 100
+#define BUFFER_SIZE 200
 float targetBuffer[BUFFER_SIZE][6];
 volatile int writeIndex = 0;
 volatile int readIndex = 0;
@@ -47,9 +47,24 @@ const int MAX_INPUT_SIZE = 100;
 
 const int lower_limit[6] = { -114, -81, -180, -180, -139, -180 };
 const int upper_limit[6] = { 114, 77, 70, 180, 139, 180 };
-#define MAX_SPEED 2200
-#define MAX_ACCEL 1000  // increase from 500
-#define MIN_ACCEL 300
+// steps/sec. For different joints (if you want joint-specific limits)
+const float MAX_JOINT_SPEEDS[6] = {
+  1500,  // Joint 1 (base) - can handle higher speeds. ≈27°/sec for joint 1
+  1200,  // Joint 2 (shoulder) - heavier load
+  1200,  // Joint 3 (elbow) - heavier load  
+  1800,  // Joint 4 (wrist roll) - lighter
+  1800,  // Joint 5 (wrist pitch) - lighter
+  2000   // Joint 6 (wrist yaw) - lightest
+};
+// steps/sec²
+const float MAX_JOINT_ACCELS[6] = {
+  800,   // Joint 1
+  600,   // Joint 2 - slower accel for heavy loads
+  600,   // Joint 3 - slower accel for heavy loads
+  1000,  // Joint 4
+  1000,  // Joint 5  
+  1200   // Joint 6
+};
 
 // Stepper motor objects
 AccelStepper steppers[6] = {
@@ -69,5 +84,20 @@ const float homePositions[6] = { 0.0, -78.51, 73.90, 0.0, -90.0, 0.0 };
 char inputBuffer[MAX_INPUT_SIZE];
 int inputIndex = 0;
 bool newCommandReady = false;
-const uint8_t step_threshold = 128; // 200 steps
+const uint8_t step_threshold = 32; // Threshold for considering movement complete
+
+// Function declarations
+void processCommand(const char *cmd);
+long degreesToSteps(float degrees, int joint);
+float stepsToRadians(long steps, int joint);
+void enableMotors(bool enable);
+void serialEvent();
+void sendCurrentPositions();
+void parseFloats(const char *str, float *out, int maxCount);
+int getBackoffDirection(uint8_t joint_num);
+void move_j2_up();
+void homeJoint(uint8_t limitPin, uint8_t joint_num);
+bool isWithinLimits(float angle, int joint);
+void moveToPositionSync(float targetDegrees[6]);
+
 #endif  // DEFINE_H_

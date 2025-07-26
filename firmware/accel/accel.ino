@@ -31,8 +31,8 @@ void setup() {
 
   // Configure steppers
   for (int i = 0; i < 6; i++) {
-    steppers[i].setMaxSpeed(MAX_SPEED);      // steps/sec
-    steppers[i].setAcceleration(MAX_ACCEL);  // steps/sec²
+    steppers[i].setMaxSpeed(MAX_JOINT_SPEEDS[i]);      // steps/sec
+    steppers[i].setAcceleration(MAX_JOINT_ACCELS[i]);  // steps/sec²
   }
 
   // Set initial positions
@@ -49,7 +49,11 @@ void loop() {
     newCommandReady = false;
   }
 
-  // Check if all steppers have reached their targets
+  // Run all steppers FIRST
+  for (int i = 0; i < 6; i++) {
+    steppers[i].run();
+  }
+  // Then Check if all steppers have reached their targets
   bool allDone = true;
   for (int i = 0; i < 6; i++) {
     if (steppers[i].distanceToGo() > step_threshold) {
@@ -64,14 +68,10 @@ void loop() {
     memcpy(jointSpaceCmd, targetBuffer[readIndex], sizeof(float) * 6);
     readIndex = BUFFER_INCREMENT(readIndex);
     moveToPositionSync(jointSpaceCmd);
-    if (buf_full==true){
+    if (buf_full == true) {
       Serial.println("ack");
+      buf_full = false;
     }
-  }
-
-  // Run all steppers
-  for (int i = 0; i < 6; i++) {
-    steppers[i].run();
   }
 
   // Periodically send current positions (5Hz)
@@ -89,13 +89,15 @@ void processCommand(const char *cmd) {
     if (BUFFER_FULL()) {
       Serial.println("buffer_full");
       buf_full = true;
-    } else {
-      parseFloats(cmd + 1, jointSpaceCmd, 6);
-      memcpy(targetBuffer[writeIndex], jointSpaceCmd, sizeof(float) * 6);
-      writeIndex = BUFFER_INCREMENT(writeIndex);
-      buf_full = false;
-      Serial.println("ack");
+      return;
     }
+    parseFloats(cmd + 1, jointSpaceCmd, 6);
+
+    memcpy(targetBuffer[writeIndex], jointSpaceCmd, sizeof(float) * 6);
+    writeIndex = BUFFER_INCREMENT(writeIndex);
+    buf_full = false;
+    Serial.println("ack");
+
   } else if (strcmp(cmd, "g28") == 0) {
     move_j2_up();
     homeJoint(Y_MAX_PIN, 2);  // Home joint 3
@@ -290,9 +292,9 @@ void moveToPositionSync(float targetDegrees[6]) {
   // Scale speeds based on longest distance
   for (int i = 0; i < 6; i++) {
     float speedRatio = maxDelta == 0 ? 0 : (float)deltaSteps[i] / maxDelta;
-    float scaledSpeed = MAX_SPEED * speedRatio;
+    float scaledSpeed = MAX_JOINT_SPEEDS[i] * speedRatio;
     steppers[i].setMaxSpeed(scaledSpeed);
-    steppers[i].setAcceleration(MAX_ACCEL * speedRatio);
+    steppers[i].setAcceleration(MAX_JOINT_ACCELS[i] * speedRatio);
     steppers[i].moveTo(targetSteps[i]);
   }
 }
