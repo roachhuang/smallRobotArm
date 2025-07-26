@@ -56,16 +56,21 @@ class RobotController:
         """
         q = np.array(q_init, dtype=np.float64)  # Ensure q is a float array
         n_steps = int(duration / dt)
-        max_qdot = np.radians(10)  # max joint velocity in rad
+        max_qdot = np.radians(30)  # 30°/sec max joint velocity. in accrod w/ firmware's MAX_SPEED.
         for i in range(n_steps):
             J = robot.jacob0(q)
-            U, Sigma, Vt = np.linalg.svd(J)
-            Sigma_plus = np.diag([1/s if s > 1e-6 else 0 for s in Sigma])  # Damped pseudoinverse
-            J_plus = Vt.T @ Sigma_plus @ U.T
+            # Check manipulability (measure of singularity)
+            manipulability = np.sqrt(np.linalg.det(J @ J.T))            
+            if manipulability < 0.01:  # Near singularity
+                # Use damped least squares with adaptive damping
+                damping = 0.1 * (0.01 - manipulability) / 0.01
+                J_plus = J.T @ np.linalg.inv(J @ J.T + damping**2 * np.eye(6))
+            else:
+                # Standard pseudoinverse
+                J_plus = np.linalg.pinv(J)
             x_dot = x_dot_func(i * dt)  # Desired end-effector vel in base/world frame (6D)
-            # q_dot = np.linalg.pinv(J, rcond=1e-4) @ x_dot
             q_dot = J_plus @ x_dot
-            # q_dot = np.clip(q_dot, 0.1, 5)
+            q_dot = np.clip(q_dot, -max_qdot, max_qdot)
             q += q_dot * dt  # Integrate joint velocity
             q_deg = np.degrees(q)
 
