@@ -3,11 +3,13 @@ from time import sleep, perf_counter
 import numpy as np
 import sys
 
+from spatialmath import SE3
+
 '''When you do import robot_tools.controller.robot_controller as controller,
 controller refers to the module robot_controller.py, not to an object.
 The method velocity_control is defined inside the RobotController class, so you need to call it on an instance of that class.'''
    
-# from robot_tools.kinematics import SmallRbtArm
+from robot_tools.kinematics import SmallRbtArm
 from robot_tools.controller import RobotController
 # import robot_tools.trajectory.plan_traj as pt
 
@@ -54,7 +56,7 @@ def main() -> None:
         ]
     )
     # create an instance of the robotarm.
-    # smallRobotArm = SmallRbtArm(std_dh_params)
+    smallRobotArm = SmallRbtArm(std_dh_params)
     controller = RobotController(smRobot)
     # Set up signal handler for graceful exit on Ctrl+C
     setup_signal_handler(controller)                    
@@ -79,27 +81,37 @@ def main() -> None:
     ''' 
     linear vel: vx, vy, vz; angular vel: wx, wy, wz
     '''
-    x_dot = np.array([20.0, 20.0, 20.0, 0.0, 0.0, 0.0])  # [mm/s, rad/s]
-    dt = 0.02  # control period (e.g. 50Hz)
-    q = np.radians(controller.current_angles)  # joint angles in radians
+    # x_dot = np.array([20.0, 20.0, 20.0, 0.0, 0.0, 0.0])  # [mm/s, rad/s]
+    # dt = 0.02  # control period (e.g. 50Hz)
+    # q = np.radians(controller.current_angles)  # joint angles in radians
     
-    controller.velocity_control(robot=smRobot, q_init=q, x_dot_func=lambda t: x_dot, dt=dt, duration=5.0)       
-      
-    # input("Press Enter to continue... square w/ corners vel")    
-    # controller.velocity_control(
-    # robot=smRobot,
-    # q_init=np.radians(controller.current_angles),
-    # x_dot_func=lambda t: controller.square_with_corners_velocity(
-    #     t, side_length=100, edge_period=2.0, hover_duration=2.0, circle_radius=25.0, circle_period=2.0),
-    # dt=0.05,
-    # duration=4 * (4.0 + 2.0 + 2.0)  # 32s = 4 corners * (edge+hover+circle)
-    # )
+    # controller.velocity_control(robot=smRobot, q_init=q, x_dot_func=lambda t: x_dot, dt=dt, duration=5.0)       
     
+    # move to center of circle 
+    p_dc = (-250, 180, 110.0, 0.0, 90.0, 0.0)   # pose wrt to desk frame.
+    T_06 = smallRobotArm.convert_p_dc_to_T06(p_dc)
+    # ik_sol = smRobot.ikine_LM(SE3(T_06), q0=np.ones(smRobot.n))
+    # if not ik_sol.success:
+    #     print("IK solution failed!!!")
+    #     exit(0)
+    # j = np.degrees(ik_sol.q)    
+    j = smallRobotArm.ik(T_06)
+    controller.move_to_angles(j)
+    sleep(2)
+    p_dc = (-200, 180, 110.0, 0.0, 90.0, 0.0)   # pose wrt to desk frame.
+    T_06 = smallRobotArm.convert_p_dc_to_T06(p_dc)
+    # ik_sol = smRobot.ikine_LM(SE3(T_06), q0=np.ones(smRobot.n))
+    # if not ik_sol.success:
+    #     print("IK solution failed!!!")
+    #     exit(0)
+    # j = np.degrees(ik_sol.q)
+    j = smallRobotArm.ik(T_06)        
+    controller.move_to_angles(j)
     
     input("Press Enter to continue circle vel...") 
     # duration/period = number of circular loop. t goes from 0 to duration (stepping by dt)
     controller.velocity_control(robot=smRobot, q_init=np.radians(controller.current_angles), x_dot_func=lambda t: controller.fourier_circle_velocity(t, radius=40, period=15.0), dt=0.05, duration=15.0)
-   
+    
     # input("Press Enter to continue square vel...")
     # controller.velocity_control(robot=smRobot, q_init=np.radians(controller.current_angles), x_dot_func=lambda t: controller.square_xz_velocity(t, side_length=40, period=15.0), dt=0.05, duration=15.0)
     
@@ -130,6 +142,16 @@ def main() -> None:
     # duration=30.0    
     # )
 
+    # input("Press Enter to continue... square w/ corners vel")    
+    # controller.velocity_control(
+    # robot=smRobot,
+    # q_init=np.radians(controller.current_angles),
+    # x_dot_func=lambda t: controller.square_with_corners_velocity(
+    #     t, side_length=100, edge_period=2.0, hover_duration=2.0, circle_radius=25.0, circle_period=2.0),
+    # dt=0.05,
+    # duration=4 * (4.0 + 2.0 + 2.0)  # 32s = 4 corners * (edge+hover+circle)
+    # )
+    
     input("Press Enter to go home...")   
     controller.go_home()
         
