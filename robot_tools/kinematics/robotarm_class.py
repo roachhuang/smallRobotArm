@@ -45,7 +45,7 @@ class SmallRbtArm(RobotArm):
         self.controller = None
       
         self.T_wd = np.array([[1, 0, 0, 440], [0, 1, 0, -75], [0, 0, 1, 0], [0, 0, 0, 1]])
-        robot_base_height = 0.0
+        robot_base_height = 40.0
         T_w0 = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, robot_base_height], [0, 0, 0, 1]])
         self.T_w0_inv = np.linalg.inv(T_w0)
         
