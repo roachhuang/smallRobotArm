@@ -120,7 +120,7 @@ def main() -> None:
     p_dc = poses[0, 1:]
     # Convert to transformation matrix
     T_dc = SE3.Trans(p_dc[0:3]) * SE3.RPY(p_dc[3:6], order="zyx", unit="deg")
-    new_T_dc = controller.compute_approach_pose(T_dc.A, approach_vec_cup=[1,0,0], offset=50)
+    new_T_dc = controller.compute_approach_pose(T_dc.A, approach_vec_cup=[0,0,1], offset=50)
     new_p_dc = smallRobotArm.T2Pose(new_T_dc)
     T_approach = smallRobotArm.convert_p_dc_to_T06(new_p_dc)    
     j = smallRobotArm.ik(T_approach)
@@ -130,6 +130,7 @@ def main() -> None:
     T_06_at_0s = smallRobotArm.convert_p_dc_to_T06(p_dc)
     j = smallRobotArm.ik(T_06_at_0s)
     controller.move_to_angles(j)
+    
     
     input("Press Enter to continue...")
     # traj planning in joint-space.

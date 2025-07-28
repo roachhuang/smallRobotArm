@@ -3,19 +3,16 @@ from time import sleep, perf_counter
 import numpy as np
 import sys
 
-# from spatialmath import SE3
-
 '''When you do import robot_tools.controller.robot_controller as controller,
 controller refers to the module robot_controller.py, not to an object.
 The method velocity_control is defined inside the RobotController class, so you need to call it on an instance of that class.'''
    
 from robot_tools.kinematics import SmallRbtArm
 from robot_tools.controller import RobotController
-# import robot_tools.trajectory.plan_traj as pt
 
 from roboticstoolbox import DHRobot, RevoluteDH
 from robot_tools.misc.signal_handler import setup_signal_handler
-from robot_tools.trajectory import figure_eight_velocity,fourier_circle_velocity,zigzag_velocity,spiral_velocity,square_xz_velocity
+from robot_tools.trajectory.motion_patterns import *
 
 # from scipy.spatial.transform import Rotation as R
 # from scipy.interpolate import CubicSpline
@@ -58,7 +55,8 @@ def main() -> None:
     )
     # create an instance of the robotarm.
     smallRobotArm = SmallRbtArm(std_dh_params)
-    controller = RobotController(smRobot)
+    # controller = RobotController(smRobot)
+    controller = RobotController(smallRobotArm)
     # Set up signal handler for graceful exit on Ctrl+C
     setup_signal_handler(controller)                    
                     
@@ -72,11 +70,16 @@ def main() -> None:
     # print("[DEBUG] Waiting for ack...")
     # sleep(2)
     
-    # zero_j = (0, 0, 0, 0, 0, 0)
+    zero_j = (0, 0, 0, 0, 0, 0)
     # controller.move_to_angles(zero_j, header="g", ack=True)
     
-    # Compute the Jacobian matrix in the base frame
-    # jacobian_matrix = smRobot.jacob0(controller.robot_rest_angles)
+    # Compute the Jacobian matrix using DH parameters
+    q_test = np.radians(controller.robot_rest_angles)
+    J_custom = smallRobotArm.compute_jacobian(q_test)
+    J_toolbox = smRobot.jacob0(q_test)
+    print(f"Custom Jacobian shape: {J_custom.shape}")
+    print(f"Toolbox Jacobian shape: {J_toolbox.shape}")
+    print(f"Max difference: {np.max(np.abs(J_custom - J_toolbox)):.6f}")
     # Desired end-effector velocity in world frame (ẋ = [vx, vy, vz, ωx, ωy, ωz])
     # my dhtbl is in mm, so here x,y,z in mm/s
     ''' 
@@ -98,49 +101,44 @@ def main() -> None:
     j = smallRobotArm.ik(T_06)
     controller.move_to_angles(j)
     sleep(2)
-    dt = 0.05  # control period (e.g. 50Hz)
+    dt = 0.05  # control period (e.g. 20Hz)
     q = np.radians(controller.current_angles)  # joint angles in radians
-    controller.velocity_control(robot=smRobot, q_init=q, x_dot_func=lambda t: x_dot, dt=dt, duration=2.5)        
+    controller.velocity_control(q_init=q, x_dot_func=lambda t: x_dot, dt=dt, duration=2.5)        
    
-    input("Press Enter to continue circle vel...") 
+    input("Press Enter to continue circle motion...") 
     # duration/period = number of circular loop. t goes from 0 to duration (stepping by dt)
-    controller.velocity_control(robot=smRobot, q_init=np.radians(controller.current_angles), x_dot_func=lambda t: fourier_circle_velocity(t, radius=50, period=15.0), dt=dt, duration=15.0)
+    controller.velocity_control(q_init=np.radians(controller.current_angles), x_dot_func=lambda t: fourier_circle(t, radius=50, period=15.0), dt=dt, duration=15.0)
     
     # input("Press Enter to continue square vel...")
-    # controller.velocity_control(robot=smRobot, q_init=np.radians(controller.current_angles), x_dot_func=lambda t: square_xz_velocity(t, side_length=50, period=15.0), dt=dt, duration=15.0)
+    # controller.velocity_control(q_init=np.radians(controller.current_angles), x_dot_func=lambda t: square_xz(t, side_length=50, period=15.0), dt=dt, duration=15.0)
     
     # zero_j = (0, 0, 0, 0, 0, 0)
     # controller.move_to_angles(zero_j, header="g", ack=True)
     # input("Press Enter to continue figure_eight vel...")
-    # controller.velocity_control(
-    # robot=smRobot,
+    # controller.velocity_control(   
     # q_init=np.radians(controller.current_angles),
-    # x_dot_func=lambda t:figure_eight_velocity(t, radius=30, freq=1.0),
+    # x_dot_func=lambda t:figure8(t, radius=30, freq=1.0),
     # dt=dt,
     # duration=110.0    
     # )
     
-    zero_j = (0, 0, 0, 0, 0, 0)
     controller.move_to_angles(zero_j, header="g", ack=True)
     input("Press Enter to continue Zigzag/sawtooth pattern...")
-    controller.velocity_control(
-    robot=smRobot,
+    controller.velocity_control(    
     q_init=np.radians(controller.current_angles),
-    x_dot_func=lambda t:zigzag_velocity(t, side_length=40, period=30.0),
+    x_dot_func=lambda t:zigzag(t, side_length=40, period=30.0),
     dt=dt,
     duration=30.0    
     )
 
-    zero_j = (0, 0, 0, 0, 0, 0)
-    controller.move_to_angles(zero_j, header="g", ack=True)
-    input("Press Enter to continue spiral vel...")
-    controller.velocity_control(
-    robot=smRobot,
-    q_init=np.radians(controller.current_angles),
-    x_dot_func=lambda t:spiral_velocity(t, radius_rate=2.0, angular_speed=0.5),
-    dt=dt,
-    duration=30.0    
-    )
+    # controller.move_to_angles(zero_j, header="g", ack=True)
+    # input("Press Enter to continue spiral vel...")
+    # controller.velocity_control(  
+    # q_init=np.radians(controller.current_angles),
+    # x_dot_func=lambda t:spiral(t, radius_rate=2.0, angular_speed=0.5),
+    # dt=dt,
+    # duration=30.0    
+    # )
 
     # input("Press Enter to continue... square w/ corners vel")    
     # controller.velocity_control(

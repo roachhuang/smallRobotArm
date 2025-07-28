@@ -41,7 +41,7 @@ class SmallRbtArm(RobotArm):
         
         self.max_qlimits = ( 130, 130.0, 73.9,  50, 120, 180) 
         self.min_qlimits = (-130, -78.5, -66, -30, -90, -180)
-        self.th_offset = (0.0, -np.pi / 2, 0.0, 0.0, 0.0, 0.0)
+        self.th_offsets = (0.0, -np.pi / 2, 0.0, 0.0, 0.0, 0.0)
         self.controller = None
       
         self.T_wd = np.array([[1, 0, 0, 440], [0, 1, 0, -75], [0, 0, 1, 0], [0, 0, 0, 1]])
@@ -57,6 +57,56 @@ class SmallRbtArm(RobotArm):
         # tool frame. this is for generating T_6E (end-effector/gripper to {6})
         # t_6E = smallRobotArm.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
         # hand made T_6E: gripper's len + x:180,y:-90, z:0. see their coordiation system.
+    
+    def compute_jacobian(self, q):
+        """Compute Jacobian matrix from DH parameters.
+        
+        Args:
+            dh_params: Nx3 array [alpha, a, d] for each joint
+            q: Joint angles in radians (6x1)
+            
+        Returns:
+            6x6 Jacobian matrix
+        """
+        n = len(q)
+        J = np.zeros((6, n))
+        
+        # Compute transformation matrices T_0^i for each joint
+        T = np.eye(4)
+        T_list = [T.copy()]  # T_0^0 = I
+        
+        for i in range(n):
+            alpha, a, d = self.dhTbl[i]
+            theta = q[i] + self.th_offsets[i]  # Add offset
+            
+            # Standard DH transformation matrix
+            ct, st = np.cos(theta), np.sin(theta)
+            ca, sa = np.cos(alpha), np.sin(alpha)
+            
+            Ti = np.array([
+                [ct, -st*ca, st*sa, a*ct],
+                [st, ct*ca, -ct*sa, a*st],
+                [0, sa, ca, d],
+                [0, 0, 0, 1]
+            ])
+            
+            T = T @ Ti
+            T_list.append(T.copy())  # T_0^(i+1)
+        
+        # End-effector position
+        p_n = T_list[-1][:3, 3]
+        
+        # Compute Jacobian columns
+        for i in range(n):
+            # z-axis and origin of frame i
+            z_i = T_list[i][:3, 2]  # z-axis of frame i
+            p_i = T_list[i][:3, 3]  # origin of frame i
+            
+            # Jacobian column for joint i
+            J[:3, i] = np.cross(z_i, p_n - p_i)  # Linear velocity
+            J[3:, i] = z_i                        # Angular velocity
+        
+        return J
     
     def convert_p_dc_to_T06(self, p:tuple)->ndarray:
         """
@@ -182,9 +232,9 @@ class SmallRbtArm(RobotArm):
 
             Jik[2] = np.pi - np.arccos(arccos_input_3) - np.arctan2(d4, r3)
 
-            T01 = self.get_ti2i_1(1, Jik[0] + self.th_offset[0])
-            T12 = self.get_ti2i_1(2, Jik[1] + self.th_offset[1])
-            T23 = self.get_ti2i_1(3, Jik[2] + self.th_offset[2])
+            T01 = self.get_ti2i_1(1, Jik[0] + self.th_offsets[0])
+            T12 = self.get_ti2i_1(2, Jik[1] + self.th_offsets[1])
+            T23 = self.get_ti2i_1(3, Jik[2] + self.th_offsets[2])
 
             T03 = T01 @ T12 @ T23
             inv_T03 = np.linalg.inv(T03)
@@ -215,7 +265,7 @@ class SmallRbtArm(RobotArm):
         # Denavit-Hartenberg matrix
         # theta = np.zeros((6,), dtype=np.float64)
         # theta=[Jfk(1); -90+Jfk(2); Jfk(3); Jfk(4); Jfk(5); Jfk(6)];
-        theta = Jfk + np.degrees(self.th_offset)
+        theta = Jfk + np.degrees(self.th_offsets)
 
         # alfa = self.dhTbl[0:6, 0]
         theta = np.deg2rad(theta)

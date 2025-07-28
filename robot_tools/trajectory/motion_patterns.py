@@ -6,7 +6,7 @@ used in robotic trajectory generation.
 
 import numpy as np
 
-def square_xz_velocity(t, side_length, period):
+def square_xz(t, side_length, period):
     """Generate velocity vector for square motion in XZ plane."""
     v = np.zeros(6)
     edge_time = period / 4
@@ -19,14 +19,14 @@ def square_xz_velocity(t, side_length, period):
     elif phase == 3: v[2] = speed
     return v
 
-def figure_eight_velocity(t, radius=30, freq=1.0):
+def figure8(t, radius=30, freq=1.0):
     """Generate velocity vector for figure-eight pattern in XY plane."""
     v = np.zeros(6)
     v[0] = -radius * 2 * np.pi * freq * np.sin(2 * np.pi * freq * t)
     v[1] = radius * 2 * np.pi * freq * np.cos(4 * np.pi * freq * t)
     return v
 
-def fourier_circle_velocity(t, radius=40, period=15.0, harmonics=1):
+def fourier_circle(t, radius=40, period=15.0, harmonics=1):
     """Generate velocity vector for circular motion."""
     omega = 2 * np.pi / period
     speed = omega * radius
@@ -41,7 +41,7 @@ def fourier_circle_velocity(t, radius=40, period=15.0, harmonics=1):
     x_dot[1] = vy
     return x_dot
 
-def spiral_velocity(t, radius_rate=2.0, angular_speed=0.5):
+def spiral(t, radius_rate=2.0, angular_speed=0.5):
     """Generate velocity vector for spiral motion in XY plane."""
     r = radius_rate * t
     v = np.zeros(6)
@@ -49,7 +49,7 @@ def spiral_velocity(t, radius_rate=2.0, angular_speed=0.5):
     v[1] = r * angular_speed * np.cos(angular_speed * t) + radius_rate * np.sin(angular_speed * t)
     return v
 
-def zigzag_velocity(t, side_length=40, period=10.0):
+def zigzag(t, side_length=40, period=10.0):
     """Generate velocity vector for zigzag motion in XY plane."""
     v = np.zeros(6)
     step = int((t / (period / 4)) % 2)

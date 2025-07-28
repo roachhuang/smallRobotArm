@@ -15,6 +15,7 @@ import numpy as np
 from numpy import ndarray
 from spatialmath import SE3
 import robot_tools.serial.serial_class as ser
+from robot_tools.kinematics import SmallRbtArm
 
 class RobotController:
     """Controller for the small robot arm.
@@ -37,7 +38,7 @@ class RobotController:
         self.conn = ser.SerialPort()
         self.conn.connect()
     
-    def velocity_control(self, robot, q_init, x_dot_func, duration, dt=0.05):
+    def velocity_control(self, q_init, x_dot_func, duration, dt=0.05):
         """Velocity control with proper error handling and smoothing.
         
         Args:
@@ -61,7 +62,8 @@ class RobotController:
         start_time = time.perf_counter()
         for i in range(n_steps):
             t = i * dt
-            J = robot.jacob0(q)
+            # J = self.robot.jacob0(q)
+            J = self.robot.compute_jacobian(q)
             
              # Damped Least Squares Inverse
             JT = J.T

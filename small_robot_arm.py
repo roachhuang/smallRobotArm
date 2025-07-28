@@ -59,7 +59,6 @@ source myenv/bin/activate  # Linux/macOS
 def main() -> None:
     logging.basicConfig()
     DOF = 6
-
     np.set_printoptions(precision=2, suppress=True)
 
     # Create a custom robot object based on my DH parameters for std dh tbl.
@@ -195,8 +194,7 @@ def main() -> None:
         diff = np.linalg.norm(np.array(kine_j) - np.array(controller.current_angles))
         steps = min(20, max(5, int(diff / 10 * 10)))  # Scale reasonably (5 deg per step)s = int(diff * 10)  # 10 steps per radian of total joint-space distance
         
-        linear_path = interp.generate_linear_path_in_js(controller.
-                                                                    current_angles, kine_j, steps)
+        linear_path = interp.generate_linear_path_in_js(controller.                   current_angles, kine_j, steps)
         
         # compute the joint-space inertia matrix
         M=smRobot.inertia(kine_j)  # 6x6 joint-space inertia matrix
