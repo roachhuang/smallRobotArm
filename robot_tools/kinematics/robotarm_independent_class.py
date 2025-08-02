@@ -182,7 +182,3 @@ class RobotArm(ABC):
     @abstractmethod
     def fk(self, Jfk):
         pass
-
-    # @abstractmethod
-    # def moveTo(self, end_effector_pose):
-    #     pass

@@ -126,7 +126,7 @@ class SerialPort:
             logging.error(f"Error getting serial ports: {e}")
         return None
     
-    @hlp.timer
+    # @hlp.timer
     def send2Arduino(self, cmd: dict) -> None:
         """
         constrain the speed of sending a CMD to arduino in about 10~20ms. avoid faster than it!!! 

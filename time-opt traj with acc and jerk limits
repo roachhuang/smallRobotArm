@@ -1,0 +1,65 @@
+import numpy as np
+
+# Sample joint path (replace with your actual path)
+joint_path = [
+    np.array([0.0, 0.2, -0.1, 0.0, 0.1, 0.0]),
+    np.array([0.1, 0.3, -0.1, 0.05, 0.2, 0.1]),
+    np.array([0.3, 0.5, 0.0, 0.1, 0.3, 0.2]),
+    np.array([0.4, 0.6, 0.1, 0.15, 0.4, 0.3])
+]
+
+# Limits
+max_velocity = 1.0      # rad/s
+max_acceleration = 2.0  # rad/s²
+max_jerk = 10.0          # rad/s³
+dt = 0.01               # initial timestep (s)
+
+def compute_time_optimal_durations(path, v_max, a_max, j_max):
+    durations = []
+    for i in range(1, len(path)):
+        delta_q = np.abs(path[i] - path[i-1])
+        max_delta_q = np.max(delta_q)
+        
+        # Estimate time based on trapezoidal jerk-limited motion profile
+        # Very simplified estimation: t = sqrt(Δq / a_max)
+        t_acc = np.sqrt(max_delta_q / a_max)
+        t_total = 2 * t_acc  # symmetrical accel/decel
+        
+        # Optional: Add jerk limit smoothing
+        if j_max > 0:
+            t_jerk = (a_max / j_max)
+            t_total += 2 * t_jerk
+
+        durations.append(max(dt, t_total))
+    return durations
+
+def generate_trajectory(path, durations, dt):
+    trajectory = []
+    timestamps = []
+    time = 0.0
+
+    for i in range(1, len(path)):
+        start = path[i-1]
+        end = path[i]
+        duration = durations[i-1]
+        steps = int(duration / dt)
+        
+        for s in range(steps):
+            alpha = s / steps
+            q = (1 - alpha) * start + alpha * end
+            trajectory.append(q)
+            timestamps.append(time)
+            time += dt
+    return np.array(timestamps), np.array(trajectory)
+
+# Compute duration for each segment based on limits
+durations = compute_time_optimal_durations(joint_path, max_velocity, max_acceleration, max_jerk)
+
+# Generate interpolated trajectory
+timestamps, trajectory = generate_trajectory(joint_path, durations, dt)
+
+# --- Output Preview ---
+print("Trajectory shape:", trajectory.shape)
+print("First 5 points:")
+for t, q in zip(timestamps[:5], trajectory[:5]):
+    print(f"t = {t:.3f}s → q = {np.round(q, 3)}")

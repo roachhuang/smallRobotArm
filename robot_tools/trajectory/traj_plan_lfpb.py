@@ -14,8 +14,7 @@ import matplotlib.pyplot as plt
 # Degrees of Freedom for the robot arm
 DOF = 6
 
-
-def planTraj(p):
+def plan_traj_with_lfpb(p:np.ndarray)->tuple:
     """Plan a trajectory with linear segments and parabolic blends.
     
     This function implements the Linear Functions with Parabolic Blends (LFPB) algorithm

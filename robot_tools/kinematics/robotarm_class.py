@@ -38,14 +38,14 @@ class SmallRbtArm(RobotArm):
         """
         super().__init__()        
         self.dhTbl = std_dh_tbl  
-        
+        self.dof=6
         self.max_qlimits = ( 130, 130.0, 73.9,  50, 120, 180) 
         self.min_qlimits = (-130, -78.5, -66, -30, -90, -180)
         self.th_offsets = (0.0, -np.pi / 2, 0.0, 0.0, 0.0, 0.0)
         self.controller = None
       
         self.T_wd = np.array([[1, 0, 0, 440], [0, 1, 0, -75], [0, 0, 1, 0], [0, 0, 0, 1]])
-        robot_base_height = 40.0
+        robot_base_height = 0.0
         T_w0 = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, robot_base_height], [0, 0, 0, 1]])
         self.T_w0_inv = np.linalg.inv(T_w0)
         

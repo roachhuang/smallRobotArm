@@ -1,68 +1,39 @@
-from time import sleep, perf_counter
-# import logging
+"""Jacobian-based Velocity Control Demo
+
+Demonstrates velocity control for a 6-DOF robot arm using Jacobian-based
+kinematics. Includes various motion patterns like circles, zigzag, and spirals.
+"""
+
+from time import sleep
 import numpy as np
 import sys
 
-'''When you do import robot_tools.controller.robot_controller as controller,
-controller refers to the module robot_controller.py, not to an object.
-The method velocity_control is defined inside the RobotController class, so you need to call it on an instance of that class.'''
-   
+from roboticstoolbox import DHRobot
+
 from robot_tools.kinematics import SmallRbtArm
+from robot_tools.kinematics import std_dh_tbl, std_dh_params
 from robot_tools.controller import RobotController
 
-from roboticstoolbox import DHRobot, RevoluteDH
 from robot_tools.misc.signal_handler import setup_signal_handler
-from robot_tools.trajectory.motion_patterns import *
+from robot_tools.trajectory.motion_patterns import ( fourier_circle, zigzag, figure8, spiral, square_xz)
 
 # from scipy.spatial.transform import Rotation as R
 # from scipy.interpolate import CubicSpline
 
-# Define your DH table parameters
-a1, a2, a3 = 47.0, 110.0, 26.0
-d1, d4, d6 = 133.0, 117.50, 28.0
-"""
-d: link offset 
-a: link length
-alpha: link twist
-offset: kinematic-joint variable offset
-"""
-std_dh_table = [
-    RevoluteDH(d=d1, a=a1, alpha=-np.pi / 2),  # joint 1
-    RevoluteDH(d=0, a=a2, alpha=0, offset=-np.pi / 2),  # joint 2
-    RevoluteDH(d=0, a=a3, alpha=-np.pi / 2),  # joint 3
-    RevoluteDH(d=d4, a=0, alpha=np.pi / 2),  # joint 4
-    RevoluteDH(d=0, a=0, alpha=-np.pi / 2),  # joint 5
-    RevoluteDH(d=d6, a=0, alpha=0),  # joint 6
-]
-
-# smallRobotArm = None  # Declare at module level
-
 def main() -> None:
-    # Create a custom robot object based on my DH parameters for std dh tbl.
-    smRobot = DHRobot(std_dh_table, name="smallRobotArm")
-    # Robot kinematics as an elemenary transform sequence
-    smRobot.ets()    
+    """Main function demonstrating velocity control with various motion patterns."""
     
-    std_dh_params = np.array(
-        [
-            [np.radians(-90), a1, d1],
-            [0, a2, 0],
-            [np.radians(-90), a3, 0],
-            [np.radians(90), 0, d4],
-            [np.radians(-90), 0, 0],
-            [0, 0, d6],
-        ]
-    )
-    # create an instance of the robotarm.
-    smallRobotArm = SmallRbtArm(std_dh_params)
-    # controller = RobotController(smRobot)
-    controller = RobotController(smallRobotArm)
-    # Set up signal handler for graceful exit on Ctrl+C
-    setup_signal_handler(controller)                    
-                    
-    # there must be a delay here right after sieal is initialized
-    sleep(1)  # don't remove this line!!!
-    controller.enable()  # enable the robot arm
+    # Initialize robot models
+    toolbox_robot = DHRobot(std_dh_tbl, name="smallRobotArm")
+    toolbox_robot.ets()  # Generate elementary transform sequence
+    
+    custom_robot = SmallRbtArm(std_dh_params)
+    controller = RobotController(custom_robot)
+    
+    # Setup signal handling and initialize hardware
+    setup_signal_handler(controller)
+    sleep(1)  # Required delay after signal initialization
+    controller.enable()
     sleep(1)
     # calibration
     # smallRobotArm.calibrate()
@@ -70,15 +41,11 @@ def main() -> None:
     # print("[DEBUG] Waiting for ack...")
     # sleep(2)
     
-    zero_j = (0, 0, 0, 0, 0, 0)
-    # controller.move_to_angles(zero_j, header="g", ack=True)
-    
-    # Compute the Jacobian matrix using DH parameters
+    # Test Jacobian computation
     q_test = np.radians(controller.robot_rest_angles)
-    J_custom = smallRobotArm.compute_jacobian(q_test)
-    J_toolbox = smRobot.jacob0(q_test)
-    print(f"Custom Jacobian shape: {J_custom.shape}")
-    print(f"Toolbox Jacobian shape: {J_toolbox.shape}")
+    J_custom = custom_robot.compute_jacobian(q_test)
+    J_toolbox = toolbox_robot.jacob0(q_test)
+    print(f"Jacobian comparison - Custom: {J_custom.shape}, Toolbox: {J_toolbox.shape}")
     print(f"Max difference: {np.max(np.abs(J_custom - J_toolbox)):.6f}")
     # Desired end-effector velocity in world frame (ẋ = [vx, vy, vz, ωx, ωy, ωz])
     # my dhtbl is in mm, so here x,y,z in mm/s
@@ -90,24 +57,27 @@ def main() -> None:
     # q = np.radians(controller.current_angles)  # joint angles in radians    
     # controller.velocity_control(robot=smRobot, q_init=q, x_dot_func=lambda t: x_dot, dt=dt, duration=5.0)       
     
-    # move to center of circle 
-    p_dc = (-250, 180, 115.0, 0.0, 90.0, 0.0)   # pose wrt to desk frame.
-    T_06 = smallRobotArm.convert_p_dc_to_T06(p_dc)
+    # Move to circle center position
+    p_dc = (-250, 180, 115.0, 0.0, 90.0, 0.0)  # Pose relative to desk frame
+    T_06 = custom_robot.convert_p_dc_to_T06(p_dc)
     # ik_sol = smRobot.ikine_LM(SE3(T_06), q0=np.ones(smRobot.n))
     # if not ik_sol.success:
     #     print("IK solution failed!!!")
     #     exit(0)
     # j = np.degrees(ik_sol.q)    
-    j = smallRobotArm.ik(T_06)
+    j = custom_robot.ik(T_06)
     controller.move_to_angles(j)
     sleep(2)
-    dt = 0.05  # control period (e.g. 20Hz)
-    q = np.radians(controller.current_angles)  # joint angles in radians
-    controller.velocity_control(q_init=q, x_dot_func=lambda t: x_dot, dt=dt, duration=2.5)        
+    
+    # Velocity control parameters
+    controller.cartesian_space_vel_ctrl(x_dot_func=lambda t: x_dot, duration=2.5)
    
     input("Press Enter to continue circle motion...") 
-    # duration/period = number of circular loop. t goes from 0 to duration (stepping by dt)
-    controller.velocity_control(q_init=np.radians(controller.current_angles), x_dot_func=lambda t: fourier_circle(t, radius=50, period=15.0), dt=dt, duration=15.0)
+    '''
+    w=2pi/t = 6.283185/15 rad/s, v=w x radius= 0.4189 rad/s x 5 ~= 1.04725cm/s
+    15s seems max.
+    '''
+    controller.cartesian_space_vel_ctrl(x_dot_func=lambda t: fourier_circle(t, radius=50, period=15), duration=15)
     
     # input("Press Enter to continue square vel...")
     # controller.velocity_control(q_init=np.radians(controller.current_angles), x_dot_func=lambda t: square_xz(t, side_length=50, period=15.0), dt=dt, duration=15.0)
@@ -122,13 +92,11 @@ def main() -> None:
     # duration=110.0    
     # )
     
-    controller.move_to_angles(zero_j, header="g", ack=True)
-    input("Press Enter to continue Zigzag/sawtooth pattern...")
-    controller.velocity_control(    
-    q_init=np.radians(controller.current_angles),
-    x_dot_func=lambda t:zigzag(t, side_length=40, period=30.0),
-    dt=dt,
-    duration=30.0    
+    controller.go_init()
+    input("Press Enter to continue Zigzag pattern...")
+    controller.cartesian_space_vel_ctrl(
+        x_dot_func=lambda t: zigzag(t, side_length=40, period=30.0),
+        duration=30.0
     )
 
     # controller.move_to_angles(zero_j, header="g", ack=True)

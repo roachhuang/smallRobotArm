@@ -1,38 +1,19 @@
 from time import sleep, perf_counter
 import logging
-# import pandas as pd
 import numpy as np
 # import pyvista
 # preferred - use absolute imports for package structure
-from robot_tools.kinematics import SmallRbtArm
+from robot_tools.kinematics import SmallRbtArm, std_dh_params, std_dh_tbl
 from robot_tools.controller import RobotController
 from robot_tools.trajectory import Interp
 from robot_tools.misc.signal_handler import setup_signal_handler
 
-from roboticstoolbox import DHRobot, RevoluteDH
+from roboticstoolbox import DHRobot
 from spatialmath import SE3
 import sys
 
 # from scipy.spatial.transform import Rotation as R
 # from scipy.interpolate import CubicSpline
-
-# Define your DH table parameters
-a1, a2, a3 = 47.0, 110.0, 26.0
-d1, d4, d6 = 133.0, 117.50, 28.0
-"""
-d: link offset 
-a: link length
-alpha: link twist
-offset: kinematic-joint variable offset
-"""
-std_dh_table = [
-    RevoluteDH(d=d1, a=a1, alpha=-np.pi / 2),  # joint 1
-    RevoluteDH(d=0, a=a2, alpha=0, offset=-np.pi / 2),  # joint 2
-    RevoluteDH(d=0, a=a3, alpha=-np.pi / 2),  # joint 3
-    RevoluteDH(d=d4, a=0, alpha=np.pi / 2),  # joint 4
-    RevoluteDH(d=0, a=0, alpha=-np.pi / 2),  # joint 5
-    RevoluteDH(d=d6, a=0, alpha=0),  # joint 6
-]
 
 """
 todo:
@@ -57,37 +38,24 @@ source myenv/bin/activate  # Linux/macOS
 # smallRobotArm = None  # Declare at module level
 
 def main() -> None:
-    logging.basicConfig()
-    DOF = 6
+    logging.basicConfig()    
     np.set_printoptions(precision=2, suppress=True)
 
     # Create a custom robot object based on my DH parameters for std dh tbl.
-    smRobot = DHRobot(std_dh_table, name="smallRobotArm")
+    smRobot = DHRobot(std_dh_tbl, name="smallRobotArm")
     print("Reach of the robot:", smRobot.reach)
     print("nbranches", smRobot.nbranches)
     # smRobot.islimit([0, 0, -4, 4, 0, 0])
     print("is spherical:", smRobot.isspherical())
     # Robot kinematics as an elemenary transform sequence
-    smRobot.ets()    
-    
-    # r6=distance btw axis6 and end-effector
-    std_dh_params = np.array(
-        [
-            [np.radians(-90), a1, d1],
-            [0, a2, 0],
-            [np.radians(-90), a3, 0],
-            [np.radians(90), 0, d4],
-            [np.radians(-90), 0, 0],
-            [0, 0, d6],
-        ]
-    )
-    
+    smRobot.ets()   
+        
     # create an instance of the robotarm.
     smallRobotArm = SmallRbtArm(std_dh_params)
     controller = RobotController(smRobot)
     interp = Interp()
     # Set up signal handler for graceful exit on Ctrl+C
-    setup_signal_handler(smallRobotArm)
+    setup_signal_handler(controller)
                     
     # these values derived from fig 10 of my smallrobotarm notebook
     """move to rest angles at begining won't work coz 1. the motors don't have encoder. 2. If your robot uses incremental encoders, it loses its position when power is cycled or the program is restarted.

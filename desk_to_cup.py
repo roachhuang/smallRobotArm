@@ -4,7 +4,7 @@ import numpy as np
 from signal import signal, SIGINT   
 from robot_tools.kinematics.robotarm_class import SmallRbtArm
 import robot_tools.controller.robot_controller as controller
-import robot_tools.trajectory.plan_traj as pt
+import robot_tools.trajectory.traj_plan_lfpb as pt
 
 from roboticstoolbox import DHRobot, RevoluteDH
 from spatialmath import SE3

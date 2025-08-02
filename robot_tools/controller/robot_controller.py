@@ -13,6 +13,7 @@ Classes:
 import time
 import numpy as np
 from numpy import ndarray
+import numpy
 from spatialmath import SE3
 import robot_tools.serial.serial_class as ser
 from robot_tools.kinematics import SmallRbtArm
@@ -32,40 +33,77 @@ class RobotController:
     """
     
     def __init__(self, robot):
+        self.robot_init_angles = (0,0,0,0,0,0)
         self.robot_rest_angles = (0.0, -78.5, 73.9, 0.0, -90.0, 0.0)       
         self.current_angles = self.robot_rest_angles
+        self.dt = 0.05 # Default dt for the main control loop
+        
+        self.epsilon = 0.01  # Damping factor
+        # Joint Velocity Controller parameters (can be tuned)
+        self.alpha = 0.7  # Smoothing factor
+        self.max_q_dot_rad = np.radians(30) # Max q_dot
+        self.joint_vel_smoothing_alpha = 0.7 # For exponential smoothing of q_dot
+        self._q_dot_prev = np.zeros(6) # Internal state for smoothing
+
+        # End-Effector Velocity Controller parameters (for DLS)
+        self.dls_epsilon = 0.01 # Damping factor for DLS
         self.robot = robot
         self.conn = ser.SerialPort()
         self.conn.connect()
+   
+    def joint_space_vel_ctrl(self, q_dot_raw:ndarray, duration):
+        """
+        Apply joint velocity control.
+
+        Args:
+            q_dot_func (callable): Function that returns 6D joint velocity at time t.
+            duration (float): Duration to run control.
+            dt (float): Time step.
+        """
+        q_rad = np.radians(self.current_angles)
+        q_dot_prev = np.zeros(6)
+        n_steps = int(duration / self.dt)
+
+        start_time = time.perf_counter()
+        for i in range(n_steps):
+            t = i * self.dt
+            q_dot_raw = np.clip(q_dot_raw, -self.max_q_dot_rad, self.max_q_dot_rad)
+            
+            # Exponential smoothing
+            q_dot = self.alpha * q_dot_raw + (1 - self.alpha) * q_dot_prev
+            q_rad += q_dot * self.dt           
+            q_dot_prev = q_dot
+            self.move_to_angles(np.degrees(q_rad), header='g', ack=True)
+
+            # Time sync
+            next_time = start_time + (i + 1) * self.dt
+            time.sleep(max(0, next_time - time.perf_counter()))
     
-    def velocity_control(self, q_init, x_dot_func, duration, dt=0.05):
+        
+    def cartesian_space_vel_ctrl(self, x_dot_func, duration):
         """Velocity control with proper error handling and smoothing.
         
         Args:
-            robot: Robot model with jacobian method
-            q_init (ndarray): Initial joint angles in radians
-            x_dot_func (callable): Function returning 6D velocity vector
-            repeats (int): Number of motion cycles
-            period (float): Duration of one cycle in seconds
+            x_dot_func (callable): Function returning 6D velocity vector in (mm/s, rad/s)
+            duration (int): duration seg
             dt (float): Time step in seconds
             
         Returns:
             ndarray: Final joint angles in degrees
         """
-        q = np.array(q_init, dtype=np.float64)
+        q_rad = np.radians(self.current_angles)
         q_dot_prev = np.zeros(6)
         
-        n_steps = int(duration / dt)
-        max_qdot = np.radians(25)
+        n_steps = int(duration / self.dt)
         alpha = 0.7  # Smoothing factor
         epsilon = 0.01  # Damping factor
         start_time = time.perf_counter()
         for i in range(n_steps):
-            t = i * dt
+            t = i * self.dt
             # J = self.robot.jacob0(q)
-            J = self.robot.compute_jacobian(q)
+            J = self.robot.compute_jacobian(q_rad)
             
-             # Damped Least Squares Inverse
+            # Damped Least Squares Inverse
             JT = J.T
             U, S, Vt = np.linalg.svd(J)
             sigma_min = np.min(S)
@@ -74,22 +112,19 @@ class RobotController:
             
             x_dot = x_dot_func(t)
             q_dot_raw = J_dls @ x_dot
-            q_dot_raw = np.clip(q_dot_raw, -max_qdot, max_qdot)
+            q_dot_raw = np.clip(q_dot_raw, -self.max_q_dot_rad, self.max_q_dot_rad)
             
             # Exponential smoothing
             q_dot = alpha * q_dot_raw + (1 - alpha) * q_dot_prev
-            q += q_dot * dt
-            
-            self.move_to_angles(np.degrees(q), header='g', ack=True)
+            q_rad += q_dot * self.dt           
             q_dot_prev = q_dot
+            self.move_to_angles(np.degrees(q_rad), header='g', ack=True)
             
             # Fixed time synchronization
-            next_time = start_time + (i + 1) * dt
-            sleep_time = next_time - time.perf_counter()
-            if sleep_time > 0:
-                time.sleep(sleep_time)
+            next_time = start_time + (i + 1) * self.dt
+            time.sleep(max(0, next_time - time.perf_counter()))
 
-        return np.degrees(q)    
+        # return np.degrees(q)    
     
     def align_path_to_vector(self, original_path, easy_direction, strength=0.7):
         """
@@ -195,6 +230,32 @@ class RobotController:
         T_tcp[0:3, 3] = p_tcp
         
         return T_tcp
+    
+    # def simple_combined_pick(self, target_pose, grasp_candidates):
+    #     """Simplest MIT + approach pose combination"""
+        
+    #     # 1. MIT: Select best grasp by reachability only
+    #     best_grasp = None
+    #     for grasp in grasp_candidates:
+    #         joints = SmallRbtArm.ik(self.convert_p_dc_to_T06(grasp['pose']))
+    #         if joints is not None:  # Just check if reachable
+    #             best_grasp = grasp
+    #             break
+        
+    #     # 2. Your approach: Generate approach pose
+    #     approach_pose = self.compute_approach_pose(
+    #         SE3.Trans(best_grasp['pose'][:3]) * SE3.RPY(best_grasp['pose'][3:], order="zyx", unit="deg"),
+    #         best_grasp['approach_vector'], 
+    #         offset=50
+    #     )
+        
+    #     # 3. Execute: approach → grasp → retreat → place
+    #     self.move_to_angles(self.robot.ik(self.convert_p_dc_to_T06(self.T2Pose(approach_pose))))
+    #     self.move_to_angles(self.robot.ik(self.convert_p_dc_to_T06(best_grasp['pose'])))
+    #     self.grab()
+    #     self.move_to_angles(self.robot.ik(self.convert_p_dc_to_T06(self.T2Pose(approach_pose))))
+    #     self.move_to_angles(self.robot.ik(self.convert_p_dc_to_T06(target_pose)))
+    #     self.drop()
         
     def grab(self):
         """Activate the gripper to grab an object."""
@@ -231,7 +292,11 @@ class RobotController:
         self.conn.send2Arduino(cmd)
         # naively assume motors moved accordinly. remove this line if motors have encoder.
         self.current_angles = j
-        
+    
+    def go_init(self):
+        """Move the robot to its initial position."""
+        self.move_to_angles(j=self.robot_init_angles)   
+       
     def go_home(self):
         """Move the robot to its home/rest position and disconnect.
         
