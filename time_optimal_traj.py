@@ -4,6 +4,7 @@ import numpy as np
 import sys   
 from robot_tools.kinematics import SmallRbtArm, std_dh_params
 from robot_tools.controller import RobotController
+from robot_tools.trajectory.motion_patterns import wave
 from robot_tools.misc.signal_handler import setup_signal_handler
 import matplotlib.pyplot as plt
 
@@ -21,6 +22,12 @@ def main() -> None:
     controller.enable()  # enable the robot arm
     sleep(1)
     
+    controller.go_init()
+    q_dot_func = lambda t: wave(t)
+    controller.joint_space_vel_ctrl(q_dot_func=q_dot_func, duration=15)
+    input("Press Enter to continue spiral vel...")
+    
+         
     joint_limits = {
     'vel': [np.radians(25)]*6,
     'acc': [2.0]*6, # 1.0 ~3.0 rad/s^2
@@ -87,7 +94,8 @@ def main() -> None:
     for i, duration_seg in enumerate(dt_list):
         q_dot = raw_velocities[i]        
         print(f"\nSending velocity {q_dot} for {duration_seg} seconds")
-        controller.joint_space_vel_ctrl(q_dot_raw=q_dot, duration=duration_seg)
+        q_dot_func = lambda t, q_dot=q_dot: q_dot
+        controller.joint_space_vel_ctrl(q_dot_func=q_dot_func, duration=duration_seg)
         
     # for i, v in enumerate(smoothed_velocities, start=1):
     #     controller.velocity_control(

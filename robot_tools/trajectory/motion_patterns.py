@@ -56,3 +56,10 @@ def zigzag(t, side_length=40, period=10.0):
     v[0] = side_length / (period / 4) if step == 0 else -side_length / (period / 4)
     v[1] = 10 * np.sin(4 * np.pi * t / period)
     return v
+
+############## for joint space
+def wave(t):
+    return np.array([
+        0.2 * np.sin(t), 0.1 * np.cos(t),
+        0, 0, 0, 0
+    ])

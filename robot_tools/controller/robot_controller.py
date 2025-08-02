@@ -11,6 +11,7 @@ Classes:
 """
 
 import time
+from typing import Callable
 import numpy as np
 from numpy import ndarray
 import numpy
@@ -40,7 +41,7 @@ class RobotController:
         
         self.epsilon = 0.01  # Damping factor
         # Joint Velocity Controller parameters (can be tuned)
-        self.alpha = 0.7  # Smoothing factor
+        self._alpha = 0.7  # Smoothing factor
         self.max_q_dot_rad = np.radians(30) # Max q_dot
         self.joint_vel_smoothing_alpha = 0.7 # For exponential smoothing of q_dot
         self._q_dot_prev = np.zeros(6) # Internal state for smoothing
@@ -50,8 +51,37 @@ class RobotController:
         self.robot = robot
         self.conn = ser.SerialPort()
         self.conn.connect()
-   
-    def joint_space_vel_ctrl(self, q_dot_raw:ndarray, duration):
+    
+    def _smooth_q_dot(self, q_dot_raw:ndarray):
+        """
+        Smooth the joint velocity using exponential smoothing.
+
+        Args:
+            q_dot_raw (ndarray): Raw joint velocity.
+
+        Returns:
+            ndarray: Smoothed joint velocity.
+        """
+        # q_dot = self.joint_vel_smoothing_alpha * q_dot_raw + (1 - self.joint_vel_smoothing_alpha) * self._q_dot_prev
+        # self._q_dot_prev = q_dot
+        
+        q_dot_raw = np.clip(q_dot_raw, -self.max_q_dot_rad, self.max_q_dot_rad)
+            
+        # Time-optimal scaling: scale velocity if any joint exceeds limit
+        max_ratios = np.abs(q_dot_raw / self.max_q_dot_rad)
+        scaling = 1.0 / np.max(max_ratios) if np.any(max_ratios > 1.0) else 1.0
+        q_dot_raw_scaled = q_dot_raw * scaling
+        
+        # adaptive damping
+        speed_mag = np.linalg.norm(q_dot_raw_scaled)
+        self._alpha = np.clip(speed_mag / self.max_q_dot_rad, 0.1, 0.95)
+        
+        # Exponential smoothing (EMA filter)
+        q_dot = self._alpha * q_dot_raw_scaled + (1 - self._alpha) * self._q_dot_prev
+        self._q_dot_prev = q_dot     
+        return q_dot
+    
+    def joint_space_vel_ctrl(self, q_dot_func:Callable[[float],ndarray], duration):
         """
         Apply joint velocity control.
 
@@ -61,18 +91,31 @@ class RobotController:
             dt (float): Time step.
         """
         q_rad = np.radians(self.current_angles)
-        q_dot_prev = np.zeros(6)
+        self.q_dot_prev = np.zeros(6)
         n_steps = int(duration / self.dt)
 
         start_time = time.perf_counter()
         for i in range(n_steps):
             t = i * self.dt
+            q_dot_raw = q_dot_func(t)
             q_dot_raw = np.clip(q_dot_raw, -self.max_q_dot_rad, self.max_q_dot_rad)
             
-            # Exponential smoothing
-            q_dot = self.alpha * q_dot_raw + (1 - self.alpha) * q_dot_prev
+            # Time-optimal scaling: scale velocity if any joint exceeds limit
+            max_ratios = np.abs(q_dot_raw / self.max_q_dot_rad)
+            scaling = 1.0 / np.max(max_ratios) if np.any(max_ratios > 1.0) else 1.0
+            q_dot_raw_scaled = q_dot_raw * scaling
+            
+            # adaptive damping
+            speed_mag = np.linalg.norm(q_dot_raw_scaled)
+            self.alpha = np.clip(speed_mag / self.max_q_dot_rad, 0.1, 0.95)
+            
+            # Exponential smoothing (EMA filter)
+            q_dot = self.alpha * q_dot_raw_scaled + (1 - self.alpha) * q_dot_prev
+            
+            # Integrate velocity to get new joint positions
             q_rad += q_dot * self.dt           
             q_dot_prev = q_dot
+            
             self.move_to_angles(np.degrees(q_rad), header='g', ack=True)
 
             # Time sync
@@ -80,7 +123,7 @@ class RobotController:
             time.sleep(max(0, next_time - time.perf_counter()))
     
         
-    def cartesian_space_vel_ctrl(self, x_dot_func, duration):
+    def cartesian_space_vel_ctrl(self, x_dot_func:Callable[[float], ndarray], duration:float):
         """Velocity control with proper error handling and smoothing.
         
         Args:
