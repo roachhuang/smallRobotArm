@@ -6,9 +6,8 @@ import sys
 # import pyvista
 from robot_tools.trajectory import plan_traj_with_lfpb, equations as polynom
 from robot_tools.kinematics import SmallRbtArm, std_dh_params, std_dh_tbl
-from robot_tools.controller import RobotController
+from robot_tools.controller import PositionController
 from robot_tools.misc.signal_handler import setup_signal_handler
-
 from roboticstoolbox import DHRobot
 from spatialmath import SE3
 
@@ -30,7 +29,7 @@ def main() -> None:
    
     # create an instance of the robotarm.
     smallRobotArm = SmallRbtArm(std_dh_params)
-    controller = RobotController(smRobot)
+    controller = PositionController(smRobot)
     setup_signal_handler(controller) 
                     
     # these values derived from fig 10 of my smallrobotarm notebook

@@ -1,9 +1,11 @@
 from time import sleep
 import logging
 import numpy as np
-import sys   
-from robot_tools.kinematics import SmallRbtArm, std_dh_params
-from robot_tools.controller import RobotController
+import sys
+
+from roboticstoolbox import DHRobot   
+from robot_tools.kinematics import SmallRbtArm, std_dh_params, std_dh_tbl
+from robot_tools.controller import VelocityController
 from robot_tools.trajectory.motion_patterns import wave
 from robot_tools.misc.signal_handler import setup_signal_handler
 import matplotlib.pyplot as plt
@@ -13,8 +15,11 @@ def main() -> None:
     np.set_printoptions(precision=2, suppress=True)
   
     # create an instance of the robotarm.
+    smRobot = DHRobot(std_dh_tbl, name="smallRobotArm")
+    
     smallRobotArm = SmallRbtArm(std_dh_params)
-    controller = RobotController(smallRobotArm)
+    controller = VelocityController(smRobot)
+    # controller = RobotController(smallRobotArm)
     setup_signal_handler(controller)                    
    
     # there must be a delay here right after sieal is initialized
@@ -22,11 +27,10 @@ def main() -> None:
     controller.enable()  # enable the robot arm
     sleep(1)
     
-    controller.go_init()
-    q_dot_func = lambda t: wave(t)
-    controller.joint_space_vel_ctrl(q_dot_func=q_dot_func, duration=15)
-    input("Press Enter to continue spiral vel...")
-    
+    # controller.go_init()
+    # q_dot_func = lambda t: wave(t)
+    # controller.joint_space_vel_ctrl(q_dot_func=q_dot_func, duration=15)
+    # input("Press Enter to continue spiral vel...")
          
     joint_limits = {
     'vel': [np.radians(25)]*6,
@@ -65,6 +69,18 @@ def main() -> None:
                 cartesian_path]
     # now in rad
     joint_path=np.array(np.radians(joint_path))
+    
+    # Optimize path for better manipulability
+    print("\nOptimizing path for manipulability...")
+    joint_path_optimized = controller.optimize_manipulability_path(joint_path, min_manipulability=0.05)
+    
+    # Show manipulability comparison
+    for i, (orig, opt) in enumerate(zip(joint_path, joint_path_optimized)):
+        orig_manip = controller.eigen_analysis(orig)['manipulability']
+        opt_manip = controller.eigen_analysis(opt)['manipulability']
+        print(f"Waypoint {i}: {orig_manip:.4f} → {opt_manip:.4f}")
+    
+    joint_path = joint_path_optimized  # Use optimized path
     
     # 3. Estimate Raw Velocities, defined per segment (between waypoints),
     raw_velocities = []

@@ -1,235 +1,27 @@
-"""Robot Controller Module
+"""Robot Controller Module (Legacy)
 
-This module provides high-level control functionality for the small robot arm,
-including velocity control, motion patterns, and direct joint control.
-
-The controller handles communication with the hardware through a serial connection
-and provides methods for various motion patterns and approach pose calculations.
+This module provides backward compatibility for the original RobotController.
+New code should use VelocityController and PositionController directly.
 
 Classes:
-    RobotController: Main controller class for the robot arm
+    RobotController: Combined controller for backward compatibility
 """
 
-import time
-from typing import Callable
+from .velocity_controller import VelocityController
+from .position_controller import PositionController
 import numpy as np
-from numpy import ndarray
-import numpy
-from spatialmath import SE3
-import robot_tools.serial.serial_class as ser
-from robot_tools.kinematics import SmallRbtArm
 
-class RobotController:
-    """Controller for the small robot arm.
+class RobotController(VelocityController, PositionController):
+    """Combined controller for backward compatibility.
     
-    This class provides methods to control the robot arm, including velocity control,
-    motion patterns, and direct joint control. It handles communication with the
-    Arduino hardware through a serial connection.
-    
-    Attributes:
-        robot_rest_angles (tuple): Default rest position angles for the robot
-        current_angles (tuple): Current joint angles of the robot
-        robot: Robot model used for kinematics calculations
-        conn (SerialPort): Serial connection to the Arduino
+    This class combines velocity and position control functionality.
+    For new projects, consider using VelocityController and PositionController directly.
     """
     
     def __init__(self, robot):
-        self.robot_init_angles = (0,0,0,0,0,0)
-        self.robot_rest_angles = (0.0, -78.5, 73.9, 0.0, -90.0, 0.0)       
-        self.current_angles = self.robot_rest_angles
-        self.dt = 0.05 # Default dt for the main control loop
-        
-        self.epsilon = 0.01  # Damping factor
-        # Joint Velocity Controller parameters (can be tuned)
-        self._alpha = 0.7  # Smoothing factor
-        self.max_q_dot_rad = np.radians(30) # Max q_dot
-        self.joint_vel_smoothing_alpha = 0.7 # For exponential smoothing of q_dot
-        self._q_dot_prev = np.zeros(6) # Internal state for smoothing
-
-        # End-Effector Velocity Controller parameters (for DLS)
-        self.dls_epsilon = 0.01 # Damping factor for DLS
-        self.robot = robot
-        self.conn = ser.SerialPort()
-        self.conn.connect()
-    
-    def _smooth_q_dot(self, q_dot_raw:ndarray):
-        """
-        Smooth the joint velocity using exponential smoothing.
-
-        Args:
-            q_dot_raw (ndarray): Raw joint velocity.
-
-        Returns:
-            ndarray: Smoothed joint velocity.
-        """
-        # q_dot = self.joint_vel_smoothing_alpha * q_dot_raw + (1 - self.joint_vel_smoothing_alpha) * self._q_dot_prev
-        # self._q_dot_prev = q_dot
-        
-        q_dot_raw = np.clip(q_dot_raw, -self.max_q_dot_rad, self.max_q_dot_rad)
-            
-        # Time-optimal scaling: scale velocity if any joint exceeds limit
-        max_ratios = np.abs(q_dot_raw / self.max_q_dot_rad)
-        scaling = 1.0 / np.max(max_ratios) if np.any(max_ratios > 1.0) else 1.0
-        q_dot_raw_scaled = q_dot_raw * scaling
-        
-        # adaptive damping
-        speed_mag = np.linalg.norm(q_dot_raw_scaled)
-        self._alpha = np.clip(speed_mag / self.max_q_dot_rad, 0.1, 0.95)
-        
-        # Exponential smoothing (EMA filter)
-        q_dot = self._alpha * q_dot_raw_scaled + (1 - self._alpha) * self._q_dot_prev
-        self._q_dot_prev = q_dot     
-        return q_dot
-    
-    def joint_space_vel_ctrl(self, q_dot_func:Callable[[float],ndarray], duration):
-        """
-        Apply joint velocity control.
-
-        Args:
-            q_dot_func (callable): Function that returns 6D joint velocity at time t.
-            duration (float): Duration to run control.
-            dt (float): Time step.
-        """
-        q_rad = np.radians(self.current_angles)
-        self.q_dot_prev = np.zeros(6)
-        n_steps = int(duration / self.dt)
-
-        start_time = time.perf_counter()
-        for i in range(n_steps):
-            t = i * self.dt
-            q_dot_raw = q_dot_func(t)
-            q_dot_raw = np.clip(q_dot_raw, -self.max_q_dot_rad, self.max_q_dot_rad)
-            
-            # Time-optimal scaling: scale velocity if any joint exceeds limit
-            max_ratios = np.abs(q_dot_raw / self.max_q_dot_rad)
-            scaling = 1.0 / np.max(max_ratios) if np.any(max_ratios > 1.0) else 1.0
-            q_dot_raw_scaled = q_dot_raw * scaling
-            
-            # adaptive damping
-            speed_mag = np.linalg.norm(q_dot_raw_scaled)
-            self.alpha = np.clip(speed_mag / self.max_q_dot_rad, 0.1, 0.95)
-            
-            # Exponential smoothing (EMA filter)
-            q_dot = self.alpha * q_dot_raw_scaled + (1 - self.alpha) * q_dot_prev
-            
-            # Integrate velocity to get new joint positions
-            q_rad += q_dot * self.dt           
-            q_dot_prev = q_dot
-            
-            self.move_to_angles(np.degrees(q_rad), header='g', ack=True)
-
-            # Time sync
-            next_time = start_time + (i + 1) * self.dt
-            time.sleep(max(0, next_time - time.perf_counter()))
-    
-        
-    def cartesian_space_vel_ctrl(self, x_dot_func:Callable[[float], ndarray], duration:float):
-        """Velocity control with proper error handling and smoothing.
-        
-        Args:
-            x_dot_func (callable): Function returning 6D velocity vector in (mm/s, rad/s)
-            duration (int): duration seg
-            dt (float): Time step in seconds
-            
-        Returns:
-            ndarray: Final joint angles in degrees
-        """
-        q_rad = np.radians(self.current_angles)
-        q_dot_prev = np.zeros(6)
-        
-        n_steps = int(duration / self.dt)
-        alpha = 0.7  # Smoothing factor
-        epsilon = 0.01  # Damping factor
-        start_time = time.perf_counter()
-        for i in range(n_steps):
-            t = i * self.dt
-            # J = self.robot.jacob0(q)
-            J = self.robot.compute_jacobian(q_rad)
-            
-            # Damped Least Squares Inverse
-            JT = J.T
-            U, S, Vt = np.linalg.svd(J)
-            sigma_min = np.min(S)
-            lambda_sq = (epsilon**2) if sigma_min > epsilon else (epsilon**2 + (1 - (sigma_min / epsilon)**2))
-            J_dls = JT @ np.linalg.inv(J @ JT + lambda_sq * np.eye(6))
-            
-            x_dot = x_dot_func(t)
-            q_dot_raw = J_dls @ x_dot
-            q_dot_raw = np.clip(q_dot_raw, -self.max_q_dot_rad, self.max_q_dot_rad)
-            
-            # Exponential smoothing
-            q_dot = alpha * q_dot_raw + (1 - alpha) * q_dot_prev
-            q_rad += q_dot * self.dt           
-            q_dot_prev = q_dot
-            self.move_to_angles(np.degrees(q_rad), header='g', ack=True)
-            
-            # Fixed time synchronization
-            next_time = start_time + (i + 1) * self.dt
-            time.sleep(max(0, next_time - time.perf_counter()))
-
-        # return np.degrees(q)    
-    
-    def align_path_to_vector(self, original_path, easy_direction, strength=0.7):
-        """
-        Adjusts path to favor movement in the "easy" direction
-        original_path: Nx6 array-like joint angle path
-        easy_direction: 6D eigenvector from inertia matrix
-        strength: 0-1, how much to bias toward easy direction
-        """
-        adjusted_path = []
-
-        # Normalize the easy direction
-        easy_direction = easy_direction / np.linalg.norm(easy_direction)
-
-        N = len(original_path)
-        for i, point in enumerate(original_path):
-            progress = i / (N - 1) if N > 1 else 0.0  # safe division
-
-            # Bell-curve weighting to bias mid-path
-            adjustment_factor = strength * np.exp(-10 * (progress - 0.5)**2)
-            delta = original_path[i] - original_path[i - 1]
-            magnitude = np.linalg.norm(delta)
-            adjusted_point = point + adjustment_factor * easy_direction * magnitude
-
-            adjusted_path.append(adjusted_point)
-
-        return adjusted_path
-
-    def eigen_analysis(self, smRobot, q):
-        """Perform eigenvalue analysis of robot Jacobian and inertia matrices.
-        
-        This analysis helps identify optimal motion directions and potential singularities.
-        
-        Args:
-            q (ndarray): Joint angles in radians
-            
-        Returns:
-            dict: Dictionary containing analysis results including optimal directions
-                 and manipulability measure
-        """
-        '''
-        Eigen-Property	        Control Decision	                Value Impact
-        min(S) < 0.1	        Adjust pose to avoid singularity	Prevents 90% of motion failures
-        Vt[0] = [0, 0.9, ...]	Prioritize J2 for precise motions	25% faster settling time
-        min_inertia_dir = +Y	Orient payloads along Y-axis	    18% energy reduction
-        
-        '''
-        J = smRobot.jacob0(q)
-        M = smRobot.inertia(q)
-        
-        # SVD for kinematics
-        U, S, Vt = np.linalg.svd(J)
-        
-        # Eigen-decomposition for dynamics
-        eigvals_M, eigvecs_M = np.linalg.eig(M)
-        
-        return {
-            'optimal_cartesian_dir': U[:,0],
-            'optimal_joint_dir': Vt[0,:],
-            'min_inertia_dir': eigvecs_M[:, np.argmin(eigvals_M)],
-            'manipulability': np.prod(S)
-        }
-    
+        # Initialize both parent classes
+        VelocityController.__init__(self, robot)
+        PositionController.__init__(self, robot)        
         
     def compute_approach_pose(self, T_cup, approach_vec_cup, offset=50):
         """
@@ -335,6 +127,44 @@ class RobotController:
         self.conn.send2Arduino(cmd)
         # naively assume motors moved accordinly. remove this line if motors have encoder.
         self.current_angles = j
+    
+    # def optimize_manipulability_path(self, waypoints):
+    #     optimized_path = []
+    #     for waypoint in waypoints:
+    #         # Use your existing eigen_analysis
+    #         analysis = self.eigen_analysis(self.robot, waypoint)
+    #         if analysis['manipulability'] < 0.1:  # Near singularity
+    #             # Adjust joint angles to improve manipulability
+    #             waypoint = self.adjust_for_manipulability(waypoint)
+    #         optimized_path.append(waypoint)
+    #     return optimized_path
+
+    def impedance_control(self, x_desired, x_dot_desired, f_external):
+        # Your existing position control + force accommodation
+        x_error = x_desired - self.get_current_pose()
+        f_desired = self.K_p @ x_error + self.K_d @ x_dot_desired
+        f_command = f_desired - f_external  # Accommodate external forces
+        return self.force_to_joint_torques(f_command)
+
+    def closed_loop_control(self, target_angles):
+        while not self.at_target(target_angles):
+            current = self.read_encoders()
+            error = target_angles - current
+            self.send_velocity_command(self.pid_controller(error))
+
+    def compliant_grasp(self, target_pose):
+        self.move_to_pose(target_pose)
+        while self.force_reading() < self.grasp_threshold:
+            self.close_gripper_slowly()
+        # Perfect grasp force achieved
+
+    def visual_servo_control(self):
+        while not self.object_centered():
+            object_pos = self.camera.detect_object()
+            error = self.target_pos - object_pos
+            velocity = self.visual_jacobian @ error
+            self.cartesian_space_vel_ctrl(lambda t: velocity, dt=0.02)
+
     
     def go_init(self):
         """Move the robot to its initial position."""

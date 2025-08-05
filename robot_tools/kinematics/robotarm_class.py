@@ -58,7 +58,7 @@ class SmallRbtArm(RobotArm):
         # t_6E = smallRobotArm.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
         # hand made T_6E: gripper's len + x:180,y:-90, z:0. see their coordiation system.
     
-    def compute_jacobian(self, q):
+    def jacob0(self, q)->ndarray:
         """Compute Jacobian matrix from DH parameters.
         
         Args:

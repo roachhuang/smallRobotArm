@@ -12,7 +12,8 @@ from roboticstoolbox import DHRobot
 
 from robot_tools.kinematics import SmallRbtArm
 from robot_tools.kinematics import std_dh_tbl, std_dh_params
-from robot_tools.controller import RobotController
+# from robot_tools.controller import RobotController
+from robot_tools.controller import VelocityController
 
 from robot_tools.misc.signal_handler import setup_signal_handler
 from robot_tools.trajectory.motion_patterns import ( fourier_circle, zigzag, figure8, spiral, square_xz)
@@ -28,7 +29,7 @@ def main() -> None:
     toolbox_robot.ets()  # Generate elementary transform sequence
     
     custom_robot = SmallRbtArm(std_dh_params)
-    controller = RobotController(custom_robot)
+    controller = VelocityController(toolbox_robot)
     
     # Setup signal handling and initialize hardware
     setup_signal_handler(controller)
@@ -43,10 +44,11 @@ def main() -> None:
     
     # Test Jacobian computation
     q_test = np.radians(controller.robot_rest_angles)
-    J_custom = custom_robot.compute_jacobian(q_test)
+    J_custom = custom_robot.jacob0(q_test)
     J_toolbox = toolbox_robot.jacob0(q_test)
     print(f"Jacobian comparison - Custom: {J_custom.shape}, Toolbox: {J_toolbox.shape}")
     print(f"Max difference: {np.max(np.abs(J_custom - J_toolbox)):.6f}")
+    
     # Desired end-effector velocity in world frame (ẋ = [vx, vy, vz, ωx, ωy, ωz])
     # my dhtbl is in mm, so here x,y,z in mm/s
     ''' 
@@ -60,11 +62,6 @@ def main() -> None:
     # Move to circle center position
     p_dc = (-250, 180, 115.0, 0.0, 90.0, 0.0)  # Pose relative to desk frame
     T_06 = custom_robot.convert_p_dc_to_T06(p_dc)
-    # ik_sol = smRobot.ikine_LM(SE3(T_06), q0=np.ones(smRobot.n))
-    # if not ik_sol.success:
-    #     print("IK solution failed!!!")
-    #     exit(0)
-    # j = np.degrees(ik_sol.q)    
     j = custom_robot.ik(T_06)
     controller.move_to_angles(j)
     sleep(2)
@@ -76,6 +73,7 @@ def main() -> None:
     '''
     w=2pi/t = 6.283185/15 rad/s, v=w x radius= 0.4189 rad/s x 5 ~= 1.04725cm/s
     15s seems max.
+    linear vel=2pi * radius / 15s = 29.0mm/s
     '''
     controller.cartesian_space_vel_ctrl(x_dot_func=lambda t: fourier_circle(t, radius=50, period=15), duration=15)
     
