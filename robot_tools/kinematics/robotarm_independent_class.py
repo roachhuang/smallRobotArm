@@ -79,6 +79,39 @@ class RobotArm(ABC):
         T = SE3(x, y, z) * SE3.Eul(alpha, beta, gamma, unit='deg')
         return T.A
 
+    def get_t_0n(self, q, i_th_frame):
+        # Compute transformation matrices T_0^i for each joint
+        T = np.eye(4)
+        # T_list = [T.copy()]  # T_0^0 = I
+        
+        for i in range(i_th_frame):
+            alpha, a, d = self.dhTbl[i]
+            theta = q[i] + self.th_offsets[i]  # Add offset
+            
+            # Standard DH transformation matrix
+            ct, st = np.cos(theta), np.sin(theta)
+            ca, sa = np.cos(alpha), np.sin(alpha)
+            
+            Ti = np.array([
+                [ct, -st*ca, st*sa, a*ct],
+                [st, ct*ca, -ct*sa, a*st],
+                [0, sa, ca, d],
+                [0, 0, 0, 1]
+            ])
+            
+            T = T @ Ti
+            # T_list.append(T.copy())  # T_0^(i+1)
+        return T
+         
+    # interface
+    @abstractmethod
+    def ik(self, T_06:ndarray)->tuple:
+        raise NotImplementedError("Subclasses must implement ik()")
+
+    @abstractmethod
+    def fk(self, Jfk):
+        pass
+    '''   
     def get_ti2i_1(self, i, theta=None) -> ndarray:
         """
         todo: when theta will be none? examin intput theta's procision by checking its number of decimal points.
@@ -172,13 +205,5 @@ class RobotArm(ABC):
         # ax.view_init(elev=30, azim=45)  # Adjust as needed
         plt.draw()
         plt.pause(0.1)  # w/o this line frame coordiantes won't be displayed.
-        
-        
-    # interface
-    @abstractmethod
-    def ik(self, T_06:ndarray)->tuple:
-        raise NotImplementedError("Subclasses must implement ik()")
-
-    @abstractmethod
-    def fk(self, Jfk):
-        pass
+'''        
+   

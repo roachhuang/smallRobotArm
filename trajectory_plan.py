@@ -62,23 +62,25 @@ def main() -> None:
     # Cup poses wrt frame {desk}.
     cartesian_path = np.array(
         [
-            (0, -150,        190, 60, 0.0, 0.0, 35.0),
-            (8, -164.5 + 19, 190, 90, 0.0, 0.0, 35.0),
+            # (0, -250, 180, 110.0, 0.0, 90.0, 0.0), 
+            (0, -200, 100, 60, 0.0, 0.0, 35.0),
+            (2, -200, 100, 90, 0.0, 0.0, 35.0),
             # rotate cup 60 degrees around y axis wrt the world frame.
-            (20, -164.5 - 120, 170.0 + 60, 350.0, 0, -60.0, 0.0),
-            (24, -164.5 - 120, 170.0 + 100, 355.0, 0, -60.0, 0.0),
+            (20, -295, 170.0, 350.0, 0.0, -60.0, 0.0),
+            (24, -295, 270.0, 350.0, 0.0, -60.0, 0.0),
         ],
         dtype=np.float64,
     )
-
+    
     # this is only for giving time col to joints
     joint_path = cartesian_path.copy()
     
     # the pose at 0s. ntu: fixed euler anglers
     p_dc = cartesian_path[0, 1:]
     # Convert to transformation matrix
-    T_dc = SE3.Trans(p_dc[0:3]) * SE3.RPY(p_dc[3:6], order="zyx", unit="deg")
-    # Define grasp candidates (different approach directions/orientations)
+    # T_dc = SE3.Trans(p_dc[0:3]) * SE3.RPY(p_dc[3:6], order="zyx", unit="deg")
+    
+    # Define grasp candidates (different approach directions/orientations)    
     grasp_candidates=[ 
         {'pose': p_dc, 'approach_vector': [0, 0, 1]},   # Top-down
         {'pose': p_dc, 'approach_vector': [1, 0, 0]},   # Side approach

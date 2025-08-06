@@ -139,15 +139,15 @@ def main() -> None:
         # T_0E = smallRobotArm.pose2T(pose, seq="zyz")
         
         # euler angles ZYZ according to smallrobot arm's demo
-        # my_j = smallRobotArm.ik(T_0E)
-        # T=smallRobotArm.pose2T(corrected_pose, seq="ZYZ")
+        kine_j = smallRobotArm.ik(T)
+
+        '''
         ik_sol = smRobot.ikine_LM(SE3(T), q0=np.ones(smRobot.n))
         if not ik_sol.success:
             print("IK solution failed!!!")
             continue
-        kine_j = np.degrees(ik_sol.q)
+        kine_j = np.degrees(ik_sol.q)                
         
-        '''
         # cross comparison of ik results from both libraries
         myfk_T = smallRobotArm.fk(kine_j)
         fkine_T = smRobot.fkine(np.radians(my_j))
@@ -168,7 +168,8 @@ def main() -> None:
         joint_path_safe = controller.optimize_manipulability_path(linear_joint_path, min_manipulability=0.05)
         
         # Step 2: Align with inertia-based "easy" direction (energy efficiency)
-        M = smRobot.inertia(np.radians(kine_j))  # 6x6 joint-space inertia matrix
+        # M = smRobot.inertia(np.radians(kine_j))  # 6x6 joint-space inertia matrix
+        M = smallRobotArm.inertia(np.radians(kine_j))  # 6x6 joint-space inertia matrix
         eigvals, eigvecs = np.linalg.eig(M)
         easy_direction = eigvecs[:, np.argmin(eigvals)]  # Minimum inertia direction
         joint_path_final = controller.align_path_to_vector(joint_path_safe, easy_direction, strength=0.3)

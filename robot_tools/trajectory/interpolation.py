@@ -1,25 +1,11 @@
 
 from spatialmath import SE3
 import numpy as np
-from .rrt_planner import plan_collision_free_path
+# from .rrt_planner import plan_collision_free_path
 
 class Interp:
     def __init__(self, robot=None):
         self.robot = robot
-    
-    def plan_rrt_path(self, start_angles, goal_angles, obstacles=None):
-        """Plan collision-free path using RRT*."""
-        if self.robot is None:
-            print("Warning: No robot model provided. Using simple linear path.")
-            return self.generate_linear_path_in_js(start_angles, goal_angles, steps=20)
-            
-        path = plan_collision_free_path(self.robot, start_angles, goal_angles, obstacles)
-        
-        if path is None:
-            print("RRT planning failed. Using linear interpolation.")
-            return self.generate_linear_path_in_js(start_angles, goal_angles, steps=20)
-            
-        return path
     
     def plan_simple_path(self, start_angles, goal_angles, obstacles=None):
         """Simple straight-line path planning in joint space."""
@@ -28,9 +14,10 @@ class Interp:
         else:
             return self.plan_rrt_path(start_angles, goal_angles, obstacles)
     
-    def interpolate_poses(self, start_pose: SE3, end_pose: SE3, num_poses=5):
+    def interpolate_poses(self, start_pose: SE3, end_pose: SE3, num_poses=5)->np.ndarray:
         s_values = np.linspace(0, 1, num_poses + 2)[1:-1]
-        poses = [start_pose.interp(end_pose, s) for s in s_values]
+        se3_poses = [start_pose.interp(end_pose, s) for s in s_values]
+        poses = [pose.A for pose in se3_poses]
         return poses
     
     # in joint space

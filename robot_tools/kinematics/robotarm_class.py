@@ -45,11 +45,11 @@ class SmallRbtArm(RobotArm):
         self.controller = None
       
         self.T_wd = np.array([[1, 0, 0, 440], [0, 1, 0, -75], [0, 0, 1, 0], [0, 0, 0, 1]])
-        robot_base_height = 0.0
+        robot_base_height = 40.0
         T_w0 = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, robot_base_height], [0, 0, 0, 1]])
         self.T_w0_inv = np.linalg.inv(T_w0)
         
-        tool_length = 36.0    # the tool attached to axis 6
+        tool_length = 25.0 # 36.0    # the tool attached to axis 6
         T_6c = np.array([[0, 0, 1, 0], [0, -1, 0, 0], [1, 0, 0, tool_length], [0, 0, 0, 1]])
         self.T_6c_inv = np.linalg.inv(T_6c)
       
@@ -57,16 +57,24 @@ class SmallRbtArm(RobotArm):
         # tool frame. this is for generating T_6E (end-effector/gripper to {6})
         # t_6E = smallRobotArm.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
         # hand made T_6E: gripper's len + x:180,y:-90, z:0. see their coordiation system.
-    
+        
+    def inertia(self, q):        
+        # Rough estimates: larger joints = higher inertia
+        joint_masses = [1.5, 1.8, 0.8, 0.5, 0.4, 0.2]  # kg
+        """Configuration-dependent fake inertia."""
+        # Simple example: inertia increases when arm is extended
+        extension_factor = 1 + 0.5 * np.abs(q[1])  # Based on joint 2 angle
+        base_inertia = np.diag(joint_masses)
+        return base_inertia * extension_factor
+
     def jacob0(self, q)->ndarray:
         """Compute Jacobian matrix from DH parameters.
         
         Args:
-            dh_params: Nx3 array [alpha, a, d] for each joint
             q: Joint angles in radians (6x1)
             
         Returns:
-            6x6 Jacobian matrix
+            6x6 Jacobian matrix in world frame coordinates
         """
         n = len(q)
         J = np.zeros((6, n))
@@ -118,6 +126,7 @@ class SmallRbtArm(RobotArm):
         Returns:
             ndarray: 4x4 transformation matrix representing the pose in the robot's joint frame.
         """
+        
         T_dc = SE3.Trans(p[0:3]) * SE3.RPY(p[3:6], order="zyx", unit="deg")
         T_wc = self.T_wd @ T_dc.A
         T_06 = self.T_w0_inv @ T_wc @ self.T_6c_inv
@@ -232,12 +241,12 @@ class SmallRbtArm(RobotArm):
 
             Jik[2] = np.pi - np.arccos(arccos_input_3) - np.arctan2(d4, r3)
 
-            T01 = self.get_ti2i_1(1, Jik[0] + self.th_offsets[0])
-            T12 = self.get_ti2i_1(2, Jik[1] + self.th_offsets[1])
-            T23 = self.get_ti2i_1(3, Jik[2] + self.th_offsets[2])
-
-            T03 = T01 @ T12 @ T23
-            inv_T03 = np.linalg.inv(T03)
+            # T01 = self.get_ti2i_1(1, Jik[0] + self.th_offsets[0])
+            # T12 = self.get_ti2i_1(2, Jik[1] + self.th_offsets[1])
+            # T23 = self.get_ti2i_1(3, Jik[2] + self.th_offsets[2])
+            # T03 = T01 @ T12 @ T23
+            T_03 = self.get_t_0n(Jik[0:3], 3)
+            inv_T03 = np.linalg.inv(T_03)
             T36 = inv_T03 @ T_06
 
             Jik[3] = np.arctan2(-T36[1][2], -T36[0][2])
@@ -279,21 +288,12 @@ class SmallRbtArm(RobotArm):
         # tool frame
         # Tft = self.pose2T([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
-        # DH homogeneous transformation matrix
-        # float T01[16], T12[16], T23[16], T34[16], T45[16], T56[16];
-        # T 1 到 0 (1在下, 0在上).
-        # #1, frame1 相對于frame0 的空間幾何關係; #2,frame1 下表達的vector可轉囘frame0下來表達.
-        # #3, 從 frame0 來看 frame1.
-        T_01 = self.get_ti2i_1(1, theta[0])
-        # T 2 到 1
-        T_12 = self.get_ti2i_1(2, theta[1])
-        T_23 = self.get_ti2i_1(3, theta[2])
-        T_34 = self.get_ti2i_1(4, theta[3])
-        T_45 = self.get_ti2i_1(5, theta[4])
-        T_56 = self.get_ti2i_1(6, theta[5])
+        # DH homogeneous transformation matrix       
+        #1, frame1 相對于frame0 的空間幾何關係; #2,frame1 下表達的vector可轉囘frame0下來表達.
+        #3, 從 frame0 來看 frame1.
+       
         # T = Twf @ T_01 @ T_12 @ T_23 @ T_34 @ T_45 @ T_56 @ Tft
-        T = T_01 @ T_12 @ T_23 @ T_34 @ T_45 @ T_56        
-        return T
+        return self.get_t_0n(theta[0:6], 6)
     
         # # print('t: ', np.around(T, 2))
         # Xfk = np.zeros((6,), dtype=np.float64)

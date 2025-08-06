@@ -14,9 +14,9 @@ from robot_tools.kinematics import SmallRbtArm
 from robot_tools.kinematics import std_dh_tbl, std_dh_params
 # from robot_tools.controller import RobotController
 from robot_tools.controller import VelocityController
-
+from robot_tools.controller.optimal_motion_refactored import OptimalMotionAnalyzer
 from robot_tools.misc.signal_handler import setup_signal_handler
-from robot_tools.trajectory.motion_patterns import ( fourier_circle, zigzag, figure8, spiral, square_xz)
+from robot_tools.trajectory.motion_patterns import (fourier_circle, zigzag, figure8, spiral, square_xz)
 
 # from scipy.spatial.transform import Rotation as R
 # from scipy.interpolate import CubicSpline
@@ -60,13 +60,13 @@ def main() -> None:
     # controller.velocity_control(robot=smRobot, q_init=q, x_dot_func=lambda t: x_dot, dt=dt, duration=5.0)       
     
     # Move to circle center position
-    p_dc = (-250, 180, 115.0, 0.0, 90.0, 0.0)  # Pose relative to desk frame
+    p_dc = (-250, 180, 110.0, 0.0, 90.0, 0.0)  # Pose relative to desk frame
     T_06 = custom_robot.convert_p_dc_to_T06(p_dc)
     j = custom_robot.ik(T_06)
     controller.move_to_angles(j)
     sleep(2)
     
-    # Velocity control parameters
+    # move in x direction by 5mm (radius of circle)
     controller.cartesian_space_vel_ctrl(x_dot_func=lambda t: x_dot, duration=2.5)
    
     input("Press Enter to continue circle motion...") 
@@ -75,6 +75,7 @@ def main() -> None:
     15s seems max.
     linear vel=2pi * radius / 15s = 29.0mm/s
     '''
+    
     controller.cartesian_space_vel_ctrl(x_dot_func=lambda t: fourier_circle(t, radius=50, period=15), duration=15)
     
     # input("Press Enter to continue square vel...")

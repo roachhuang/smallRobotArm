@@ -11,6 +11,8 @@ import time
 from typing import Callable
 import numpy as np
 from numpy import ndarray
+
+from robot_tools.controller.optimal_motion_refactored import OptimalMotionAnalyzer
 from .base_controller import BaseController
 
 
@@ -31,6 +33,7 @@ class VelocityController(BaseController):
         
         # End-Effector Velocity Controller parameters
         self.dls_epsilon = 0.01  # Damping factor for DLS
+        self.manipulability_threshold = 0.01  # Minimum manipulability threshold
     
     def _smooth_q_dot(self, q_dot_raw: ndarray):
         """Smooth joint velocity using time-optimal scaling and adaptive EMA.
@@ -101,6 +104,7 @@ class VelocityController(BaseController):
             x_dot_func (callable): Function returning 6D velocity vector in (mm/s, rad/s)
             duration (float): Duration to run control
         """
+        analyzer = OptimalMotionAnalyzer(self.robot, self.max_q_dot_rad)
         
         n_steps = int(duration / self.dt)
         self._q_dot_prev = np.zeros(6)
@@ -116,12 +120,29 @@ class VelocityController(BaseController):
                 # Damped Least Squares Inverse for singularity avoidance
                 JT = J.T
                 U, S, Vt = np.linalg.svd(J)
+                svd_data = {'U': U, 'S': S}
+               
+                '''
+                manipulability = np.prod(S)
+                if manipulability < self.manipulability_threshold:
+                    # Add null-space motion or increase damping
+                    print(f"Manipulability Measure: {manipulability:.4f}")
+                
+                # 3. Principal Directions of Manipulability (U matrix columns)
+                # U[:, 0] is the direction of easiest motion (largest singular value)
+                # U[:, -1] is the direction of hardest motion (smallest singular value)
+                print(f"Direction of Easiest Motion (Task Space): {U[:, 0]}")
+                print(f"Direction of Hardest Motion (Task Space): {U[:, -1]}")
+                '''
                 sigma_min = np.min(S)
                 epsilon = self.dls_epsilon
                 lambda_sq = (epsilon**2) if sigma_min > epsilon else (epsilon**2 + (1 - (sigma_min / epsilon)**2))
                 J_dls = JT @ np.linalg.inv(J @ JT + lambda_sq * np.eye(6))
                 
                 x_dot = x_dot_func(t)
+                # Option 1: Use optimizer (recommended), but this will reshpae circular motion!!!
+                # q_dot_raw = analyzer.optimize_cartesian_velocity(x_dot, svd_data=svd_data)
+                # Option 2: Use DLS (original method)
                 q_dot_raw = J_dls @ x_dot
                 q_dot = self._smooth_q_dot(q_dot_raw)
                 q_rad += q_dot * self.dt           
@@ -133,3 +154,44 @@ class VelocityController(BaseController):
             except Exception as e:
                 print(f"Error in cartesian space velocity control at step {i}: {e}")
                 break
+            
+    def get_optimal_directions(self, U, Vt):
+        return {
+            'easiest_cartesian_motion': U[:, 0],      # Direction requiring least joint effort
+            'hardest_cartesian_motion': U[:, -1],     # Direction requiring most joint effort
+            'most_effective_joint': Vt[0, :],        # Joint combination with max end-effector effect
+            'least_effective_joint': Vt[-1, :]       # Joint combination with min end-effector effect
+        }
+        
+    def force_analysis(self, desired_force, q):
+        J = self.robot.compute_jacobian(q)
+        U, S, Vt = np.linalg.svd(J)
+        
+        # Required joint torques for desired end-effector force
+        tau_required = J.T @ desired_force
+        
+        # Force amplification in each direction
+        force_amplification = 1.0 / S  # Higher singular values = easier force generation
+        
+        return {
+            'joint_torques': tau_required,
+            'force_difficulty': force_amplification,
+            'hardest_force_direction': U[:, -1]  # Direction hardest to generate force
+        }
+
+    def adaptive_control_gains(self, S):       
+        # Higher gains for well-conditioned directions
+        position_gains = S * 100  # Scale with singular values
+        velocity_gains = np.sqrt(S) * 20
+        
+        return np.diag(position_gains), np.diag(velocity_gains)
+
+    def analyze_singularities(self, S, Vt):
+        # Detect near-singularities
+        condition_number = S[0] / S[-1]
+        if condition_number > 100:
+            return "Near singularity - avoid this pose"
+        
+        # Find null space (lost DOF directions)
+        null_directions = Vt[S < 0.01]  # Joint directions that don't move end-effector
+        return null_directions

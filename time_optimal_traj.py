@@ -42,13 +42,24 @@ def main() -> None:
     # dt_list = [T1-T0, T2-T1, T3-T2]: 3 elements. Durations of the segments
     dt_list=[timestamps[i]-timestamps[i-1] for i in range(1,len(timestamps))]   # 8,12,4
     # cartesian_path = [WP0, WP1, WP2, WP3]: 4 elements. Cartesian waypoints.
+    # cartesian_path = np.array(
+    #     [
+    #         [-150,        190, 60, 0.0, 0.0, 35.0],
+    #         [-164.5 + 19, 190, 90, 0.0, 0.0, 35.0],
+    #         # rotate cup 60 degrees around y axis wrt the world frame.
+    #         [-164.5 - 120, 170.0 + 60, 350.0, 0, -60.0, 0.0],
+    #         [-164.5 - 120, 170.0 + 100, 355.0, 0, -60.0, 0.0],
+    #     ],
+    #     dtype=np.float64,
+    # )
     cartesian_path = np.array(
         [
-            [-150,        190, 60, 0.0, 0.0, 35.0],
-            [-164.5 + 19, 190, 90, 0.0, 0.0, 35.0],
+            # (0, -250, 180, 110.0, 0, 90.0, 0.0), 
+            (-200, 100, 60, 0.0, 0, 35.0),
+            (-200, 100, 90, 0.0, 0, 35.0),
             # rotate cup 60 degrees around y axis wrt the world frame.
-            [-164.5 - 120, 170.0 + 60, 350.0, 0, -60.0, 0.0],
-            [-164.5 - 120, 170.0 + 100, 355.0, 0, -60.0, 0.0],
+            (-295, 170, 350, 0, -60, 0.0),
+            (-295, 270, 350, 0, -60, 0.0),
         ],
         dtype=np.float64,
     )

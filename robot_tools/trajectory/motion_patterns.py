@@ -6,7 +6,7 @@ used in robotic trajectory generation.
 
 import numpy as np
 
-def square_xz(t, side_length, period):
+def square_xz(t, side_length, period)->np.ndarray:
     """Generate velocity vector for square motion in XZ plane."""
     v = np.zeros(6)
     edge_time = period / 4
