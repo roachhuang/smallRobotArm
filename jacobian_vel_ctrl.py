@@ -14,9 +14,9 @@ from robot_tools.kinematics import SmallRbtArm
 from robot_tools.kinematics import std_dh_tbl, std_dh_params
 # from robot_tools.controller import RobotController
 from robot_tools.controller import VelocityController
-from robot_tools.controller.optimal_motion_refactored import OptimalMotionAnalyzer
+from robot_tools.trajectory.velocity_optimizer import VelOptimizer
 from robot_tools.misc.signal_handler import setup_signal_handler
-from robot_tools.trajectory.motion_patterns import (fourier_circle, zigzag, figure8, spiral, square_xz)
+from robot_tools.trajectory.motion_patterns import MotionPatterns
 
 # from scipy.spatial.transform import Rotation as R
 # from scipy.interpolate import CubicSpline
@@ -30,6 +30,8 @@ def main() -> None:
     
     custom_robot = SmallRbtArm(std_dh_params)
     controller = VelocityController(toolbox_robot)
+    motion = MotionPatterns()
+    # VelOptimizer(custom_robot, controller, controller.joint_limits['vel'])
     
     # Setup signal handling and initialize hardware
     setup_signal_handler(controller)
@@ -76,7 +78,7 @@ def main() -> None:
     linear vel=2pi * radius / 15s = 29.0mm/s
     '''
     
-    controller.cartesian_space_vel_ctrl(x_dot_func=lambda t: fourier_circle(t, radius=50, period=15), duration=15)
+    controller.cartesian_space_vel_ctrl(x_dot_func=lambda t: motion.fourier_circle(t, radius=50, period=15), duration=15)
     
     # input("Press Enter to continue square vel...")
     # controller.velocity_control(q_init=np.radians(controller.current_angles), x_dot_func=lambda t: square_xz(t, side_length=50, period=15.0), dt=dt, duration=15.0)
@@ -94,7 +96,7 @@ def main() -> None:
     controller.go_init()
     input("Press Enter to continue Zigzag pattern...")
     controller.cartesian_space_vel_ctrl(
-        x_dot_func=lambda t: zigzag(t, side_length=40, period=30.0),
+        x_dot_func=lambda t: motion.zigzag(t, side_length=40, period=30.0),
         duration=30.0
     )
 

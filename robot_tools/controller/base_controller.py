@@ -39,78 +39,8 @@ class BaseController:
         self.conn = ser.SerialPort()  # h/w interface
         self.conn.connect()
     
-    def eigen_analysis(self, q):
-        """Perform eigenvalue analysis of robot Jacobian and inertia matrices."""
-        Jacobi = self.robot.jacobe(q)
-        M = self.robot.inertia(q)
-        
-        # SVD for kinematics
-        U, S, Vt = np.linalg.svd(Jacobi)
-        
-        # Eigen-decomposition for dynamics
-        eigvals_M, eigvecs_M = np.linalg.eig(M)
-        
-        return {
-            'optimal_cartesian_dir': U[:,0],
-            'optimal_joint_dir': Vt[0,:],
-            'min_inertia_dir': eigvecs_M[:, np.argmin(eigvals_M)],
-            'manipulability': np.prod(S),
-            'singular_values': S
-        }
-    
-    def adjust_for_manipulability(self, q_rad, min_manipulability=0.1):
-        """Adjust joint angles to improve manipulability near singularities."""
-        best_q = q_rad.copy()
-        best_manip = self.eigen_analysis(q_rad)['manipulability']
-        
-        if best_manip > min_manipulability:
-            return best_q
-            
-        # Try small adjustments to joints 2,3,5 (most effective for manipulability)
-        for joint_idx in [1, 2, 4]:  # joints 2,3,5 (0-indexed)
-            for delta in [-0.1, 0.1]:  # ±5.7 degrees
-                q_test = q_rad.copy()
-                q_test[joint_idx] += delta
-                manip = self.eigen_analysis(q_test)['manipulability']
-                if manip > best_manip:
-                    best_manip = manip
-                    best_q = q_test
-        return best_q
-    
-    def optimize_manipulability_path(self, waypoints_rad, min_manipulability=0.1):
-        """Optimize joint path to avoid singularities."""
-        optimized_path = []
-        
-        for i, waypoint in enumerate(waypoints_rad):
-            analysis = self.eigen_analysis(waypoint)
-            manip = analysis['manipulability']
-            
-            if manip < min_manipulability:
-                print(f"Waypoint {i}: Low manipulability {manip:.3f}, optimizing...")
-                optimized_waypoint = self.adjust_for_manipulability(waypoint, min_manipulability)
-                new_manip = self.eigen_analysis(optimized_waypoint)['manipulability']
-                print(f"  Improved from {manip:.3f} to {new_manip:.3f}")
-                optimized_path.append(optimized_waypoint)
-            else:
-                optimized_path.append(waypoint)
-                
-        return np.array(optimized_path)
-    
-    def align_path_to_vector(self, original_path, easy_direction, strength=0.7):
-        """Adjusts path to favor movement in the "easy" direction."""
-        adjusted_path = []
-        easy_direction = easy_direction / np.linalg.norm(easy_direction)
-
-        N = len(original_path)
-        for i, point in enumerate(original_path):
-            progress = i / (N - 1) if N > 1 else 0.0
-            adjustment_factor = strength * np.exp(-10 * (progress - 0.5)**2)
-            delta = original_path[i] - original_path[i - 1]
-            magnitude = np.linalg.norm(delta)
-            adjusted_point = point + adjustment_factor * easy_direction * magnitude
-            adjusted_path.append(adjusted_point)
-
-        return adjusted_path
+    # Path optimization methods moved to robot_tools.trajectory.path_optimizer
+    # Use PathOptimizer class for trajectory optimization functionality
     
     def compute_approach_pose(self, T_cup, approach_vec_cup, offset=50):
         """Compute an approach pose with a specified offset from the target."""

@@ -6,6 +6,7 @@ import numpy as np
 from robot_tools.kinematics import SmallRbtArm, std_dh_params, std_dh_tbl
 from robot_tools.controller import PositionController
 from robot_tools.trajectory import Interp
+from robot_tools.trajectory.path_optimizer import PathOptimizer
 from robot_tools.misc.signal_handler import setup_signal_handler
 
 from roboticstoolbox import DHRobot
@@ -165,14 +166,14 @@ def main() -> None:
         linear_joint_path = interp.generate_linear_path_in_js(controller.                   current_angles, kine_j, steps)
         
         # Step 1: Optimize for manipulability (avoid singularities)
-        joint_path_safe = controller.optimize_manipulability_path(linear_joint_path, min_manipulability=0.05)
+        path_optimizer = PathOptimizer(smRobot)
+        joint_path_safe = path_optimizer.optimize_manipulability_path(linear_joint_path, min_manipulability=0.05)
         
         # Step 2: Align with inertia-based "easy" direction (energy efficiency)
-        # M = smRobot.inertia(np.radians(kine_j))  # 6x6 joint-space inertia matrix
         M = smallRobotArm.inertia(np.radians(kine_j))  # 6x6 joint-space inertia matrix
         eigvals, eigvecs = np.linalg.eig(M)
         easy_direction = eigvecs[:, np.argmin(eigvals)]  # Minimum inertia direction
-        joint_path_final = controller.align_path_to_vector(joint_path_safe, easy_direction, strength=0.3)
+        joint_path_final = path_optimizer.align_path_to_vector(joint_path_safe, easy_direction, strength=0.3)
         
         print(f"Path optimization: {len(linear_joint_path)} → {len(joint_path_safe)} → {len(joint_path_final)} points")
         

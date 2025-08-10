@@ -12,7 +12,6 @@ Classes:
 from .base_controller import BaseController
 from .velocity_controller import VelocityController
 from .position_controller import PositionController
-from .optimal_motion_refactored import OptimalMotionAnalyzer
 # Legacy import for backward compatibility
 from .robot_controller import RobotController
 
@@ -21,5 +20,4 @@ __all__ = [
     'VelocityController', 
     'PositionController',
     'RobotController',
-    'OptimalMotionAnalyzer',
 ]

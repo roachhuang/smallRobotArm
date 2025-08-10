@@ -93,3 +93,129 @@ def main() -> None:
         
 if __name__ == "__main__":
     main()
+
+#!/usr/bin/env python3
+import numpy as np
+from scipy.spatial.transform import Rotation as R
+from ikpy.chain import Chain
+
+# ====== CONFIG ======
+URDF_PATH = "my_robot.urdf"  # change to your robot's URDF
+GRIPPER_OFFSET = [0.0, 0.0, 0.10]  # 10 cm above object
+GRIPPER_RPY = [180, 0, 0]          # align gripper Z with object Z
+APPROACH_DIST = 0.10               # approach distance in meters
+RETREAT_DIST = 0.10                # retreat distance in meters
+
+# ====== UTILS ======
+def make_pose(position, rpy_deg):
+    """Create 4x4 homogeneous transform from pos + RPY."""
+    rot = R.from_euler('xyz', rpy_deg, degrees=True).as_matrix()
+    pose = np.eye(4)
+    pose[:3, :3] = rot
+    pose[:3, 3] = position
+    return pose
+
+def grasp_pose(object_pose, offset_pose):
+    """Object pose × offset → gripper pose."""
+    return object_pose @ offset_pose
+
+def offset_along_gripper_z(pose, dist):
+    """Move along gripper +Z axis."""
+    new_pose = np.copy(pose)
+    new_pose[:3, 3] += new_pose[:3, 2] * dist
+    return new_pose
+
+# ====== MAIN PLANNER ======
+def plan_pick_and_place(object_pose, place_pose, chain):
+    """Generate IK joint sequences for pick-and-place."""
+    offset_pose = make_pose(GRIPPER_OFFSET, GRIPPER_RPY)
+
+    # PICK
+    grasp = grasp_pose(object_pose, offset_pose)
+    approach = offset_along_gripper_z(grasp, APPROACH_DIST)
+    retreat = offset_along_gripper_z(grasp, -RETREAT_DIST)
+
+    # PLACE
+    place = grasp_pose(place_pose, offset_pose)
+    pre_place = offset_along_gripper_z(place, APPROACH_DIST)
+    post_place = offset_along_gripper_z(place, -RETREAT_DIST)
+
+    # Solve IK for each waypoint
+    waypoints = [approach, grasp, retreat, pre_place, place, post_place]
+    joint_paths = []
+    for pose in waypoints:
+        pos = pose[:3, 3]
+        rot = pose[:3, :3]
+        joints = chain.inverse_kinematics(pos, target_orientation=rot)
+        joint_paths.append(joints)
+
+    return joint_paths
+
+# ====== DEMO ======
+if __name__ == "__main__":
+    # Load robot chain
+    chain = Chain.from_urdf_file(URDF_PATH)
+
+    # Example object & place poses in WORLD frame
+    X_object = make_pose([0.5, 0.0, 0.2], [0, 0, 0])  # object at 50cm forward, 20cm high
+    X_place  = make_pose([0.3, 0.3, 0.2], [0, 0, 90]) # place at right side
+
+    # Plan sequence
+    joint_seq = plan_pick_and_place(X_object, X_place, chain)
+
+    # Print joint sequences
+    for i, q in enumerate(joint_seq):
+        print(f"Waypoint {i+1}: {np.round(q, 3)}")
+
+
+'''
+def pick_and_place(T_cup: np.ndarray, ik_solver, move_to_pose, gripper):
+    """
+    High-level pick and place routine.
+    
+    Args:
+        T_cup: 4x4 np.ndarray, cup pose in base frame
+        ik_solver: function that returns joint angles given a 4x4 pose
+        move_to_pose: function to command the robot to joint angles
+        gripper: object with open() and close() methods
+    """
+    # 1. Define grasp and approach poses
+    T_approach_offset = np.eye(4)
+    T_approach_offset[2, 3] = -0.1  # 10cm above the cup
+
+    T_approach = T_cup @ T_approach_offset  # offset in cup frame
+    T_grasp = T_cup                         # directly at the cup
+
+    # 2. Move to approach pose
+    q_approach = ik_solver(T_approach)
+    move_to_pose(q_approach)
+
+    # 3. Move to grasp pose
+    q_grasp = ik_solver(T_grasp)
+    move_to_pose(q_grasp)
+
+    # 4. Close gripper
+    gripper.close()
+
+    # 5. Retreat back to approach
+    move_to_pose(q_approach)
+
+    # 6. Move to place location (define as needed)
+    T_place = np.eye(4)
+    T_place[:3, 3] = [0.3, -0.2, 0.1]  # Example place location
+    T_place_approach = T_place.copy()
+    T_place_approach[2, 3] += 0.1
+
+    q_place_approach = ik_solver(T_place_approach)
+    q_place = ik_solver(T_place)
+
+    move_to_pose(q_place_approach)
+    move_to_pose(q_place)
+
+    # 7. Open gripper
+    gripper.open()
+
+    # 8. Retreat
+    move_to_pose(q_place_approach)
+
+'''

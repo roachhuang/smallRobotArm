@@ -8,13 +8,12 @@ Classes:
 """
 
 import time
-from typing import Callable
+from typing import Callable, Dict, List
 import numpy as np
 from numpy import ndarray
 
-from robot_tools.controller.optimal_motion_refactored import OptimalMotionAnalyzer
+# from robot_tools.trajectory.path_optimizer import PathOptimizer
 from .base_controller import BaseController
-
 
 class VelocityController(BaseController):
     """Velocity controller for the small robot arm.
@@ -25,9 +24,14 @@ class VelocityController(BaseController):
     
     def __init__(self, robot):
         super().__init__(robot)
-        
+        self.joint_limits: Dict[str, List[float]] = {
+        'vel': [np.radians(30)] * 6,  # Max velocity: 25 deg/s per joint
+        'acc': [2.0] * 6,             # Max acceleration: 2.0 rad/s²
+        'jerk': [10] * 6,             # Max jerk: 10 rad/s³ (higher = snappier motion)
+        }
+    
         # Joint Velocity Controller parameters
-        self.max_q_dot_rad = np.radians(30)  # Max joint velocity
+        self.max_q_dot_rad = np.radians(30)*6  # Max joint velocity
         # self.max_q_dot_rad = np.radians(30) * 6  # Max joint velocity
         self._q_dot_prev = np.zeros(6)  # Internal state for smoothing
         
@@ -104,7 +108,7 @@ class VelocityController(BaseController):
             x_dot_func (callable): Function returning 6D velocity vector in (mm/s, rad/s)
             duration (float): Duration to run control
         """
-        analyzer = OptimalMotionAnalyzer(self.robot, self.max_q_dot_rad)
+        # analyzer = OptimalMotionAnalyzer(self.robot, self.max_q_dot_rad)
         
         n_steps = int(duration / self.dt)
         self._q_dot_prev = np.zeros(6)
