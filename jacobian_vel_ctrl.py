@@ -62,7 +62,8 @@ def main() -> None:
     # controller.velocity_control(robot=smRobot, q_init=q, x_dot_func=lambda t: x_dot, dt=dt, duration=5.0)       
     
     # Move to circle center position
-    p_dc = (-250, 180, 110.0, 0.0, 90.0, 0.0)  # Pose relative to desk frame
+    p_dc = (-260, 100, 110.0, 0.0, 90.0, 0.0)  # Pose relative to desk frame
+    # p_dc = (-250, 180, 100.0, 0.0, 90.0, 0.0)  # Pose relative to desk frame
     T_06 = custom_robot.convert_p_dc_to_T06(p_dc)
     j = custom_robot.ik(T_06)
     controller.move_to_angles(j)
@@ -97,6 +98,7 @@ def main() -> None:
     input("Press Enter to continue Zigzag pattern...")
     controller.cartesian_space_vel_ctrl(
         x_dot_func=lambda t: motion.zigzag(t, side_length=40, period=30.0),
+        # x_dot_func=lambda t: motion.wave(t),
         duration=30.0
     )
 

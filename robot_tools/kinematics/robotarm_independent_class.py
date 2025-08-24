@@ -57,20 +57,10 @@ class RobotArm(ABC):
         # avoid naming roll, pitch and yaw with zyz coz of misleading
         # x, y, z, psi, theta, phi = pose
         # r = R.from_euler(seq=seq, angles=[psi, theta, phi], degrees=True)
-
-        # Translation matrix
-        # translation_matrix = np.eye(4)
-        # translation_matrix[:3, 3] = [x, y, z]
-
         # Homogeneous transformation matrix
         # T = np.eye(4)
         # T[:3, :3] = r.as_matrix()  # rotation_matrix
         # T[:3, 3] = [x, y, z]
-
-        # Alternatively, you can multiply the translation and rotation matrix.
-        # T = translation_matrix @ np.eye(4)
-        # T[:3,:3] = rotation_matrix
-
         # return T
     
         x, y, z = pose[:3]

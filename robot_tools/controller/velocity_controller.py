@@ -32,7 +32,6 @@ class VelocityController(BaseController):
     
         # Joint Velocity Controller parameters
         self.max_q_dot_rad = np.radians(30)*6  # Max joint velocity
-        # self.max_q_dot_rad = np.radians(30) * 6  # Max joint velocity
         self._q_dot_prev = np.zeros(6)  # Internal state for smoothing
         
         # End-Effector Velocity Controller parameters
@@ -108,7 +107,6 @@ class VelocityController(BaseController):
             x_dot_func (callable): Function returning 6D velocity vector in (mm/s, rad/s)
             duration (float): Duration to run control
         """
-        # analyzer = OptimalMotionAnalyzer(self.robot, self.max_q_dot_rad)
         
         n_steps = int(duration / self.dt)
         self._q_dot_prev = np.zeros(6)
@@ -138,11 +136,33 @@ class VelocityController(BaseController):
                 print(f"Direction of Easiest Motion (Task Space): {U[:, 0]}")
                 print(f"Direction of Hardest Motion (Task Space): {U[:, -1]}")
                 '''
-                sigma_min = np.min(S)
-                epsilon = self.dls_epsilon
-                lambda_sq = (epsilon**2) if sigma_min > epsilon else (epsilon**2 + (1 - (sigma_min / epsilon)**2))
-                J_dls = JT @ np.linalg.inv(J @ JT + lambda_sq * np.eye(6))
+                # fixed-threshold damping
+                # sigma_min = np.min(S)
+                # epsilon = self.dls_epsilon
+                # lambda_sq = (epsilon**2) if sigma_min > epsilon else (epsilon**2 + (1 - (sigma_min / epsilon)**2))
+                # J_dls = JT @ np.linalg.inv(J @ JT + lambda_sq * np.eye(6))
                 
+                # Dynamic Damping Adjustment Based on Manipulability
+                w = np.prod(S)  # Manipulability index
+                w_max = 0.01     # Tune (0.01-0.1)based on your arm’s nominal configuration
+                lambda_max = 0.1  # Maximum damping
+                lambda_sq = (lambda_max**2) * (1 - np.clip(w / w_max, 0, 1))**2
+
+                # Ensure minimum damping to avoid numerical issues
+                lambda_sq = max(lambda_sq, 1e-4)  # Prevent excessive damping
+
+                # Damped Least Squares inverse
+                JT = J.T
+                JJT = J @ JT
+                JJT_damped = JJT + lambda_sq * np.eye(6)
+                # Robust matrix inversion
+                try:
+                    J_dls = JT @ np.linalg.pinv(JJT_damped)  # Use pinv for stability
+                except np.linalg.LinAlgError:
+                    print("Matrix inversion failed, using fallback damping")
+                    J_dls = JT @ np.linalg.pinv(JJT + 0.01 * np.eye(6))
+                    
+                # Compute joint velocities
                 x_dot = x_dot_func(t)
                 # Option 1: Use optimizer (recommended), but this will reshpae circular motion!!!
                 # q_dot_raw = analyzer.optimize_cartesian_velocity(x_dot, svd_data=svd_data)
@@ -151,6 +171,11 @@ class VelocityController(BaseController):
                 q_dot = self._smooth_q_dot(q_dot_raw)
                 q_rad += q_dot * self.dt           
                 self.move_to_angles(np.degrees(q_rad), header='g', ack=True)
+                
+                # Debug prints
+                print(f"Singular values: {S}")
+                print(f"Manipulability w: {w}, lambda_sq: {lambda_sq}")
+                print(f"J_dls norm: {np.linalg.norm(J_dls)}")
                 
                 # Fixed time synchronization
                 next_time = start_time + (i + 1) * self.dt

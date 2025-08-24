@@ -26,7 +26,6 @@ from typing import List, Tuple, Dict, Any
 from roboticstoolbox import DHRobot   
 from robot_tools.kinematics import SmallRbtArm, std_dh_params, std_dh_tbl
 from robot_tools.controller import VelocityController
-from robot_tools.trajectory.motion_patterns import wave
 from robot_tools.misc.signal_handler import setup_signal_handler
 import matplotlib.pyplot as plt
 from robot_tools.trajectory.path_optimizer import PathOptimizer
@@ -55,6 +54,7 @@ def main() -> None:
     smRobot = DHRobot(std_dh_tbl, name="smallRobotArm")
     smallRobotArm = SmallRbtArm(std_dh_params)
     controller = VelocityController(smRobot)
+    path_optimizer = PathOptimizer(smRobot)
     
     # Setup signal handling for graceful shutdown
     setup_signal_handler(controller)                    
@@ -94,7 +94,7 @@ def main() -> None:
     
     # Optimize trajectory for manipulability (avoid singularities)
     print("\nOptimizing trajectory for manipulability...")
-    path_optimizer = PathOptimizer(smRobot)
+   
     joint_path_optimized = path_optimizer.optimize_manipulability_path(
         joint_path_rad, min_manipulability=0.05
     )

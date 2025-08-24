@@ -12,12 +12,18 @@ Classes:
 from .base_controller import BaseController
 from .velocity_controller import VelocityController
 from .position_controller import PositionController
+from .feedforward_controller import FeedforwardController
+from .trajectory_controller import TrajectoryController
+from .hybrid_controller import HybridController
 # Legacy import for backward compatibility
-from .robot_controller import RobotController
+# from .robot_controller import RobotController
 
 __all__ = [
     'BaseController',
     'VelocityController', 
     'PositionController',
-    'RobotController',
+    'FeedforwardController',
+    'TrajectoryController',
+    'HybridController',
+    # 'RobotController',
 ]

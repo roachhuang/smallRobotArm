@@ -36,6 +36,18 @@ python -m venv myenv
 source myenv/bin/activate  # Linux/macOS
 """
 
+from robot_tools.controller import FeedforwardController
+
+# controller = FeedforwardController(robot)
+# controller.enable_compensation(gravity=True, friction=True)
+
+# # Move with compensation
+# controller.move_to_angles_with_compensation((10, 20, 30, 0, 0, 0), duration=3.0)
+
+# # Tune parameters
+# controller.set_compensation_parameters(gravity_scale=0.9)
+
+
 # smallRobotArm = None  # Declare at module level
 
 def main() -> None:
@@ -121,27 +133,34 @@ def main() -> None:
         ]
     )
    
-    T_inter_poses=[]
-    # Loop through consecutive pairs and interpolate
-    for i in range(len(poses0) - 1):
-        start_pose = smallRobotArm.pose2T(poses0[i])
-        end_pose = smallRobotArm.pose2T(poses0[i + 1])
+    # T_inter_poses=[]
+    # # Loop through consecutive pairs and interpolate
+    # for i in range(len(poses0) - 1):
+    #     start_pose = smallRobotArm.pose2T(poses0[i])
+    #     end_pose = smallRobotArm.pose2T(poses0[i + 1])
         
-        T_inter_poses.append(start_pose)  # Keep the original
-        interpolated = interp.interpolate_poses(SE3(start_pose), SE3(end_pose), num_poses=5)
-        T_inter_poses.extend(interpolated)
+    #     T_inter_poses.append(start_pose)  # Keep the original
+    #     interpolated = interp.interpolate_poses(SE3(start_pose), SE3(end_pose), num_poses=5)
+    #     T_inter_poses.extend(interpolated)
 
-    # Append the final pose
-    T_inter_poses.append(smallRobotArm.pose2T(poses0[-1]))
-    # T_smooth_poses = path.smooth_pose_path(SE3(T_inter_poses))
+    # # Append the final pose
+    # T_inter_poses.append(smallRobotArm.pose2T(poses0[-1]))
     
-    for T in T_inter_poses:
+    # Build trajectory with only waypoints
+    T_waypoints = [smallRobotArm.pose2T(pose) for pose in poses0]
+    T_se3_waypoints = [SE3(T) for T in T_waypoints]
+
+    # Smooth directly between waypoints
+    T_smooth_poses = interp.smooth_pose_path(T_se3_waypoints, alpha=0.3)
+    
+    for T_se3 in T_smooth_poses:
         # poses' coordiation system is end-effector's wrt world frame.
         # T_0E = smallRobotArm.pose2T(pose, seq="zyz")
         
         # euler angles ZYZ according to smallrobot arm's demo
-        kine_j = smallRobotArm.ik(T)
-
+        kine_j = smallRobotArm.ik(T_se3.A)
+        # Just move directly - poses are already well-planned
+        controller.move_to_angles(kine_j, header="g", ack=True)
         '''
         ik_sol = smRobot.ikine_LM(SE3(T), q0=np.ones(smRobot.n))
         if not ik_sol.success:
@@ -160,29 +179,26 @@ def main() -> None:
         
         # print(kine_j.round(2))
         
-        diff = np.linalg.norm(np.array(kine_j) - np.array(controller.current_angles))
-        steps = min(20, max(5, int(diff / 10 * 10)))  # Scale reasonably (5 deg per step)s = int(diff * 10)  # 10 steps per radian of total joint-space distance
+        # diff = np.linalg.norm(np.array(kine_j) - np.array(controller.current_angles))
+        # steps = min(20, max(5, int(diff / 10 * 10)))  # Scale reasonably (5 deg per step)s = int(diff * 10)  # 10 steps per radian of total joint-space distance
         
-        linear_joint_path = interp.generate_linear_path_in_js(controller.                   current_angles, kine_j, steps)
+        # # linear_joint_path = interp.generate_linear_path_in_js(controller.                   current_angles, kine_j, steps)
         
-        # Step 1: Optimize for manipulability (avoid singularities)
-        path_optimizer = PathOptimizer(smRobot)
-        joint_path_safe = path_optimizer.optimize_manipulability_path(linear_joint_path, min_manipulability=0.05)
+        # # Step 1: Optimize for manipulability (avoid singularities)
+        # path_optimizer = PathOptimizer(smRobot)
+        # joint_path_safe = path_optimizer.optimize_manipulability_path(linear_joint_path, min_manipulability=0.05)
         
-        # Step 2: Align with inertia-based "easy" direction (energy efficiency)
-        M = smallRobotArm.inertia(np.radians(kine_j))  # 6x6 joint-space inertia matrix
-        eigvals, eigvecs = np.linalg.eig(M)
-        easy_direction = eigvecs[:, np.argmin(eigvals)]  # Minimum inertia direction
-        joint_path_final = path_optimizer.align_path_to_vector(joint_path_safe, easy_direction, strength=0.3)
+        # # Step 2: Align with inertia-based "easy" direction (energy efficiency)
+        # M = smallRobotArm.inertia(np.radians(kine_j))  # 6x6 joint-space inertia matrix
+        # eigvals, eigvecs = np.linalg.eig(M)
+        # easy_direction = eigvecs[:, np.argmin(eigvals)]  # Minimum inertia direction
+        # joint_path_final = path_optimizer.align_path_to_vector(joint_path_safe, easy_direction, strength=0.3)
         
-        print(f"Path optimization: {len(linear_joint_path)} → {len(joint_path_safe)} → {len(joint_path_final)} points")
+        # print(f"Path optimization: {len(linear_joint_path)} → {len(joint_path_safe)} → {len(joint_path_final)} points")
         
-        for angles in joint_path_final:
-            controller.move_to_angles(angles, header="g", ack=True)
+        # for angles in joint_path_final:
+        #     controller.move_to_angles(angles, header="g", ack=True)
         
-        # smallRobotArm.move_to_angles(kine_j, header="g", ack=True)
-        # controller.current_angles = kine_j  # Important to track for next segment
-    
     input("Press Enter to continue...")
     controller.go_home()
     print("THREAD TERMINATED!")

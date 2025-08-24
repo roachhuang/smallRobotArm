@@ -7,7 +7,6 @@ import numpy as np
 from numpy import ndarray
 from typing import List
 
-
 class PathOptimizer:
     """Path optimizer for robot trajectory planning."""
     
