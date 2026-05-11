@@ -101,18 +101,29 @@ def main() -> None:
     sleep(1)
     
     # Define trajectory timing and waypoints
-    timestamps: List[float] = [0, 8, 10, 24]  # Time points in seconds
+    timestamps: List[float] = [0, 2, 20, 24]  # Time points in seconds
+    # timestamps: List[float] = [0, 8, 10, 24]  # Time points in seconds
     dt_list: List[float] = [timestamps[i] - timestamps[i-1] 
                            for i in range(1, len(timestamps))]  # [8, 12, 4] seconds
     
     # Cartesian waypoints: [x, y, z, roll, pitch, yaw] in desk coordinate frame
     # Units: mm for position, degrees for orientation
-    cartesian_path: np.ndarray = np.array([
-        (-200, 100, 60, 0.0, 0, 35.0),    # Start position
-        (-200, 100, 90, 0.0, 0, 35.0),    # Lift up
-        (-295, 170, 350, 0, -60, 0.0),    # Move and rotate
-        (-295, 270, 350, 0, -60, 0.0),    # Final position
-    ], dtype=np.float64)
+    # cartesian_path: np.ndarray = np.array([
+    #     (-200, 100, 60, 0.0, 0, 35.0),    # Start position
+    #     (-200, 100, 90, 0.0, 0, 35.0),    # Lift up
+    #     (-295, 170, 350, 0, -60, 0.0),    # Move and rotate
+    #     (-295, 270, 350, 0, -60, 0.0),    # Final position
+    # ], dtype=np.float64)
+
+    cartesian_path = np.array(
+        [
+            (-200, 160, 60, 0.0, 0.0, 35.0),
+            (-200, 160, 90, 0.0, 0.0, 35.0),
+            (-295, 270.0, 350.0, 0.0, -60.0, 0.0),
+            (-295, 350.0, 350.0, 0.0, -60.0, 0.0),
+        ],
+        dtype=np.float64,
+    )
 
     # Move to initial position
     initial_pose = tuple(cartesian_path[0])
