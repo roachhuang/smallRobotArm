@@ -9,218 +9,292 @@ Classes:
 
 import time
 from typing import Callable, Dict, List
+
 import numpy as np
 from numpy import ndarray
 
-# from robot_tools.trajectory.path_optimizer import PathOptimizer
 from .base_controller import BaseController
+
+# ---------------------------------------------------------------------------
+# Tunable parameters
+# ---------------------------------------------------------------------------
+
+# Per-joint velocity / acceleration / jerk limits
+JOINT_VEL_LIMIT_RAD  = [2.0] * 6   # rad/s — one per joint
+JOINT_ACC_LIMIT      = [5.0] * 6                          # rad/s²
+JOINT_JERK_LIMIT     = [10.0] * 6                         # rad/s³
+
+# DLS / manipulability parameters
+DLS_EPSILON               = 0.01   # fallback damping factor
+MANIPULABILITY_THRESHOLD  = 0.01   # minimum manipulability before warning
+W_MAX                     = 0.01   # nominal manipulability (tune per arm)
+LAMBDA_MAX                = 0.1    # maximum DLS damping coefficient
+LAMBDA_MIN                = 1e-4   # floor to prevent numerical blowup
+
+# EMA smoothing bounds
+ALPHA_MIN = 0.1
+ALPHA_MAX = 0.9
+
+# Debug print interval (steps) — prints once per second at 50 Hz
+DEBUG_PRINT_EVERY = 50
+
 
 class VelocityController(BaseController):
     """Velocity controller for the small robot arm.
-    
-    This class provides velocity control methods including joint-space and
-    Cartesian-space velocity control with advanced smoothing and singularity handling.
+
+    Provides joint-space and Cartesian-space velocity control with adaptive
+    EMA smoothing, dynamic DLS singularity avoidance, and optional debug
+    logging.
+
+    Args:
+        robot: Robot model exposing ``jacob0()`` and joint-angle interfaces.
+        debug: If True, print diagnostics every ``DEBUG_PRINT_EVERY`` steps.
     """
-    
-    def __init__(self, robot):
+
+    def __init__(self, robot, debug: bool = False):
         super().__init__(robot)
+
+        self.debug = debug
+
         self.joint_limits: Dict[str, List[float]] = {
-        'vel': [np.radians(30)] * 6,  # Max velocity: 25 deg/s per joint
-        'acc': [2.0] * 6,             # Max acceleration: 2.0 rad/s²
-        'jerk': [10] * 6,             # Max jerk: 10 rad/s³ (higher = snappier motion)
+            'vel':  list(JOINT_VEL_LIMIT_RAD),
+            'acc':  JOINT_ACC_LIMIT,
+            'jerk': JOINT_JERK_LIMIT,
         }
-    
-        # Joint Velocity Controller parameters
-        self.max_q_dot_rad = np.radians(30)*6  # Max joint velocity
-        self._q_dot_prev = np.zeros(6)  # Internal state for smoothing
-        
-        # End-Effector Velocity Controller parameters
-        self.dls_epsilon = 0.01  # Damping factor for DLS
-        self.manipulability_threshold = 0.01  # Minimum manipulability threshold
-    
-    def _smooth_q_dot(self, q_dot_raw: ndarray):
+
+        # Per-joint velocity ceiling — shape (6,) so array ops are correct
+        self.max_q_dot_rad: ndarray = JOINT_VEL_LIMIT_RAD.copy()
+
+        # Internal EMA state
+        self._q_dot_prev: ndarray = np.zeros(6)
+
+        # Cartesian controller parameters
+        self.dls_epsilon              = DLS_EPSILON
+        self.manipulability_threshold = MANIPULABILITY_THRESHOLD
+
+    # ------------------------------------------------------------------
+    # Private helpers
+    # ------------------------------------------------------------------
+
+    def _smooth_q_dot(self, q_dot_raw: ndarray) -> ndarray:
         """Smooth joint velocity using time-optimal scaling and adaptive EMA.
 
         Args:
-            q_dot_raw (ndarray): Raw joint velocities in radians/s.
+            q_dot_raw: Raw joint velocities in rad/s, shape (6,).
 
         Returns:
-            ndarray: Smoothed joint velocities in radians/s.
+            Smoothed joint velocities in rad/s, shape (6,).
         """
-        
-        # Numerical safety: handle NaN or invalid inputs
-        if np.any(np.isnan(q_dot_raw)) or np.any(np.isnan(self.max_q_dot_rad)):
-            return self._q_dot_prev  # Return previous velocity to avoid crashes
+        # Guard against NaN / Inf — hold last good velocity
+        if not np.all(np.isfinite(q_dot_raw)):
+            return self._q_dot_prev.copy()
 
-        # Time-optimal scaling: scale velocity if any joint exceeds limit
-        max_ratios = np.abs(q_dot_raw / np.atleast_1d(self.max_q_dot_rad))
+        # Time-optimal scaling: uniformly scale down if any joint exceeds limit
+        max_ratios = np.abs(q_dot_raw / self.max_q_dot_rad)
         scaling = 1.0 / np.max(max_ratios) if np.any(max_ratios > 1.0) else 1.0
         q_dot_scaled = q_dot_raw * scaling
 
-        # Adaptive smoothing: higher speeds -> lower alpha -> more smoothing
-        max_q_dot = np.max(np.atleast_1d(self.max_q_dot_rad))
-        speed_ratio = np.linalg.norm(q_dot_scaled) / max_q_dot if max_q_dot > 1e-6 else 0.0\
-        # NEW: Sigmoid fn
-        alpha = np.clip(0.5 / (1 + np.exp(5 * (speed_ratio - 0.5))), 0.1, 0.9)
-        alpha_scaled = 1 - (1 - alpha) ** (self.dt / 0.005)  # Adjust for dt
+        # Adaptive alpha: higher speed → lower alpha → more smoothing (sigmoid)
+        max_q_dot  = np.max(self.max_q_dot_rad)
+        speed_ratio = (
+            np.linalg.norm(q_dot_scaled) / max_q_dot
+            if max_q_dot > 1e-6 else 0.0
+        )
+        alpha = np.clip(
+            0.5 / (1.0 + np.exp(5.0 * (speed_ratio - 0.5))),
+            ALPHA_MIN, ALPHA_MAX,
+        )
+        # Adjust EMA coefficient for the actual control period
+        alpha_dt = 1.0 - (1.0 - alpha) ** (self.dt / 0.005)
 
-        # Exponential smoothing (EMA filter)
-        q_dot = alpha_scaled * q_dot_scaled + (1 - alpha_scaled) * self._q_dot_prev
+        q_dot = alpha_dt * q_dot_scaled + (1.0 - alpha_dt) * self._q_dot_prev
         self._q_dot_prev = q_dot
         return q_dot
-        
-    
-    def joint_space_vel_ctrl(self, q_dot_func: Callable[[float], ndarray], duration: float):
-        """Apply joint velocity control.
 
-        Args:
-            q_dot_func (callable): Function that returns 6D joint velocity at time t.
-            duration (float): Duration to run control.
-        """
-        q_rad = np.radians(self.current_angles)
-        n_steps = int(duration / self.dt)
-        self._q_dot_prev = np.zeros(6)
-        start_time = time.perf_counter()
-        
-        for i in range(n_steps):
-            t = i * self.dt
-            try:
-                q_dot_raw = q_dot_func(t)            
-                q_dot = self._smooth_q_dot(q_dot_raw)
-                
-                # Integrate velocity to get new joint positions
-                q_rad += q_dot * self.dt           
-                
-                self.move_to_angles(np.degrees(q_rad), header='g', ack=True)
-
-                # Time sync
-                next_time = start_time + (i + 1) * self.dt
-                time.sleep(max(0, next_time - time.perf_counter()))
-            except Exception as e:
-                print(f"Error in joint space velocity control at step {i}: {e}")
-                break    
-    
-    def cartesian_space_vel_ctrl(self, x_dot_func: Callable[[float], ndarray], duration: float):
-        """Velocity control with proper error handling and smoothing.
-        
-        Args:
-            x_dot_func (callable): Function returning 6D velocity vector in (mm/s, rad/s)
-            duration (float): Duration to run control
-        """
-        
-        n_steps = int(duration / self.dt)
-        self._q_dot_prev = np.zeros(6)
-        start_time = time.perf_counter()
-        
-        for i in range(n_steps):
-            t = i * self.dt
-            try:
-                # close loop 
-                q_rad = np.radians(self.current_angles)
-                J = self.robot.jacob0(q_rad)
-                
-                # Damped Least Squares Inverse for singularity avoidance
-                JT = J.T
-                U, S, Vt = np.linalg.svd(J)
-                svd_data = {'U': U, 'S': S}
-               
-                '''
-                manipulability = np.prod(S)
-                if manipulability < self.manipulability_threshold:
-                    # Add null-space motion or increase damping
-                    print(f"Manipulability Measure: {manipulability:.4f}")
-                
-                # 3. Principal Directions of Manipulability (U matrix columns)
-                # U[:, 0] is the direction of easiest motion (largest singular value)
-                # U[:, -1] is the direction of hardest motion (smallest singular value)
-                print(f"Direction of Easiest Motion (Task Space): {U[:, 0]}")
-                print(f"Direction of Hardest Motion (Task Space): {U[:, -1]}")
-                '''
-                # fixed-threshold damping
-                # sigma_min = np.min(S)
-                # epsilon = self.dls_epsilon
-                # lambda_sq = (epsilon**2) if sigma_min > epsilon else (epsilon**2 + (1 - (sigma_min / epsilon)**2))
-                # J_dls = JT @ np.linalg.inv(J @ JT + lambda_sq * np.eye(6))
-                
-                # Dynamic Damping Adjustment Based on Manipulability
-                w = np.prod(S)  # Manipulability index
-                w_max = 0.01     # Tune (0.01-0.1)based on your arm’s nominal configuration
-                lambda_max = 0.1  # Maximum damping
-                lambda_sq = (lambda_max**2) * (1 - np.clip(w / w_max, 0, 1))**2
-
-                # Ensure minimum damping to avoid numerical issues
-                lambda_sq = max(lambda_sq, 1e-4)  # Prevent excessive damping
-
-                # Damped Least Squares inverse
-                JT = J.T
-                JJT = J @ JT
-                JJT_damped = JJT + lambda_sq * np.eye(6)
-                # Robust matrix inversion
-                try:
-                    J_dls = JT @ np.linalg.pinv(JJT_damped)  # Use pinv for stability
-                except np.linalg.LinAlgError:
-                    print("Matrix inversion failed, using fallback damping")
-                    J_dls = JT @ np.linalg.pinv(JJT + 0.01 * np.eye(6))
-                    
-                # Compute joint velocities
-                x_dot = x_dot_func(t)
-                # Option 1: Use optimizer (recommended), but this will reshpae circular motion!!!
-                # q_dot_raw = analyzer.optimize_cartesian_velocity(x_dot, svd_data=svd_data)
-                # Option 2: Use DLS (original method)
-                q_dot_raw = J_dls @ x_dot
-                q_dot = self._smooth_q_dot(q_dot_raw)
-                q_rad += q_dot * self.dt           
-                self.move_to_angles(np.degrees(q_rad), header='g', ack=True)
-                
-                # Debug prints
-                print(f"Singular values: {S}")
-                print(f"Manipulability w: {w}, lambda_sq: {lambda_sq}")
-                print(f"J_dls norm: {np.linalg.norm(J_dls)}")
-                
-                # Fixed time synchronization
-                next_time = start_time + (i + 1) * self.dt
-                time.sleep(max(0, next_time - time.perf_counter()))
-            except Exception as e:
-                print(f"Error in cartesian space velocity control at step {i}: {e}")
-                break
-            
-    def get_optimal_directions(self, U, Vt):
-        return {
-            'easiest_cartesian_motion': U[:, 0],      # Direction requiring least joint effort
-            'hardest_cartesian_motion': U[:, -1],     # Direction requiring most joint effort
-            'most_effective_joint': Vt[0, :],        # Joint combination with max end-effector effect
-            'least_effective_joint': Vt[-1, :]       # Joint combination with min end-effector effect
-        }
-        
-    def force_analysis(self, desired_force, q):
-        J = self.robot.compute_jacobian(q)
+    def _compute_dls_inverse(self, J: ndarray) -> tuple[ndarray, ndarray, float]:
         U, S, Vt = np.linalg.svd(J)
-        
-        # Required joint torques for desired end-effector force
-        tau_required = J.T @ desired_force
-        
-        # Force amplification in each direction
-        force_amplification = 1.0 / S  # Higher singular values = easier force generation
-        
+        sigma_min = float(S[-1])
+
+        # Nakamura & Hanafusa: ramp lambda only below threshold
+        if sigma_min >= self.dls_epsilon:
+            lambda_sq = 0.0
+        else:
+            ratio     = sigma_min / self.dls_epsilon
+            lambda_sq = (LAMBDA_MAX ** 2) * (1.0 - ratio ** 2)
+        lambda_sq = max(lambda_sq, LAMBDA_MIN)
+
+        A = J @ J.T + lambda_sq * np.eye(6)
+        try:
+            # solve is faster and cleaner than pinv for guaranteed-invertible A
+            J_dls = np.linalg.solve(A, J).T
+        except np.linalg.LinAlgError:
+            # fallback: increase damping floor and retry
+            A_fallback = J @ J.T + 0.01 * np.eye(6)
+            J_dls = np.linalg.solve(A_fallback, J).T
+
+        return J_dls, S, lambda_sq
+
+    # ------------------------------------------------------------------
+    # Public control loops
+    # ------------------------------------------------------------------
+
+    def joint_space_vel_ctrl(
+        self,
+        q_dot_func: Callable[[float], ndarray],
+        duration: float,
+    ) -> None:
+        """Apply joint-space velocity control.
+
+        Args:
+            q_dot_func: Returns a 6D joint velocity vector (rad/s) at time t.
+            duration: Total control duration in seconds.
+        """
+        q_rad      = np.radians(self.current_angles)
+        n_steps    = int(duration / self.dt)
+        self._q_dot_prev = np.zeros(6)
+        start_time = time.perf_counter()
+
+        for i in range(n_steps):
+            t = i * self.dt
+            try:
+                q_dot_raw = q_dot_func(t)
+                q_dot     = self._smooth_q_dot(q_dot_raw)
+                q_rad    += q_dot * self.dt
+                self.move_to_angles(np.degrees(q_rad), header='g', ack=True)
+
+            except (ValueError, np.linalg.LinAlgError) as e:
+                print(f"[WARN] Recoverable error at step {i}: {e}")
+                break
+            except Exception as e:
+                print(f"[ERROR] Unrecoverable error at step {i}: {e}")
+                self.go_home()
+                raise
+
+            next_time = start_time + (i + 1) * self.dt
+            time.sleep(max(0.0, next_time - time.perf_counter()))
+
+    def cartesian_space_vel_ctrl(
+        self,
+        x_dot_func: Callable[[float], ndarray],
+        duration: float,
+    ) -> None:
+        """Cartesian-space velocity control with DLS singularity avoidance.
+
+        Re-reads joint angles from hardware each tick (closed-loop) to prevent
+        drift accumulation.
+
+        Args:
+            x_dot_func: Returns a 6D end-effector velocity [mm/s, rad/s] at t.
+            duration:   Total control duration in seconds.
+        """
+        n_steps    = int(duration / self.dt)
+        self._q_dot_prev = np.zeros(6)
+        start_time = time.perf_counter()
+
+        for i in range(n_steps):
+            t = i * self.dt
+            try:
+                # Closed-loop: read actual encoder positions each tick
+                q_rad = np.radians(self.current_angles)
+                J     = self.robot.jacob0(q_rad)
+
+                J_dls, S, lambda_sq = self._compute_dls_inverse(J)
+
+                if self.debug and i % DEBUG_PRINT_EVERY == 0:
+                    w = float(np.prod(S))
+                    print(f"[step {i:4d}] S={np.round(S, 4)}, "
+                          f"w={w:.4f}, λ²={lambda_sq:.6f}, "
+                          f"‖J_dls‖={np.linalg.norm(J_dls):.4f}")
+
+                if float(np.prod(S)) < self.manipulability_threshold:
+                    print(f"[WARN] Low manipulability at step {i}: {np.prod(S):.4f}")
+
+                x_dot     = x_dot_func(t)
+                q_dot_raw = J_dls @ x_dot
+                q_dot     = self._smooth_q_dot(q_dot_raw)
+                q_rad    += q_dot * self.dt
+                self.move_to_angles(np.degrees(q_rad), header='g', ack=True)
+
+            except (ValueError, np.linalg.LinAlgError) as e:
+                print(f"[WARN] Recoverable error at step {i}: {e}")
+                break
+            except Exception as e:
+                print(f"[ERROR] Unrecoverable error at step {i}: {e}")
+                self.go_home()
+                raise
+
+            next_time = start_time + (i + 1) * self.dt
+            time.sleep(max(0.0, next_time - time.perf_counter()))
+
+    # ------------------------------------------------------------------
+    # Analysis utilities
+    # ------------------------------------------------------------------
+
+    def get_optimal_directions(self, U: ndarray, Vt: ndarray) -> Dict[str, ndarray]:
+        """Return task-space and joint-space principal motion directions.
+
+        Args:
+            U:   Left singular vectors of the Jacobian, shape (6, 6).
+            Vt:  Right singular vectors (transposed), shape (6, 6).
+
+        Returns:
+            Dict with keys: easiest_cartesian_motion, hardest_cartesian_motion,
+            most_effective_joint, least_effective_joint.
+        """
         return {
-            'joint_torques': tau_required,
-            'force_difficulty': force_amplification,
-            'hardest_force_direction': U[:, -1]  # Direction hardest to generate force
+            'easiest_cartesian_motion': U[:, 0],
+            'hardest_cartesian_motion': U[:, -1],
+            'most_effective_joint':     Vt[0, :],
+            'least_effective_joint':    Vt[-1, :],
         }
 
-    def adaptive_control_gains(self, S):       
-        # Higher gains for well-conditioned directions
-        position_gains = S * 100  # Scale with singular values
-        velocity_gains = np.sqrt(S) * 20
-        
-        return np.diag(position_gains), np.diag(velocity_gains)
+    def is_near_singularity(self, S: ndarray, threshold: float = 100.0) -> bool:
+        """Return True if the condition number of J exceeds threshold.
 
-    def analyze_singularities(self, S, Vt):
-        # Detect near-singularities
-        condition_number = S[0] / S[-1]
-        if condition_number > 100:
-            return "Near singularity - avoid this pose"
-        
-        # Find null space (lost DOF directions)
-        null_directions = Vt[S < 0.01]  # Joint directions that don't move end-effector
-        return null_directions
+        Args:
+            S:         Singular values of the Jacobian.
+            threshold: Condition number limit (default 100).
+        """
+        return bool(S[0] / S[-1] > threshold)
+
+    def null_space_directions(self, S: ndarray, Vt: ndarray,
+                              tol: float = 0.01) -> ndarray:
+        """Return joint-space directions that produce no end-effector motion.
+
+        Args:
+            S:   Singular values of the Jacobian.
+            Vt:  Right singular vectors (transposed).
+            tol: Singular value threshold below which a direction is null.
+        """
+        return Vt[S < tol]
+
+    def force_analysis(self, desired_force: ndarray, q: ndarray) -> Dict[str, ndarray]:
+        """Compute joint torques and force difficulty for a desired wrench.
+
+        Args:
+            desired_force: 6D desired end-effector wrench.
+            q:             Joint angles in radians.
+
+        Returns:
+            Dict with joint_torques, force_difficulty, hardest_force_direction.
+        """
+        J = self.robot.compute_jacobian(q)
+        _, S, _ = np.linalg.svd(J)
+        return {
+            'joint_torques':          J.T @ desired_force,
+            'force_difficulty':       1.0 / S,
+            'hardest_force_direction': S[-1],   # smallest singular value direction
+        }
+
+    def adaptive_control_gains(
+        self, S: ndarray
+    ) -> tuple[ndarray, ndarray]:
+        """Return position and velocity gain matrices scaled by singular values.
+
+        Args:
+            S: Singular values of the Jacobian.
+
+        Returns:
+            Tuple of (Kp, Kv) diagonal gain matrices.
+        """
+        return np.diag(S * 100.0), np.diag(np.sqrt(S) * 20.0)
