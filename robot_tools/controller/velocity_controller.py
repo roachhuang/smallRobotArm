@@ -7,6 +7,7 @@ Classes:
     VelocityController: Velocity controller for the robot arm
 """
 
+import logging
 import time
 from typing import Callable, Dict, List
 
@@ -15,40 +16,41 @@ from numpy import ndarray
 
 from .base_controller import BaseController
 
+log = logging.getLogger(__name__)
+
 # ---------------------------------------------------------------------------
 # Tunable parameters
 # ---------------------------------------------------------------------------
 
 # Per-joint velocity / acceleration / jerk limits
-JOINT_VEL_LIMIT_RAD  = [2.0] * 6   # rad/s — one per joint
-JOINT_ACC_LIMIT      = [5.0] * 6                          # rad/s²
-JOINT_JERK_LIMIT     = [10.0] * 6                         # rad/s³
+JOINT_VEL_LIMIT_RAD = np.array([2.0] * 6)   # rad/s, shape (6,) — ndarray so
+                                              # array ops in _smooth_q_dot are correct
+JOINT_ACC_LIMIT     = [5.0]  * 6             # rad/s²
+JOINT_JERK_LIMIT    = [10.0] * 6             # rad/s³
 
 # DLS / manipulability parameters
-DLS_EPSILON               = 0.01   # fallback damping factor
-MANIPULABILITY_THRESHOLD  = 0.01   # minimum manipulability before warning
-W_MAX                     = 0.01   # nominal manipulability (tune per arm)
-LAMBDA_MAX                = 0.1    # maximum DLS damping coefficient
-LAMBDA_MIN                = 1e-4   # floor to prevent numerical blowup
+DLS_EPSILON              = 0.01   # σ_min threshold below which damping activates
+MANIPULABILITY_THRESHOLD = 0.01   # minimum manipulability before warning
+LAMBDA_MAX               = 0.1    # maximum DLS damping coefficient
+LAMBDA_MIN               = 1e-4   # floor to prevent numerical blowup
 
 # EMA smoothing bounds
 ALPHA_MIN = 0.1
 ALPHA_MAX = 0.9
 
-# Debug print interval (steps) — prints once per second at 50 Hz
-DEBUG_PRINT_EVERY = 50
+# Debug log interval (steps) — logs once per second at 50 Hz
+DEBUG_LOG_EVERY = 50
 
 
 class VelocityController(BaseController):
     """Velocity controller for the small robot arm.
 
     Provides joint-space and Cartesian-space velocity control with adaptive
-    EMA smoothing, dynamic DLS singularity avoidance, and optional debug
-    logging.
+    EMA smoothing, dynamic DLS singularity avoidance, and structured logging.
 
     Args:
-        robot: Robot model exposing ``jacob0()`` and joint-angle interfaces.
-        debug: If True, print diagnostics every ``DEBUG_PRINT_EVERY`` steps.
+        robot:  Robot model exposing ``jacob0()`` and joint-angle interfaces.
+        debug:  If True, log diagnostics every ``DEBUG_LOG_EVERY`` steps.
     """
 
     def __init__(self, robot, debug: bool = False):
@@ -62,10 +64,11 @@ class VelocityController(BaseController):
             'jerk': JOINT_JERK_LIMIT,
         }
 
-        # Per-joint velocity ceiling — shape (6,) so array ops are correct
+        # Per-joint velocity ceiling — ndarray so division in _smooth_q_dot
+        # produces a correctly shaped (6,) result, not a list-of-scalars.
         self.max_q_dot_rad: ndarray = JOINT_VEL_LIMIT_RAD.copy()
 
-        # Internal EMA state
+        # Internal EMA state — reset by _run_control_loop before each motion
         self._q_dot_prev: ndarray = np.zeros(6)
 
         # Cartesian controller parameters
@@ -91,11 +94,11 @@ class VelocityController(BaseController):
 
         # Time-optimal scaling: uniformly scale down if any joint exceeds limit
         max_ratios = np.abs(q_dot_raw / self.max_q_dot_rad)
-        scaling = 1.0 / np.max(max_ratios) if np.any(max_ratios > 1.0) else 1.0
+        scaling    = 1.0 / np.max(max_ratios) if np.any(max_ratios > 1.0) else 1.0
         q_dot_scaled = q_dot_raw * scaling
 
         # Adaptive alpha: higher speed → lower alpha → more smoothing (sigmoid)
-        max_q_dot  = np.max(self.max_q_dot_rad)
+        max_q_dot   = np.max(self.max_q_dot_rad)
         speed_ratio = (
             np.linalg.norm(q_dot_scaled) / max_q_dot
             if max_q_dot > 1e-6 else 0.0
@@ -104,7 +107,8 @@ class VelocityController(BaseController):
             0.5 / (1.0 + np.exp(5.0 * (speed_ratio - 0.5))),
             ALPHA_MIN, ALPHA_MAX,
         )
-        # Adjust EMA coefficient for the actual control period
+        # Normalise EMA decay for the actual control period so smoothing
+        # behaviour is consistent regardless of dt
         alpha_dt = 1.0 - (1.0 - alpha) ** (self.dt / 0.005)
 
         q_dot = alpha_dt * q_dot_scaled + (1.0 - alpha_dt) * self._q_dot_prev
@@ -112,10 +116,30 @@ class VelocityController(BaseController):
         return q_dot
 
     def _compute_dls_inverse(self, J: ndarray) -> tuple[ndarray, ndarray, float]:
-        U, S, Vt = np.linalg.svd(J)
+        """Compute the Damped Least Squares pseudo-inverse of the Jacobian.
+
+        Implements Nakamura & Hanafusa (1986) variable damping: λ = 0 when
+        σ_min ≥ ε (well-conditioned), ramping quadratically to LAMBDA_MAX
+        as σ_min → 0 (approaching singularity).
+
+        The system (JJᵀ + λI) X = J is solved via LU decomposition rather
+        than ``pinv``. This is valid because the damped matrix is guaranteed
+        strictly positive-definite (λ > 0), making LU faster (~3–5×) and
+        numerically cleaner than a full SVD-based pseudoinverse.
+
+        Args:
+            J: Jacobian matrix, shape (6, n_joints).
+
+        Returns:
+            Tuple of:
+              J_dls     — DLS inverse, shape (n_joints, 6).
+              S         — Singular values, shape (6,), descending.
+              lambda_sq — Damping coefficient actually applied.
+        """
+        _, S, _ = np.linalg.svd(J)
         sigma_min = float(S[-1])
 
-        # Nakamura & Hanafusa: ramp lambda only below threshold
+        # Ramp damping only below the singularity threshold
         if sigma_min >= self.dls_epsilon:
             lambda_sq = 0.0
         else:
@@ -123,16 +147,54 @@ class VelocityController(BaseController):
             lambda_sq = (LAMBDA_MAX ** 2) * (1.0 - ratio ** 2)
         lambda_sq = max(lambda_sq, LAMBDA_MIN)
 
-        A = J @ J.T + lambda_sq * np.eye(6)
+        A = J @ J.T + lambda_sq * np.eye(J.shape[0])
         try:
-            # solve is faster and cleaner than pinv for guaranteed-invertible A
             J_dls = np.linalg.solve(A, J).T
         except np.linalg.LinAlgError:
-            # fallback: increase damping floor and retry
-            A_fallback = J @ J.T + 0.01 * np.eye(6)
+            # Fallback: raise damping floor and retry once
+            log.warning("DLS solve failed (lambda_sq=%.2e); retrying with "
+                        "increased damping.", lambda_sq)
+            A_fallback = J @ J.T + 0.01 * np.eye(J.shape[0])
             J_dls = np.linalg.solve(A_fallback, J).T
 
         return J_dls, S, lambda_sq
+
+    def _run_control_loop(
+        self,
+        n_steps: int,
+        tick: Callable[[int, float], None],
+    ) -> None:
+        """Run a timed control loop, calling ``tick(i, t)`` each step.
+
+        Handles EMA state reset, real-time synchronisation, and exception
+        routing so individual control methods only implement their per-tick
+        logic.
+
+        Recoverable errors (``ValueError``, ``LinAlgError``) log a warning
+        and break the loop cleanly. All other exceptions trigger ``go_home()``
+        before re-raising so the arm is always safe-stopped.
+
+        Args:
+            n_steps: Total number of control steps.
+            tick:    Callable invoked as ``tick(step_index, elapsed_time_s)``.
+        """
+        self._q_dot_prev = np.zeros(6)
+        start_time = time.perf_counter()
+
+        for i in range(n_steps):
+            t = i * self.dt
+            try:
+                tick(i, t)
+            except (ValueError, np.linalg.LinAlgError) as e:
+                log.warning("Recoverable error at step %d: %s", i, e)
+                break
+            except Exception as e:
+                log.error("Unrecoverable error at step %d: %s", i, e)
+                self.go_home()
+                raise
+
+            next_time = start_time + (i + 1) * self.dt
+            time.sleep(max(0.0, next_time - time.perf_counter()))
 
     # ------------------------------------------------------------------
     # Public control loops
@@ -143,35 +205,27 @@ class VelocityController(BaseController):
         q_dot_func: Callable[[float], ndarray],
         duration: float,
     ) -> None:
-        """Apply joint-space velocity control.
+        """Apply closed-loop joint-space velocity control.
+
+        Re-reads joint angles from hardware each tick so that communication
+        latency, motor slip, or a missed command cannot cause the integrated
+        position to drift from actual joint positions.
 
         Args:
             q_dot_func: Returns a 6D joint velocity vector (rad/s) at time t.
-            duration: Total control duration in seconds.
+            duration:   Total control duration in seconds.
         """
-        q_rad      = np.radians(self.current_angles)
-        n_steps    = int(duration / self.dt)
-        self._q_dot_prev = np.zeros(6)
-        start_time = time.perf_counter()
+        n_steps = int(duration / self.dt)
 
-        for i in range(n_steps):
-            t = i * self.dt
-            try:
-                q_dot_raw = q_dot_func(t)
-                q_dot     = self._smooth_q_dot(q_dot_raw)
-                q_rad    += q_dot * self.dt
-                self.move_to_angles(np.degrees(q_rad), header='g', ack=True)
+        def tick(i: int, t: float) -> None:
+            # Closed-loop: re-read encoder positions every tick
+            q_rad     = np.radians(self.current_angles)
+            q_dot_raw = q_dot_func(t)
+            q_dot     = self._smooth_q_dot(q_dot_raw)
+            q_rad    += q_dot * self.dt
+            self.move_to_angles(np.degrees(q_rad), header='g', ack=True)
 
-            except (ValueError, np.linalg.LinAlgError) as e:
-                print(f"[WARN] Recoverable error at step {i}: {e}")
-                break
-            except Exception as e:
-                print(f"[ERROR] Unrecoverable error at step {i}: {e}")
-                self.go_home()
-                raise
-
-            next_time = start_time + (i + 1) * self.dt
-            time.sleep(max(0.0, next_time - time.perf_counter()))
+        self._run_control_loop(n_steps, tick)
 
     def cartesian_space_vel_ctrl(
         self,
@@ -187,44 +241,34 @@ class VelocityController(BaseController):
             x_dot_func: Returns a 6D end-effector velocity [mm/s, rad/s] at t.
             duration:   Total control duration in seconds.
         """
-        n_steps    = int(duration / self.dt)
-        self._q_dot_prev = np.zeros(6)
-        start_time = time.perf_counter()
+        n_steps = int(duration / self.dt)
 
-        for i in range(n_steps):
-            t = i * self.dt
-            try:
-                # Closed-loop: read actual encoder positions each tick
-                q_rad = np.radians(self.current_angles)
-                J     = self.robot.jacob0(q_rad)
+        def tick(i: int, t: float) -> None:
+            # Closed-loop: re-read encoder positions every tick
+            q_rad = np.radians(self.current_angles)
+            J     = self.robot.jacob0(q_rad)
 
-                J_dls, S, lambda_sq = self._compute_dls_inverse(J)
+            J_dls, S, lambda_sq = self._compute_dls_inverse(J)
 
-                if self.debug and i % DEBUG_PRINT_EVERY == 0:
-                    w = float(np.prod(S))
-                    print(f"[step {i:4d}] S={np.round(S, 4)}, "
-                          f"w={w:.4f}, λ²={lambda_sq:.6f}, "
-                          f"‖J_dls‖={np.linalg.norm(J_dls):.4f}")
+            w = float(np.prod(S))
 
-                if float(np.prod(S)) < self.manipulability_threshold:
-                    print(f"[WARN] Low manipulability at step {i}: {np.prod(S):.4f}")
+            if w < self.manipulability_threshold:
+                log.warning("Low manipulability at step %d: %.4f", i, w)
 
-                x_dot     = x_dot_func(t)
-                q_dot_raw = J_dls @ x_dot
-                q_dot     = self._smooth_q_dot(q_dot_raw)
-                q_rad    += q_dot * self.dt
-                self.move_to_angles(np.degrees(q_rad), header='g', ack=True)
+            if self.debug and i % DEBUG_LOG_EVERY == 0:
+                log.debug(
+                    "[step %4d] S=%s, w=%.4f, λ²=%.6f, ‖J_dls‖=%.4f",
+                    i, np.round(S, 4), w, lambda_sq,
+                    np.linalg.norm(J_dls),
+                )
 
-            except (ValueError, np.linalg.LinAlgError) as e:
-                print(f"[WARN] Recoverable error at step {i}: {e}")
-                break
-            except Exception as e:
-                print(f"[ERROR] Unrecoverable error at step {i}: {e}")
-                self.go_home()
-                raise
+            x_dot     = x_dot_func(t)
+            q_dot_raw = J_dls @ x_dot
+            q_dot     = self._smooth_q_dot(q_dot_raw)
+            q_rad    += q_dot * self.dt
+            self.move_to_angles(np.degrees(q_rad), header='g', ack=True)
 
-            next_time = start_time + (i + 1) * self.dt
-            time.sleep(max(0.0, next_time - time.perf_counter()))
+        self._run_control_loop(n_steps, tick)
 
     # ------------------------------------------------------------------
     # Analysis utilities
@@ -257,8 +301,9 @@ class VelocityController(BaseController):
         """
         return bool(S[0] / S[-1] > threshold)
 
-    def null_space_directions(self, S: ndarray, Vt: ndarray,
-                              tol: float = 0.01) -> ndarray:
+    def null_space_directions(
+        self, S: ndarray, Vt: ndarray, tol: float = 0.01
+    ) -> ndarray:
         """Return joint-space directions that produce no end-effector motion.
 
         Args:
@@ -268,7 +313,9 @@ class VelocityController(BaseController):
         """
         return Vt[S < tol]
 
-    def force_analysis(self, desired_force: ndarray, q: ndarray) -> Dict[str, ndarray]:
+    def force_analysis(
+        self, desired_force: ndarray, q: ndarray
+    ) -> Dict[str, ndarray]:
         """Compute joint torques and force difficulty for a desired wrench.
 
         Args:
@@ -281,9 +328,9 @@ class VelocityController(BaseController):
         J = self.robot.compute_jacobian(q)
         _, S, _ = np.linalg.svd(J)
         return {
-            'joint_torques':          J.T @ desired_force,
-            'force_difficulty':       1.0 / S,
-            'hardest_force_direction': S[-1],   # smallest singular value direction
+            'joint_torques':           J.T @ desired_force,
+            'force_difficulty':        1.0 / S,
+            'hardest_force_direction': S[-1],
         }
 
     def adaptive_control_gains(
