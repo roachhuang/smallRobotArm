@@ -101,6 +101,10 @@ class RobotArm(ABC):
     @abstractmethod
     def fk(self, Jfk):
         pass
+    
+    @abstractmethod
+    def poe_fk(self, theta_list:list):
+        pass
     '''   
     def get_ti2i_1(self, i, theta=None) -> ndarray:
         """
