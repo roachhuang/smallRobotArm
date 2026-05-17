@@ -97,7 +97,7 @@ def run_demo(controller: VelocityController,
     )
 
     input("Press Enter to go home…")
-
+    controller.go_home()
 
 def main() -> int:
     """Entry point — returns 0 on success, 1 on error."""
