@@ -137,6 +137,7 @@ class VelocityController(BaseController):
               lambda_sq — Damping coefficient actually applied.
         """
         _, S, _ = np.linalg.svd(J)
+        # smallest singular value — the real risk signal
         sigma_min = float(S[-1])
 
         # Ramp damping only below the singularity threshold
@@ -146,7 +147,7 @@ class VelocityController(BaseController):
             ratio     = sigma_min / self.dls_epsilon
             lambda_sq = (LAMBDA_MAX ** 2) * (1.0 - ratio ** 2)
         lambda_sq = max(lambda_sq, LAMBDA_MIN)
-
+        # In the equation $JJ^T + lambda^2I, this lambda^2 term acts as a numerical floor.  Even if $JJ^T$ is singular and has zero eigenvalues, the combined matrix will have eigenvalues no smaller than lambda^2. This ensures the matrix is "well-conditioned" and the inverse doesn't explode
         A = J @ J.T + lambda_sq * np.eye(J.shape[0])
         try:
             J_dls = np.linalg.solve(A, J).T
