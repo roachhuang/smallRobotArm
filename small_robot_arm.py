@@ -76,11 +76,15 @@ def main() -> None:
     """    
 
     # zero positon (see fig1)
-    zero_j = (0, 0, 0, 0, 0, 0)
+    zero_j = (90, 30, 10, 20, 30, 40)
+    # zero_j = (np.pi, np.pi/2, np.pi/3, np.pi/4, np.pi/5, np.pi/6)
     T = smRobot.fkine(np.radians(zero_j))
     # j=smallRobotArm.ik(T.A)
     # smallRobotArm.move_to_angles(j)
     print(f"zero joint pose: {smallRobotArm.T2Pose(T.A)}")
+
+    T =smallRobotArm.poe_fk(list(np.radians(zero_j)))
+    print(f"zero joint pose: {smallRobotArm.T2Pose(T)}")
 
     # there must be a delay here right after sieal is initialized
     sleep(1)  # don't remove this line!!!
@@ -109,7 +113,7 @@ def main() -> None:
     # end-effector pose = the position and orientation of the robot's last link (often frame 6) relative to the robot's base frame (frame 0).
     poses0 = np.array(
         [
-            # todo: fk j = (0, 0, 0, 0, 0, 0) to see if it is home
+            # (0, 0, 0, 0, 0, 0), # to see if it is home
             (164.5, 0.0, 241.0, 90.0, 180.0, -90.0),  # Home (x, y, z, ZYZ Euler angles)
             (164.5, 0.0, 141.0, 90.0, 180.0, -90.0),  # j1
             (164.5 + 14.7, 35.4, 141.0, 90.0, 180.0, -90.0),  # j11

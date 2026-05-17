@@ -16,5 +16,5 @@ spatialmath-python >= 1.1.14
 pandas >= 1.2.4
 matplotlib >= 3.3.4
 roboticstoolbox-python == 1.1.1
-
+modern_robotics >=1.1.1
 

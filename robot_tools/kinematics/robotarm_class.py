@@ -8,9 +8,9 @@ Classes:
 """
 
 import numpy as np
+import modern_robotics as mr
 from numpy import ndarray
 from spatialmath import SE3
-
 from .robotarm_independent_class import RobotArm
 
 class SmallRbtArm(RobotArm):    
@@ -68,7 +68,44 @@ class SmallRbtArm(RobotArm):
         # tool frame. this is for generating T_6E (end-effector/gripper to {6})
         # t_6E = smallRobotArm.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
         # hand made T_6E: gripper's len + x:180,y:-90, z:0. see their coordiation system.
-        
+         # 1. Zero Configuration Matrix (Home Pose)
+        self.M = np.array([
+            [0,  0, 1, 192.5],
+            [0, -1, 0, 0],
+            [1,  0, 0, 269.0],
+            [0,  0, 0, 1],
+        ])
+        # 2. Points on the joint axes (q)    ])
+        q1=np.array([0,0,0])
+        q2=np.array([47,0,133])
+        q3=np.array([47,0,243])
+        q4=np.array([47,0,269])
+        q5=np.array([164.5,0,269])
+        q6=np.array([192.5,0,269])
+        # 3. Direction of axes (CRITICAL: Double check your physical arm's tilt axes!)
+        w1=np.array([0, 0, 1])
+        w2=np.array([0, 1, 0])
+        w3=np.array([0, 1, 0])
+        w4=np.array([1, 0, 0])
+        w5=np.array([0, 1, 0])
+        w6=np.array([1, 0, 0])
+        # 4. Linear Velocity Components (Notice the negative sign: -w x q)
+        v1=-np.cross(w1,q1)
+        v2=-np.cross(w2,q2)
+        v3=-np.cross(w3,q3)
+        v4=-np.cross(w4,q4)
+        v5=-np.cross(w5,q5)
+        v6=-np.cross(w6,q6)
+        # 5. Combine into 6x1 Screw Axis vectors (flattened)
+        s1=np.hstack([w1,v1])
+        s2=np.hstack([w2,v2])
+        s3=np.hstack([w3,v3])
+        s4=np.hstack([w4,v4])
+        s5=np.hstack([w5,v5])
+        s6=np.hstack([w6,v6])
+        # Stack them into an elegant 6 x 6 matrix where each column is a screw axis
+        self.Slist = np.column_stack((s1, s2, s3, s4, s5, s6))
+
     def inertia(self, q):        
         # Rough estimates: larger joints = higher inertia
         joint_masses = [1.5, 1.8, 0.8, 0.5, 0.4, 0.2]  # kg
@@ -273,6 +310,18 @@ class SmallRbtArm(RobotArm):
             print("Warning: arccos domain error in Joint calculations.")
             return None
 
+    def poe_fk(self, theta_list:list) -> ndarray:
+        """
+        Calculates Forward Kinematics using Product of Exponentials.
+        theta_list: array or list of 6 joint angles in radians [theta1, theta2, ..., theta6]
+        """
+
+        # 6. Calculate T(theta) using Modern Robotics library
+        # This automatically computes: e^([s1]*th1) * e^([s2]*th2) * ... * M
+        T_theta = mr.FKinSpace(self.M, self.Slist, theta_list)
+    
+        return T_theta
+    
     # todo: fk taks care of qs wrt t06 instead of t0-cup. don't do the transformation in fk.
     # @hlp.timer
     def fk(self, Jfk:tuple) -> ndarray:
