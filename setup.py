@@ -8,6 +8,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         "numpy",
+        "modern_robotics",
         "pyserial",
         "roboticstoolbox-python",
         "spatialmath-python",

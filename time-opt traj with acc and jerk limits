@@ -1,4 +1,5 @@
 import numpy as np
+import modern_robotics as mr
 
 # Sample joint path (replace with your actual path)
 joint_path = [
@@ -56,10 +57,16 @@ def generate_trajectory(path, durations, dt):
 durations = compute_time_optimal_durations(joint_path, max_velocity, max_acceleration, max_jerk)
 
 # Generate interpolated trajectory
-timestamps, trajectory = generate_trajectory(joint_path, durations, dt)
-
+# timestamps, trajectory = generate_trajectory(joint_path, durations, dt)
+q_start = np.array([1, 0, 0, 1, 1, 0.2])
+q_end = np.array([1.2, 0.5, 0.6, 1.1, 2, 2])
+Tf=8
+N=16
+traj = mr.JointTrajectory(q_start, q_end, Tf, N, 5)
 # --- Output Preview ---
-print("Trajectory shape:", trajectory.shape)
+print("Trajectory shape:", traj.shape)
 print("First 5 points:")
-for t, q in zip(timestamps[:5], trajectory[:5]):
-    print(f"t = {t:.3f}s → q = {np.round(q, 3)}")
+# The elapsed time between each row is Tf / (N - 1)
+
+for t in traj:
+    print(f"t = {t} @  {Tf/N}")

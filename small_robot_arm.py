@@ -6,9 +6,8 @@ import numpy as np
 from robot_tools.kinematics import SmallRbtArm, std_dh_params, std_dh_tbl
 from robot_tools.controller import PositionController
 from robot_tools.trajectory import Interp
-from robot_tools.trajectory.path_optimizer import PathOptimizer
+# from robot_tools.trajectory.path_optimizer import PathOptimizer
 from robot_tools.misc.signal_handler import setup_signal_handler
-
 from roboticstoolbox import DHRobot
 from spatialmath import SE3
 import sys
@@ -76,20 +75,26 @@ def main() -> None:
     """    
 
     # zero positon (see fig1)
-    zero_j = (90, 30, 10, 20, 30, 40)
-    # zero_j = (np.pi, np.pi/2, np.pi/3, np.pi/4, np.pi/5, np.pi/6)
+    # zero_j = (90, 30, 10, 20, 30, 40)
+    # zero_j = (0, 0, 0, 0, 0, 0)
+    zero_j = (np.pi, np.pi/2, np.pi/3, np.pi/4, np.pi/5, np.pi/6)
     T = smRobot.fkine(np.radians(zero_j))
     # j=smallRobotArm.ik(T.A)
     # smallRobotArm.move_to_angles(j)
     print(f"zero joint pose: {smallRobotArm.T2Pose(T.A)}")
 
     T =smallRobotArm.poe_fk(list(np.radians(zero_j)))
-    print(f"zero joint pose: {smallRobotArm.T2Pose(T)}")
-
-    # there must be a delay here right after sieal is initialized
+    print(f"zero joint pose using POE: {smallRobotArm.T2Pose(T)}")   
+       
     sleep(1)  # don't remove this line!!!
     controller.enable()  # enable the robot arm
     sleep(1)
+
+    kine_j = smallRobotArm.ik(T.A)
+    # Just move directly - poses are already well-planned    
+    controller.move_to_angles(kine_j, header="g", ack=True)
+    # there must be a delay here right after sieal is initialized
+
     # calibration
     # smallRobotArm.calibrate()
     # smallRobotArm.conn._event_ok2send.clear()    
@@ -99,6 +104,8 @@ def main() -> None:
     # T = smallRobotArm.fk(smallRobotArm.robot_rest_angles)
     # print(f"rest pose: {smallRobotArm.T2Pose(T)}")
     
+
+
     """ 
     these end-effector posese are wrt frame{0}
     initially, think of the orientation in rotation matrix is easier to understand:

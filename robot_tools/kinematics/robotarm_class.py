@@ -68,21 +68,32 @@ class SmallRbtArm(RobotArm):
         # tool frame. this is for generating T_6E (end-effector/gripper to {6})
         # t_6E = smallRobotArm.pose2T([0.0, 0.0, 50.0, 180.0, -90.0, 0.0])
         # hand made T_6E: gripper's len + x:180,y:-90, z:0. see their coordiation system.
-         # 1. Zero Configuration Matrix (Home Pose)
+        
+        # 1. Zero Configuration Matrix (all theta are zero)
         self.M = np.array([
             [0,  0, 1, 192.5],
             [0, -1, 0, 0],
             [1,  0, 0, 269.0],
             [0,  0, 0, 1],
         ])
-        # 2. Points on the joint axes (q)    ])
+        # 2. Points on the joint axes (q)
+        d1=133
+        d4=117.5
+        d6=28
+        r1=47
+        r2=110
+        r3=26
+
         q1=np.array([0,0,0])
-        q2=np.array([47,0,133])
-        q3=np.array([47,0,243])
-        q4=np.array([47,0,269])
-        q5=np.array([164.5,0,269])
-        q6=np.array([192.5,0,269])
+        q2=np.array([r1,0,d1])
+        q3=np.array([r1,0,d1+r2])
+        q4=np.array([r1,0,d1+r2+r3])
+        q5=np.array([r1+d4,0,d1+r2+r3])
+        # q5=np.array([164.5,0,269])
+        q6=np.array([r1+d4+d6,0,d1+r2+r3])
+        # q6=np.array([192.5,0,269])
         # 3. Direction of axes (CRITICAL: Double check your physical arm's tilt axes!)
+        # since the screw axis has rotation, w is a unit vector. (screw axis wrt {s})
         w1=np.array([0, 0, 1])
         w2=np.array([0, 1, 0])
         w3=np.array([0, 1, 0])
@@ -96,7 +107,7 @@ class SmallRbtArm(RobotArm):
         v4=-np.cross(w4,q4)
         v5=-np.cross(w5,q5)
         v6=-np.cross(w6,q6)
-        # 5. Combine into 6x1 Screw Axis vectors (flattened)
+        # 5. Combine into 6x1 Screw Axis vectors (flattened) in the『{s}
         s1=np.hstack([w1,v1])
         s2=np.hstack([w2,v2])
         s3=np.hstack([w3,v3])
@@ -105,6 +116,36 @@ class SmallRbtArm(RobotArm):
         s6=np.hstack([w6,v6])
         # Stack them into an elegant 6 x 6 matrix where each column is a screw axis
         self.Slist = np.column_stack((s1, s2, s3, s4, s5, s6))
+        
+        # body frame transformatin so postmultiplies M: q is expressed in the {b} frame
+        w1=np.array([0,1,0])
+        w2=np.array([0,1,0])
+        w3=np.array([0,0,1])
+        w4=np.array([0,1,0])
+        w5=np.array([0,0,1])
+        w6=np.array([0,0,1])
+        # see from {b}
+        q1=np.array([-269, 0, -192.5])
+        q2=np.array([-136, 0, -145.5])
+        q3=np.array([-26, 0, -145.5])
+        q4=np.array([0, 0, -145.5])
+        q5=np.array([0, 0, -28])
+        q6=np.array([0, 0, 0])
+        v1=-np.cross(w1, q1)
+        v2=-np.cross(w2,q2)
+        v3=-np.cross(w3,q3)
+        v4=-np.cross(w4,q4)
+        v5=-np.cross(w5,q5)
+        v6=-np.cross(w6,q6)
+        # 5. Combine into 6x1 Screw Axis vectors (flattened)
+        s1=np.hstack([w1,v1])
+        s2=np.hstack([w2,v2])
+        s3=np.hstack([w3,v3])
+        s4=np.hstack([w4,v4])
+        s5=np.hstack([w5,v5])
+        s6=np.hstack([w6,v6])
+        # Stack them into an elegant 6 x 6 matrix where each column is a screw axis
+        self.Slist_body = np.column_stack((s1, s2, s3, s4, s5, s6))
 
     def inertia(self, q):        
         # Rough estimates: larger joints = higher inertia
@@ -114,10 +155,14 @@ class SmallRbtArm(RobotArm):
         extension_factor = 1 + 0.5 * np.abs(q[1])  # Based on joint 2 angle
         base_inertia = np.diag(joint_masses)
         return base_inertia * extension_factor
-
-    def jacob0(self, q)->ndarray:
-        """Compute Jacobian matrix from DH parameters.
         
+    def poe_jacob(self, Slist:ndarray, thetaList:list)->ndarray:
+        # return mr.JacobianBody(Slist, thetaList)
+        return mr.JacobianSpace(Slist, thetaList)
+
+    def jaco0(self, q)->ndarray:
+        """Compute Jacobian matrix from DH parameters.
+            JacoSpace
         Args:
             q: Joint angles in radians (6x1)
             
