@@ -11,6 +11,7 @@ import numpy as np
 from roboticstoolbox import DHRobot
 
 from robot_tools.kinematics import SmallRbtArm, std_dh_params, std_dh_tbl
+from robot_tools.kinematics import jacobians as jk
 from robot_tools.controller import VelocityController
 from robot_tools.misc.signal_handler import setup_signal_handler
 from robot_tools.trajectory.motion_patterns import MotionPatterns
@@ -46,9 +47,13 @@ POSITION_SETTLE_S = 2             # s — after move_to_angles()
 def check_jacobians(custom_robot: SmallRbtArm,
                     toolbox_robot: DHRobot,
                     q_test: np.ndarray) -> None:
-    """Compare custom and toolbox Jacobians; raise if they diverge."""
-    J_custom  = custom_robot.jacob0(q_test)
-    J_toolbox = toolbox_robot.jacob0(q_test)
+    """Compare custom and toolbox Jacobians; raise if they diverge.
+
+    Both sides compared in robot_tools' canonical MR block order
+    ([omega; v], EE-point referenced) via the named converters.
+    """
+    J_custom  = custom_robot.compute_jacobian(q_test)
+    J_toolbox = jk.jacobian_geometric_from_rtb(toolbox_robot, q_test)
     max_diff  = np.max(np.abs(J_custom - J_toolbox))
     print(f"Jacobian shapes — custom: {J_custom.shape}, toolbox: {J_toolbox.shape}")
     print(f"Max element-wise difference: {max_diff:.6f}")
@@ -106,7 +111,8 @@ def run_demo(controller: VelocityController,
     sleep(POSITION_SETTLE_S)
 
     # --- approach: move +X by CIRCLE_RADIUS_MM to reach circle perimeter ---
-    x_dot_approach = np.array([APPROACH_VEL_X_MM_S, 0.0, 0.0, 0.0, 0.0, 0.0])
+    # Canonical MR twist order [omega; v] — linear X goes in the last 3 slots.
+    x_dot_approach = np.array([0.0, 0.0, 0.0, APPROACH_VEL_X_MM_S, 0.0, 0.0])
     controller.cartesian_space_vel_ctrl(
         x_dot_func=lambda t: x_dot_approach,
         duration=APPROACH_DURATION_S,

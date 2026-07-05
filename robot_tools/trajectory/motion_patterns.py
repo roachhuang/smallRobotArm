@@ -22,16 +22,16 @@ class MotionPatterns:
             vx += -n * speed * np.sin(n * omega * t)
             vy += n * speed * np.cos(n * omega * t)
 
-        x_dot[0] = vx
-        x_dot[1] = vy
+        x_dot[3] = vx
+        x_dot[4] = vy
         return x_dot
     
     @staticmethod
     def figure8(t: float, radius: float = 30, freq: float = 1.0) -> ndarray:
         """Generate velocity vector for figure-eight pattern in XY plane."""
         v = np.zeros(6)
-        v[0] = -radius * 2 * np.pi * freq * np.sin(2 * np.pi * freq * t)
-        v[1] = radius * 2 * np.pi * freq * np.cos(4 * np.pi * freq * t)
+        v[3] = -radius * 2 * np.pi * freq * np.sin(2 * np.pi * freq * t)
+        v[4] = radius * 2 * np.pi * freq * np.cos(4 * np.pi * freq * t)
         return v
     
     @staticmethod
@@ -39,8 +39,8 @@ class MotionPatterns:
         """Generate velocity vector for spiral motion in XY plane."""
         r = radius_rate * t
         v = np.zeros(6)
-        v[0] = -r * angular_speed * np.sin(angular_speed * t) + radius_rate * np.cos(angular_speed * t)
-        v[1] = r * angular_speed * np.cos(angular_speed * t) + radius_rate * np.sin(angular_speed * t)
+        v[3] = -r * angular_speed * np.sin(angular_speed * t) + radius_rate * np.cos(angular_speed * t)
+        v[4] = r * angular_speed * np.cos(angular_speed * t) + radius_rate * np.sin(angular_speed * t)
         return v
     
     @staticmethod
@@ -48,8 +48,8 @@ class MotionPatterns:
         """Generate velocity vector for zigzag motion in XY plane."""
         v = np.zeros(6)
         step = int((t / (period / 4)) % 2)
-        v[0] = side_length / (period / 4) if step == 0 else -side_length / (period / 4)
-        v[1] = 10 * np.sin(4 * np.pi * t / period)
+        v[3] = side_length / (period / 4) if step == 0 else -side_length / (period / 4)
+        v[4] = 10 * np.sin(4 * np.pi * t / period)
         return v
     
     @staticmethod
@@ -60,10 +60,10 @@ class MotionPatterns:
         speed = side_length / edge_time
         phase = int(t / edge_time) % 4
         
-        if phase == 0: v[0] = speed
-        elif phase == 1: v[2] = -speed
-        elif phase == 2: v[0] = -speed
-        elif phase == 3: v[2] = speed
+        if phase == 0: v[3] = speed
+        elif phase == 1: v[5] = -speed
+        elif phase == 2: v[3] = -speed
+        elif phase == 3: v[5] = speed
         return v
     
     @staticmethod

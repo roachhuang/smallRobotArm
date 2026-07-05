@@ -12,6 +12,7 @@ import modern_robotics as mr
 from numpy import ndarray
 from spatialmath import SE3
 from .robotarm_independent_class import RobotArm
+from . import jacobians as jk
 
 class SmallRbtArm(RobotArm):    
     """Small Robot Arm kinematics implementation.
@@ -116,38 +117,11 @@ class SmallRbtArm(RobotArm):
         s6=np.hstack([w6,v6])
         # Stack them into an elegant 6 x 6 matrix where each column is a screw axis
         self.Slist = np.column_stack((s1, s2, s3, s4, s5, s6))
-        
-        # body frame transformatin so postmultiplies M: q is expressed in the {b} frame
-        w1=np.array([0,1,0])
-        w2=np.array([0,1,0])
-        w3=np.array([0,0,1])
-        w4=np.array([0,1,0])
-        w5=np.array([0,0,1])
-        w6=np.array([0,0,1])
-        # see from {b}
-        q1=np.array([-269, 0, -192.5])
-        q2=np.array([-136, 0, -145.5])
-        q3=np.array([-26, 0, -145.5])
-        q4=np.array([0, 0, -145.5])
-        q5=np.array([0, 0, -28])
-        q6=np.array([0, 0, 0])
-        v1=-np.cross(w1, q1)
-        v2=-np.cross(w2,q2)
-        v3=-np.cross(w3,q3)
-        v4=-np.cross(w4,q4)
-        v5=-np.cross(w5,q5)
-        v6=-np.cross(w6,q6)
-        # 5. Combine into 6x1 Screw Axis vectors (flattened)
-        s1=np.hstack([w1,v1])
-        s2=np.hstack([w2,v2])
-        s3=np.hstack([w3,v3])
-        s4=np.hstack([w4,v4])
-        s5=np.hstack([w5,v5])
-        s6=np.hstack([w6,v6])
-        # Stack them into an elegant 6 x 6 matrix where each column is a screw axis
-        self.Slist_body = np.column_stack((s1, s2, s3, s4, s5, s6))
 
-    def inertia(self, q):        
+        # Body-frame screw axes, MR Eq. 5.20: Blist = [Ad_{M^-1}] Slist
+        self.Blist = mr.Adjoint(mr.TransInv(self.M)) @ self.Slist
+
+    def inertia(self, q):
         # Rough estimates: larger joints = higher inertia
         joint_masses = [1.5, 1.8, 0.8, 0.5, 0.4, 0.2]  # kg
         """Configuration-dependent fake inertia."""
@@ -156,59 +130,23 @@ class SmallRbtArm(RobotArm):
         base_inertia = np.diag(joint_masses)
         return base_inertia * extension_factor
         
-    def poe_jacob(self, Slist:ndarray, thetaList:list)->ndarray:
-        # return mr.JacobianBody(Slist, thetaList)
-        return mr.JacobianSpace(Slist, thetaList)
+    def jacobian_space(self, q: ndarray) -> ndarray:
+        """Space Jacobian J_s(q), MR Eq. 5.11. Rows [omega; v], frame {s}."""
+        return jk.jacobian_space(self.Slist, q)
 
-    def jaco0(self, q)->ndarray:
-        """Compute Jacobian matrix from DH parameters.
-            JacoSpace
-        Args:
-            q: Joint angles in radians (6x1)
-            
-        Returns:
-            6x6 Jacobian matrix in world frame coordinates
-        """
-        n = len(q)
-        J = np.zeros((6, n))
-        
-        # Compute transformation matrices T_0^i for each joint
-        T = np.eye(4)
-        T_list = [T.copy()]  # T_0^0 = I
-        
-        for i in range(n):
-            alpha, a, d = self.dhTbl[i]
-            theta = q[i] + self.th_offsets[i]  # Add offset
-            
-            # Standard DH transformation matrix
-            ct, st = np.cos(theta), np.sin(theta)
-            ca, sa = np.cos(alpha), np.sin(alpha)
-            
-            Ti = np.array([
-                [ct, -st*ca, st*sa, a*ct],
-                [st, ct*ca, -ct*sa, a*st],
-                [0, sa, ca, d],
-                [0, 0, 0, 1]
-            ])
-            
-            T = T @ Ti
-            T_list.append(T.copy())  # T_0^(i+1)
-        
-        # End-effector position
-        p_n = T_list[-1][:3, 3]
-        
-        # Compute Jacobian columns
-        for i in range(n):
-            # z-axis and origin of frame i
-            z_i = T_list[i][:3, 2]  # z-axis of frame i
-            p_i = T_list[i][:3, 3]  # origin of frame i
-            
-            # Jacobian column for joint i
-            J[:3, i] = np.cross(z_i, p_n - p_i)  # Linear velocity
-            J[3:, i] = z_i                        # Angular velocity
-        
-        return J
-    
+    def jacobian_body(self, q: ndarray) -> ndarray:
+        """Body Jacobian J_b(q), MR Eq. 5.18. Rows [omega; v], frame {b}."""
+        return jk.jacobian_body(self.Blist, q)
+
+    def jacobian_geometric(self, q: ndarray) -> ndarray:
+        """Geometric Jacobian: MR block order [omega; v], EE-point referenced."""
+        p_ee = self.poe_fk(q)[0:3, 3]
+        return jk.spatial_to_geometric(self.jacobian_space(q), p_ee)
+
+    def compute_jacobian(self, q: ndarray) -> ndarray:
+        """Jacobian contract for the force controllers: geometric, EE-point wrench [m; f]."""
+        return self.jacobian_geometric(q)
+
     def convert_p_dc_to_T06(self, p:tuple)->ndarray:
         """
         Convert a desk/cup pose to the robot's joint-space transformation matrix T0_6.

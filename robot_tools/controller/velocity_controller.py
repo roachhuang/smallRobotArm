@@ -15,6 +15,7 @@ import numpy as np
 from numpy import ndarray
 
 from .base_controller import BaseController
+from ..kinematics import jacobians as jk
 
 log = logging.getLogger(__name__)
 
@@ -239,7 +240,8 @@ class VelocityController(BaseController):
         drift accumulation.
 
         Args:
-            x_dot_func: Returns a 6D end-effector velocity [mm/s, rad/s] at t.
+            x_dot_func: Returns a 6D end-effector twist [omega, v] (rad/s,
+                mm/s) at t, robot_tools' canonical MR block order.
             duration:   Total control duration in seconds.
         """
         n_steps = int(duration / self.dt)
@@ -247,7 +249,9 @@ class VelocityController(BaseController):
         def tick(i: int, t: float) -> None:
             # Closed-loop: re-read encoder positions every tick
             q_rad = np.radians(self.current_angles)
-            J     = self.robot.jacob0(q_rad)
+            # Named producer, not a raw robot.jacob0() call — J already in
+            # robot_tools' canonical MR block order ([omega; v]).
+            J     = jk.jacobian_geometric_from_rtb(self.robot, q_rad)
 
             J_dls, S, lambda_sq = self._compute_dls_inverse(J)
 
@@ -271,7 +275,7 @@ class VelocityController(BaseController):
 
         self._run_control_loop(n_steps, tick)
 
-    def get_q_dot_for_straight_line(J, T_sb, v_world, omega_world):
+    def get_q_dot_for_straight_line(self, J, T_sb, v_world, omega_world):
         """
         根據世界座標系下的常規速度，計算 modern_robotics 空間雅可比所需的 q_dot
         
