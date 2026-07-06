@@ -29,9 +29,10 @@ class ForceController(BaseController):
         self.force_threshold = 2.0  # Contact detection threshold (N)
         
         # Impedance control parameters
-        self.K_p = np.diag([1000, 1000, 1000, 100, 100, 100])  # Position stiffness
-        self.K_d = np.diag([50, 50, 50, 10, 10, 10])  # Damping
-        self.M_d = np.diag([1, 1, 1, 0.1, 0.1, 0.1])  # Desired inertia
+        # MR block order [angular; linear]: rotational gains first
+        self.K_p = np.diag([100, 100, 100, 1000, 1000, 1000])  # Stiffness
+        self.K_d = np.diag([10, 10, 10, 50, 50, 50])  # Damping
+        self.M_d = np.diag([0.1, 0.1, 0.1, 1, 1, 1])  # Desired inertia
         
         # Compliant motion parameters
         self.compliance_gain = 0.1  # How much to yield to forces
@@ -40,9 +41,9 @@ class ForceController(BaseController):
     
     def read_force_sensor(self):
         """Read force/torque from sensor.
-        
+
         Returns:
-            6D force/torque vector [Fx, Fy, Fz, Mx, My, Mz]
+            6D wrench in MR order [Mx, My, Mz, Fx, Fy, Fz] (moment first)
         """
         if not self.force_sensor_available:
             # Simulate force reading or return zeros
@@ -78,7 +79,10 @@ class ForceController(BaseController):
         f_external = self.filter_force(self.read_force_sensor())
         
         # Calculate position and velocity errors
-        x_error = np.array(x_desired) - np.array(x_current)
+        # T2Pose returns [x,y,z, rx,ry,rz] (position first); reorder to MR
+        # block order [angular; linear] before applying the gain matrices.
+        err = np.array(x_desired) - np.array(x_current)
+        x_error = np.concatenate([err[3:6], err[0:3]])
         # x_dot_current would need velocity estimation
         x_dot_current = np.zeros(6)  # Placeholder
         x_dot_error = x_dot_desired - x_dot_current
@@ -220,7 +224,8 @@ class ForceController(BaseController):
         
         # Convert Cartesian velocity to joint velocity
         try:
-            q_dot = np.linalg.pinv(J) @ np.concatenate([cartesian_velocity, [0, 0, 0]])
+            # Twist in MR order [omega; v]: zero angular, linear last
+            q_dot = np.linalg.pinv(J) @ np.concatenate([[0, 0, 0], cartesian_velocity])
             q_new = q_current + q_dot * self.dt
             self.move_to_angles(np.degrees(q_new))
         except np.linalg.LinAlgError:

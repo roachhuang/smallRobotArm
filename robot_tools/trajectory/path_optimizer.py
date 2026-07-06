@@ -7,15 +7,18 @@ import numpy as np
 from numpy import ndarray
 from typing import List
 
+from robot_tools.kinematics import jacobians as jk
+
 class PathOptimizer:
     """Path optimizer for robot trajectory planning."""
-    
+
     def __init__(self, robot):
         self.robot = robot
-    
+
     def eigen_analysis(self, q: ndarray) -> dict:
         """Perform eigenvalue analysis of robot Jacobian and inertia matrices."""
-        J = self.robot.jacob0(q)
+        J = (self.robot.jacobian_space(q) if hasattr(self.robot, 'jacobian_space')
+             else jk.jacobian_space_from_rtb(self.robot, q))
         M = self.robot.inertia(q)
         
         U, S, Vt = np.linalg.svd(J)
