@@ -275,35 +275,6 @@ class VelocityController(BaseController):
 
         self._run_control_loop(n_steps, tick)
 
-    def get_q_dot_for_straight_line(self, J, T_sb, v_world, omega_world):
-        """
-        根據世界座標系下的常規速度，計算 modern_robotics 空間雅可比所需的 q_dot
-        
-        :param Js: 當前的 6xn 空間雅可比矩陣 (mr.JacobianSpace)
-        :param T_sb: 當前末端相對於基座的 4x4 正向運動學矩陣
-        :param v_world: 世界座標系下的目標線速度 [vx, vy, vz]
-        :param omega_world: 世界座標系下的目標角速度 [wx, wy, wz]
-        :return: 關節速度 q_dot (list)
-        """
-        # 1. 提取末端當前在世界座標系下的位置 p = [x, y, z]
-        p = T_sb[0:3, 3]
-        
-        # 2. 將常規速度轉換為 Modern Robotics 的空間線速度 (Spatial Velocity)
-        # 公式：v_spatial = v_world - (omega_world x p)
-        # 這裡使用了我們前面討論過的向量外積 (np.cross)
-        
-        v_spatial = np.array(v_world) - np.cross(omega_world, p)
-        
-        # 3. 組合出 Modern Robotics 預設排列的 6x1 空間旋量 [omega; v]
-        spatial_twist = np.concatenate((omega_world, v_spatial))
-        
-        # 4. 使用虛擬逆矩陣計算關節速度
-        Js_pinv = np.linalg.pinv(J)
-        q_dot_array = Js_pinv @ spatial_twist
-        
-        # 5. 轉換為 list 輸出
-        return q_dot_array.tolist()
-
     # ------------------------------------------------------------------
     # Analysis utilities
     # ------------------------------------------------------------------
@@ -347,26 +318,7 @@ class VelocityController(BaseController):
         """
         return Vt[S < tol]
 
-    def force_analysis(
-        self, desired_force: ndarray, q: ndarray
-    ) -> Dict[str, ndarray]:
-        """Compute joint torques and force difficulty for a desired wrench.
-
-        Args:
-            desired_force: 6D desired end-effector wrench.
-            q:             Joint angles in radians.
-
-        Returns:
-            Dict with joint_torques, force_difficulty, hardest_force_direction.
-        """
-        J = self.robot.compute_jacobian(q)
-        _, S, _ = np.linalg.svd(J)
-        return {
-            'joint_torques':           J.T @ desired_force,
-            'force_difficulty':        1.0 / S,
-            'hardest_force_direction': S[-1],
-        }
-
+   
     def adaptive_control_gains(
         self, S: ndarray
     ) -> tuple[ndarray, ndarray]:

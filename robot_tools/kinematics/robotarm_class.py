@@ -13,6 +13,7 @@ from numpy import ndarray
 from spatialmath import SE3
 from .robotarm_independent_class import RobotArm
 from . import jacobians as jk
+from robot_tools.kinematics.numerical_ik import solve_ik_with_restarts, IKResult
 
 class SmallRbtArm(RobotArm):    
     """Small Robot Arm kinematics implementation.
@@ -51,8 +52,12 @@ class SmallRbtArm(RobotArm):
         super().__init__()        
         self.dhTbl = std_dh_tbl  
         self.dof=6
-        self.max_qlimits = ( 130, 130.0, 73.9,  50, 120, 180) 
+        self.max_qlimits = ( 130, 130.0, 73.9,  50, 120, 180)
         self.min_qlimits = (-130, -78.5, -66, -30, -90, -180)
+        # (n, 2) [lower, upper] per joint in radians, for solve_ik_with_restarts
+        self.joint_limits = np.radians(
+            np.column_stack((self.min_qlimits, self.max_qlimits))
+        )
         self.th_offsets = (0.0, -np.pi / 2, 0.0, 0.0, 0.0, 0.0)
         # self.controller = None
       
@@ -182,7 +187,19 @@ class SmallRbtArm(RobotArm):
             max(min(a, max_val), min_val)
             for a, max_val, min_val in zip(angles, self.max_qlimits, self.min_qlimits)
         ]
-        
+    
+    def ik_numerical(self, T_sd, q0=None, **kwargs) -> IKResult:
+        """Numerical IK (MR Ch. 6.2) refined from a seed.
+
+        Seed priority: caller's q0 > closed-form geometric IK > zero config.
+        """
+        if q0 is None:
+            j_deg = self.ik(T_sd)  # hybrid per MR 6.2 intro
+            q0 = np.radians(j_deg) if j_deg is not None else np.zeros(self.dof)
+        return solve_ik_with_restarts(
+            self.Slist, self.M, T_sd, q0,
+            joint_limits=self.joint_limits, **kwargs)
+    
     # @hlp.timer
     def ik(self, T_06: ndarray) -> tuple | None:
         """

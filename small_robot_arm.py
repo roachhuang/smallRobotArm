@@ -46,7 +46,6 @@ from robot_tools.controller import FeedforwardController
 # # Tune parameters
 # controller.set_compensation_parameters(gravity_scale=0.9)
 
-
 # smallRobotArm = None  # Declare at module level
 
 def main() -> None:
@@ -76,8 +75,8 @@ def main() -> None:
 
     # zero positon (see fig1)
     # zero_j = (90, 30, 10, 20, 30, 40)
-    # zero_j = (0, 0, 0, 0, 0, 0)
-    zero_j = (np.pi, np.pi/2, np.pi/3, np.pi/4, np.pi/5, np.pi/6)
+    zero_j = (0, 0, 0, 0, 0, 0)
+    # zero_j = (np.pi, np.pi/2, np.pi/3, np.pi/4, np.pi/5, np.pi/6)
     T = smRobot.fkine(np.radians(zero_j))
     # j=smallRobotArm.ik(T.A)
     # smallRobotArm.move_to_angles(j)
@@ -103,8 +102,6 @@ def main() -> None:
     
     # T = smallRobotArm.fk(smallRobotArm.robot_rest_angles)
     # print(f"rest pose: {smallRobotArm.T2Pose(T)}")
-    
-
 
     """ 
     these end-effector posese are wrt frame{0}
