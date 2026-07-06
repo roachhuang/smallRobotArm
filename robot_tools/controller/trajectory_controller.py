@@ -176,9 +176,10 @@ class TrajectoryController(BaseController):
         joint_waypoints = []
         
         for pose in poses:
-            # Assuming pose is 6D: [x, y, z, rx, ry, rz]
+            # pose is 6D: [x, y, z, rx, ry, rz]
             if hasattr(self.robot, 'ik'):
-                joints = self.robot.ik(pose)
+                T_06 = self.robot.convert_p_dc_to_T06(pose)
+                joints = self.robot.ik(T_06)
                 joint_waypoints.append(joints)
             else:
                 raise NotImplementedError("Robot must have ik() method for Cartesian trajectories")

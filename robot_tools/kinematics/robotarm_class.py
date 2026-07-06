@@ -145,14 +145,14 @@ class SmallRbtArm(RobotArm):
 
     def jacobian_geometric(self, q: ndarray) -> ndarray:
         """Geometric Jacobian: MR block order [omega; v], EE-point referenced."""
-        p_ee = self.poe_fk(q)[0:3, 3]
+        p_ee = self.poe_fk(q).t
         return jk.spatial_to_geometric(self.jacobian_space(q), p_ee)
 
     def compute_jacobian(self, q: ndarray) -> ndarray:
         """Jacobian contract for the force controllers: geometric, EE-point wrench [m; f]."""
         return self.jacobian_geometric(q)
 
-    def convert_p_dc_to_T06(self, p:tuple)->ndarray:
+    def convert_p_dc_to_T06(self, p:tuple)->SE3:
         """
         Convert a desk/cup pose to the robot's joint-space transformation matrix T0_6.
 
@@ -160,13 +160,13 @@ class SmallRbtArm(RobotArm):
             p (tuple): A 6-element tuple containing (x, y, z, roll, pitch, yaw) in mm and degrees.
 
         Returns:
-            ndarray: 4x4 transformation matrix representing the pose in the robot's joint frame.
+            SE3: transformation representing the pose in the robot's joint frame.
         """
-        
+
         T_dc = SE3.Trans(p[0:3]) * SE3.RPY(p[3:6], order="zyx", unit="deg")
         T_wc = self.T_wd @ T_dc.A
         T_06 = self.T_w0_inv @ T_wc @ self.T_6c_inv
-        return T_06        
+        return SE3(T_06)
         
     def limit_joint_angles(self, angles):
         """Limit joint angles to specified max/min values.
@@ -188,7 +188,7 @@ class SmallRbtArm(RobotArm):
             for a, max_val, min_val in zip(angles, self.max_qlimits, self.min_qlimits)
         ]
     
-    def ik_numerical(self, T_sd, q0=None, **kwargs) -> IKResult:
+    def ik_numerical(self, T_sd: SE3, q0=None, **kwargs) -> IKResult:
         """Numerical IK (MR Ch. 6.2) refined from a seed.
 
         Seed priority: caller's q0 > closed-form geometric IK > zero config.
@@ -197,14 +197,14 @@ class SmallRbtArm(RobotArm):
             j_deg = self.ik(T_sd)  # hybrid per MR 6.2 intro
             q0 = np.radians(j_deg) if j_deg is not None else np.zeros(self.dof)
         return solve_ik_with_restarts(
-            self.Slist, self.M, T_sd, q0,
+            self.Slist, self.M, T_sd.A, q0,
             joint_limits=self.joint_limits, **kwargs)
     
     # @hlp.timer
-    def ik(self, T_06: ndarray) -> tuple | None:
+    def ik(self, T_06: SE3) -> tuple | None:
         """
         in general, the T taken in is the desired pose of the end-effector frame relative to the world frame)
-        
+
         arg:
             pose: end-effector pose in cartension space.
             position is retrieve from T_06.
@@ -212,13 +212,14 @@ class SmallRbtArm(RobotArm):
         return:
             4 decimaled joints angles in degrees.
         """
+        T_06 = T_06.A
         (_, r1, d1) = self.dhTbl[0, :]
         r2 = self.dhTbl[1, 1]
         (_, r3, d3) = self.dhTbl[2, :]
         d4 = self.dhTbl[3, 2]
         d6 = self.dhTbl[5, 2]
 
-        Jik = np.zeros((6,), dtype=np.float64)        
+        Jik = np.zeros((6,), dtype=np.float64)
 
         # T_06 = T_0E @ self.T_6E_inv
         wrist_position = T_06[:3, 3] - d6 * T_06[:3, 2]
@@ -310,7 +311,7 @@ class SmallRbtArm(RobotArm):
             print("Warning: arccos domain error in Joint calculations.")
             return None
 
-    def poe_fk(self, theta_list:list) -> ndarray:
+    def poe_fk(self, theta_list:list) -> SE3:
         """
         Calculates Forward Kinematics using Product of Exponentials.
         theta_list: array or list of 6 joint angles in radians [theta1, theta2, ..., theta6]
@@ -319,8 +320,8 @@ class SmallRbtArm(RobotArm):
         # 6. Calculate T(theta) using Modern Robotics library
         # This automatically computes: e^([s1]*th1) * e^([s2]*th2) * ... * M
         T_theta = mr.FKinSpace(self.M, self.Slist, theta_list)
-    
-        return T_theta
+
+        return SE3(T_theta)
     
     # todo: fk taks care of qs wrt t06 instead of t0-cup. don't do the transformation in fk.
     # @hlp.timer

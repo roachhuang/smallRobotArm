@@ -6,6 +6,7 @@ for optimal motion control of stepper motor robot arms.
 
 import numpy as np
 from typing import List, Tuple, Callable, Optional
+from spatialmath import SE3
 from .trajectory_controller import TrajectoryController
 from .feedforward_controller import FeedforwardController
 
@@ -75,7 +76,7 @@ class HybridController(TrajectoryController, FeedforwardController):
                 self.move_to_angles(tuple(np.degrees(compensated_pos)), header="g", ack=False)
                 self.current_angles = tuple(np.degrees(pos))  # Track actual commanded position
     
-    def execute_compensated_cartesian_trajectory(self, poses: List[np.ndarray], 
+    def execute_compensated_cartesian_trajectory(self, poses: List[SE3],
                                                duration: float) -> None:
         """Execute Cartesian trajectory with compensation."""
         # Convert to joint space

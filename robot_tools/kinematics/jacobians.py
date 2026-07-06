@@ -121,15 +121,22 @@ def mr_to_rtb_jacobian(J_s: np.ndarray, p_ee: np.ndarray) -> np.ndarray:
 
 # ------------------------------------------------------------- analysis
 
-def sigma_min(J: np.ndarray) -> float:
+def sigma_min(J_or_S: np.ndarray) -> float:
     """Smallest singular value; near-singularity measure (MR Sec. 5.4).
 
     Frame-invariant in the sense that J_b and J_s share rank, but the
     numeric value differs between them (Adjoint is not orthogonal) -
     compare thresholds against ONE convention. robot_tools standard:
     evaluate on the SPACE Jacobian.
+
+    Accepts either a Jacobian matrix (SVD computed here) or an
+    already-computed 1-D array of singular values, so callers that also
+    need the full spectrum (e.g. for manipulability) don't pay for a
+    second SVD.
     """
-    return float(np.linalg.svd(np.asarray(J), compute_uv=False)[-1])
+    arr = np.asarray(J_or_S)
+    S = arr if arr.ndim == 1 else np.linalg.svd(arr, compute_uv=False)
+    return float(S[-1])
 
 
 def joint_torques_from_wrench(J: np.ndarray, F: np.ndarray) -> np.ndarray:

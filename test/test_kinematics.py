@@ -1,5 +1,6 @@
 import unittest
 import numpy as np
+from spatialmath import SE3
 from robot_tools.kinematics.transforms import TransformationUtils
 from robot_tools.kinematics.joint_limits import JointLimits
 from robot_tools.kinematics.robotarm_class import SmallRbtArm
@@ -71,9 +72,9 @@ class TestKinematics(unittest.TestCase):
         # Test with a known configuration
         joint_angles = (30, 45, -30, 20, 10, 5)
         T = self.robot.fk(joint_angles)
-        
+
         # Calculate IK solution
-        ik_solution = self.robot.ik(T)
+        ik_solution = self.robot.ik(SE3(T))
         
         # Verify solution exists
         self.assertIsNotNone(ik_solution)

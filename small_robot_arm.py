@@ -89,8 +89,8 @@ def main() -> None:
     controller.enable()  # enable the robot arm
     sleep(1)
 
-    kine_j = smallRobotArm.ik(T.A)
-    # Just move directly - poses are already well-planned    
+    kine_j = smallRobotArm.ik(T)
+    # Just move directly - poses are already well-planned
     controller.move_to_angles(kine_j, header="g", ack=True)
     # there must be a delay here right after sieal is initialized
 
@@ -166,7 +166,7 @@ def main() -> None:
         # T_0E = smallRobotArm.pose2T(pose, seq="zyz")
         
         # euler angles ZYZ according to smallrobot arm's demo
-        kine_j = smallRobotArm.ik(T_se3.A)
+        kine_j = smallRobotArm.ik(T_se3)
         # Just move directly - poses are already well-planned
         controller.move_to_angles(kine_j, header="g", ack=True)
         '''

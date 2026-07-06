@@ -137,10 +137,10 @@ class VelocityController(BaseController):
               S         — Singular values, shape (6,), descending.
               lambda_sq — Damping coefficient actually applied.
         """
-        _, S, _ = np.linalg.svd(J)
+        S = np.linalg.svd(J, compute_uv=False)
         # smallest singular value — the real risk signal
-        sigma_min = float(S[-1])
-
+        sigma_min = jk.sigma_min(S)
+        
         # Ramp damping only below the singularity threshold
         if sigma_min >= self.dls_epsilon:
             lambda_sq = 0.0

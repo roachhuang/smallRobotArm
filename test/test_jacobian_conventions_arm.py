@@ -27,11 +27,11 @@ def _rand_q():
 
 def test_poe_and_dh_models_agree():
     """Sanity: PoE FK == toolbox DH FK (same robot, same q)."""
-    assert np.allclose(arm.poe_fk(np.zeros(6)), toolbox.fkine(np.zeros(6)).A,
+    assert np.allclose(arm.poe_fk(np.zeros(6)).A, toolbox.fkine(np.zeros(6)).A,
                        atol=1e-9), "zero-config mismatch: M vs fkine(0)"
     for _ in range(20):
         q = _rand_q()
-        assert np.allclose(arm.poe_fk(q), toolbox.fkine(q).A, atol=1e-8)
+        assert np.allclose(arm.poe_fk(q).A, toolbox.fkine(q).A, atol=1e-8)
 
 
 def test_rtb_cross_validation_needs_both_corrections():
@@ -45,7 +45,7 @@ def test_rtb_cross_validation_needs_both_corrections():
         assert np.allclose(J_geo, J_rtb_mr, atol=1e-8)
 
         # full spatial round trip
-        p_ee = arm.poe_fk(q)[0:3, 3]
+        p_ee = arm.poe_fk(q).t
         assert np.allclose(jk.rtb_to_mr_jacobian(toolbox.jacob0(q), p_ee),
                            arm.jacobian_space(q), atol=1e-8)
 

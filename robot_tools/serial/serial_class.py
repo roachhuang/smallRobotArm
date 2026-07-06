@@ -14,6 +14,14 @@ import logging
 from threading import Thread, Event, Lock
 import robot_tools.misc.helpers as hlp
 
+# Per-attempt ack wait before retrying (normal round trip is ~6-20ms, per
+# send2Arduino's docstring, so this comfortably avoids spurious retries).
+SEND_RETRY_TIMEOUT_S = 0.5
+# Max resend attempts on buffer_full/no-ack before giving up. 20 * 0.5s = 10s
+# worst case -- shorter than, and actually retries unlike, the old flat 20s
+# single wait that silently dropped the command.
+MAX_SEND_RETRIES = 20
+
 class SerialPort:
     """Serial port manager for Arduino communication.
     
@@ -129,36 +137,40 @@ class SerialPort:
     @hlp.timer
     def send2Arduino(self, cmd: dict) -> None:
         """
-        constrain the speed of sending a CMD to arduino in about 10~20ms. avoid faster than it!!! 
+        constrain the speed of sending a CMD to arduino in about 10~20ms. avoid faster than it!!!
         send robot cmd to arduino
         Args:
             ser (_type_): _description_
             header (str): cmd type
             j (float): theta in deg for 6 axes
             bWaitAck (bool): wait for ack from arduino or not
+
+        Retries on buffer_full/no-ack: the Arduino's command buffer can fill
+        during sustained streaming (e.g. velocity control), in which case it
+        replies "buffer_full" and drops the command instead of queuing it.
+        Resend the same command after a short wait rather than waiting the
+        full timeout once and losing it.
         """
         if self.ser and self.ser.is_open:
             msg = "{}{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}\n".format(
                 cmd["header"], *cmd["joint_angle"]
             )
             try:
-                # self.i = 0
-                # self._event_ok2send.set()
-                # while (self.i < 1): # retry if buffer is full
-                #     if self._event_ok2send:
-                #         self.ser.write(msg.encode("utf-8"))
-                #         self._event_ok2send.clear()
-                        # time.sleep(0.05)
-                
-                # logging.debug(f"Sent command: {msg.strip()}")
                 if cmd["ack"]:
-                    self.ser.write(msg.encode("utf-8"))                           
-                    self._event_ok2send.clear()
-                    # print("[DEBUG] Waiting for ack...")
-                    # timeout must be >= 15
-                    if not self._event_ok2send.wait(timeout=20):  # timeout added.
-                        logging.error("Timeout waiting for Arduino acknowledgement.")
-                       
+                    for attempt in range(MAX_SEND_RETRIES):
+                        self._event_ok2send.clear()
+                        self.ser.write(msg.encode("utf-8"))
+                        if self._event_ok2send.wait(timeout=SEND_RETRY_TIMEOUT_S):
+                            return
+                        logging.warning(
+                            "No ack within %.2fs (buffer full?); retry %d/%d",
+                            SEND_RETRY_TIMEOUT_S, attempt + 1, MAX_SEND_RETRIES,
+                        )
+                    logging.error(
+                        "Timeout waiting for Arduino acknowledgement after %d retries.",
+                        MAX_SEND_RETRIES,
+                    )
+
             except serial.SerialTimeoutException:
                 logging.error("Serial write timeout.")
             except serial.SerialException as e:
